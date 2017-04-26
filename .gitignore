@@ -1,0 +1,12 @@
+*.pyc
+MANIFEST
+dist
+build
+.DS_Store
+/.idea
+/.tox
+*.egg-info/
+*.swp
+*.swo
+arcanist/.phutil_module_cache
+autogen_docs_config.json
