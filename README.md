@@ -83,7 +83,7 @@ you can use `pyenv` and `virtualenv`
 Check wiki page for more detail, and some advanced usage.
 
 ## How to contribute
-Check this [wiki page](https://github.com/facebookincubator/OnlineSchemaChange/wiki/How-to-Contribute) if you want to contribute to this project.
+Check this [wiki page](https://github.com/facebookincubator/OnlineSchemaChange/blob/master/CONTRIBUTING.md) if you want to contribute to this project.
 
 
 ## License
