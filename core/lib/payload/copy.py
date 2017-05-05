@@ -1642,7 +1642,7 @@ class CopyPayload(Payload):
         return self.query(
             sql.checksum_by_chunk_with_assign(
                 table_name, self.checksum_column_list,
-                self.old_pk_list,
+                self._pk_for_filter,
                 self.range_start_vars_array, self.range_end_vars_array,
                 self.select_chunk_size, use_where,
                 idx_for_checksum))[0]
@@ -1658,7 +1658,7 @@ class CopyPayload(Payload):
         """
         log.info("Dumping raw data onto local disk for further investigation")
         log.info("Columns will be dumped in following order: ")
-        log.info(", ".join(self.old_pk_list + self.checksum_column_list))
+        log.info(", ".join(self._pk_for_filter + self.checksum_column_list))
         for table_name in [self.table_name, self.new_table_name]:
             if table_name == self.new_table_name:
                 # index for new scehma can be any indexes that provides
@@ -1674,7 +1674,7 @@ class CopyPayload(Payload):
             self.execute_sql(
                 sql.dump_current_chunk(
                     table_name, self.checksum_column_list,
-                    self.old_pk_list,
+                    self._pk_for_filter,
                     self.range_start_vars_array,
                     self.select_chunk_size,
                     idx_for_checksum, use_where), (outfile,))
