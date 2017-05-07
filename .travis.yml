@@ -12,10 +12,10 @@ python:
 before_install:
   - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then sudo apt-get install python-dev libmysqlclient-dev; fi 
   - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; then sudo apt-get install python3-dev; fi
-  - mysql -e 'grant all on *.* to osc@"%" identified by osc'
-  - mysql -e 'create database if not exist test'
 
 before_script:
+  - mysql -e 'grant all on *.* to "osc"@"localhost" identified by osc'
+  - mysql -e 'create database if not exist test'
   - echo -e "[server]\nsocket=/tmp/mysql.sock" | sudo tee -a /etc/mysql/my.cnf
   - sudo service mysql restart
 
