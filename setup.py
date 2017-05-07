@@ -30,7 +30,7 @@ setup(
         "http://github.com/PyMySQL/mysqlclient-python/tarball/master",
         "http://github.com/google/python-subprocess32/tarball/master",
     ],
-    scripts=['osc_cli'],
+    scripts=['osc_cli', 'test_cli'],
     include_package_data=True,
     zip_safe=False,
 )
