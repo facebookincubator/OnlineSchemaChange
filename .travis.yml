@@ -23,4 +23,4 @@ install:
   - python setup.py install --install-scripts=/tmp
 
 script: 
-  - /tmp/test_cli --mysql-user=osc --mysql-password=osc --database test --socket=/tmp/mysql.sock 
+  - cd $TRAVIS_BUILD_DIR && ./test_cli --mysql-user=osc --mysql-password=osc --database test --socket=/tmp/mysql.sock 
