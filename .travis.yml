@@ -18,9 +18,10 @@ before_script:
   - mysql -uroot -e 'create database if not exists test'
   - echo -e "[server]\nsocket=/tmp/mysql.sock" | sudo tee -a /etc/mysql/my.cnf
   - sudo service mysql restart
+  - sudo chmod 777 /var/lib/mysql-files/
 
 install:
   - python setup.py install --install-scripts=/tmp
 
 script: 
-  - cd $TRAVIS_BUILD_DIR && ./test_cli --mysql-user=osc --mysql-password=osc --database test --socket=/tmp/mysql.sock 
+  - /tmp/test_cli --mysql-user=osc --mysql-password=osc --database test --socket=/tmp/mysql.sock 
