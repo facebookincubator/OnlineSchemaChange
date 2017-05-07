@@ -11,7 +11,7 @@ before_install:
   - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; then sudo apt-get install python3-dev; fi
 
 install:
-  - python setup.py install
+  - python setup.py install --install-scripts=/tmp
 
 script: 
-  - test_cli
+  - /tmp/test_cli
