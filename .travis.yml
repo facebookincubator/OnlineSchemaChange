@@ -14,8 +14,8 @@ before_install:
   - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; then sudo apt-get install python3-dev; fi
 
 before_script:
-  - mysql -e 'grant all on *.* to "osc"@"localhost" identified by "osc"'
-  - mysql -e 'create database if not exist test'
+  - mysql -uroot -e 'grant all on *.* to "osc"@"localhost" identified by "osc"'
+  - mysql -uroot -e 'create database if not exist test'
   - echo -e "[server]\nsocket=/tmp/mysql.sock" | sudo tee -a /etc/mysql/my.cnf
   - sudo service mysql restart
 
