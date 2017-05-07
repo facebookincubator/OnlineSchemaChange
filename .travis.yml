@@ -15,7 +15,7 @@ before_install:
 
 before_script:
   - mysql -uroot -e 'grant all on *.* to "osc"@"localhost" identified by "osc"'
-  - mysql -uroot -e 'create database if not exist test'
+  - mysql -uroot -e 'create database if not exists test'
   - echo -e "[server]\nsocket=/tmp/mysql.sock" | sudo tee -a /etc/mysql/my.cnf
   - sudo service mysql restart
 
