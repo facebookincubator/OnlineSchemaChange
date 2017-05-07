@@ -1,5 +1,8 @@
 language: python
 
+service:
+  - mysql
+
 python:
   - 2.7
   - 3.3
@@ -9,9 +12,15 @@ python:
 before_install:
   - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then sudo apt-get install python-dev libmysqlclient-dev; fi 
   - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; then sudo apt-get install python3-dev; fi
+  - mysql -e 'grant all on *.* to osc@"%" identified by osc'
+  - mysql -e 'create database if not exist test'
+
+before_script:
+  - echo -e "[server]\nsocket=/tmp/mysql.sock" | sudo tee -a /etc/mysql/my.cnf
+  - sudo service mysql restart
 
 install:
   - python setup.py install --install-scripts=/tmp
 
 script: 
-  - /tmp/test_cli
+  - /tmp/test_cli --mysql-user=osc --mysql-password=osc --database test --mysql-socket=/tmp/mysql.sock 
