@@ -93,6 +93,10 @@ class Copy(CommandBase):
                             default=constant.DEFAULT_BATCH_SIZE,
                             help="Commit transaction after X changes have "
                             "been replayed")
+        parser.add_argument("--replay-grouping-size", type=int,
+                            default=constant.DEFAULT_REPLAY_GROUP_SIZE,
+                            help="Do not group more than this number of "
+                            "events with the same type into one replay query")
         parser.add_argument("--replay-max-attempt", type=int,
                             default=constant.DEFAULT_REPLAY_ATTEMPT,
                             help="Maximum number of times we should try to "

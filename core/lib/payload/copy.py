@@ -100,6 +100,8 @@ class CopyPayload(Payload):
             'replay_timeout', constant.REPLAY_DEFAULT_TIMEOUT)
         self.replay_batch_size = kwargs.get(
             'replay_batch_size', constant.DEFAULT_BATCH_SIZE)
+        self.replay_group_size = kwargs.get(
+            'replay_group_size', constant.DEFAULT_REPLAY_GROUP_SIZE)
         self.skip_pk_coverage_check = kwargs.get(
             'skip_pk_coverage_check', False)
         self.skip_long_trx_check = kwargs.get(
@@ -1364,52 +1366,48 @@ class CopyPayload(Payload):
         return result[0]['max_id']
 
     @wrap_hook
-    def replay_delete_row(self, row):
+    def replay_delete_row(self, sql, *ids):
         """
         Replay delete type change
 
-        @param row:  single row of delta information from self.delta_table_name
-        @type  row:  list
+        @param sql:  SQL statement to replay the changes stored in chg table
+        @type  sql:  string
+        @param ids:  values of ID column from self.delta_table_name
+        @type  ids:  list
         """
-        affected_row = self.execute_sql(
-            sql.replay_delete_row(
-                self.new_table_name, self.delta_table_name, self.IDCOLNAME,
-                row[self.IDCOLNAME], self._pk_for_filter
-            )
-        )
+        affected_row = self.execute_sql(sql, ids)
         if not self.eliminate_dups and not self.where and \
                 not self.skip_affected_rows_check:
             if not affected_row != 0:
                 raise OSCError('REPLAY_WRONG_AFFECTED', {'num': affected_row})
 
     @wrap_hook
-    def replay_insert_row(self, row):
+    def replay_insert_row(self, sql, *ids):
         """
         Replay insert type change
 
-        @param row:  single row of delta information from self.delta_table_name
-        @type  row:  list
+        @param sql:  SQL statement to replay the changes stored in chg table
+        @type  sql:  string
+        @param ids:  values of ID column from self.delta_table_name
+        @type  ids:  list
         """
-        affected_row = self.execute_sql(
-            sql.replay_insert_row(
-                self.old_column_list, self.new_table_name,
-                self.delta_table_name, self.IDCOLNAME, row[self.IDCOLNAME],
-                self.eliminate_dups))
-        if not self.eliminate_dups and not self.skip_affected_rows_check:
+        affected_row = self.execute_sql(sql, ids)
+        if not self.eliminate_dups and not self.where and \
+                not self.skip_affected_rows_check:
             if not affected_row != 0:
                 raise OSCError('REPLAY_WRONG_AFFECTED', {'num': affected_row})
 
     @wrap_hook
-    def replay_update_row(self, row):
+    def replay_update_row(self, sql, *ids):
         """
         Replay update type change
+
+        @param sql:  SQL statement to replay the changes stored in chg table
+        @type  sql:  string
+        @param row:  single row of delta information from self.delta_table_name
+        @type  row:  list
         """
-        self.execute_sql(
-            sql.replay_update_row(
-                self.old_non_pk_column_list, self.new_table_name,
-                self.delta_table_name, self.eliminate_dups,
-                self.IDCOLNAME, row[self.IDCOLNAME], self._pk_for_filter
-            ))
+        self.execute_sql(sql, ids)
 
     def get_gap_changes(self):
         # See if there're some gaps we need to cover. Because there're some
@@ -1434,6 +1432,45 @@ class CopyPayload(Payload):
             "{} changes before last checkpoint ready for replay"
             .format(len(delta)))
         return delta
+
+    def divide_changes_to_group(self, chg_rows):
+        """
+        Put consecutive changes with the same type into a group so that we can
+        execute them in a single query to speed up replay
+
+        @param chg_rows:  list of rows returned from _chg select query
+        @type  chg_rows:  list[dict]
+        """
+        id_group = []
+        type_now = None
+        for idx, chg in enumerate(chg_rows):
+            # Start of the current group
+            if type_now is None:
+                type_now = chg[self.DMLCOLNAME]
+            id_group.append(chg[self.IDCOLNAME])
+
+            # Dump when we are at the end of the changes
+            if idx == len(chg_rows) - 1:
+                yield type_now, id_group
+                return
+            # update type cannot be grouped
+            elif type_now == self.DML_TYPE_UPDATE:
+                yield type_now, id_group
+                type_now = None
+                id_group = []
+            # The next change is a different type, dump what we have now
+            elif chg_rows[idx + 1][self.DMLCOLNAME] != type_now:
+                yield type_now, id_group
+                type_now = None
+                id_group = []
+            # Reach the max group size, let's submit the query for now
+            elif len(id_group) >= self.replay_group_size:
+                yield type_now, id_group
+                type_now = None
+                id_group = []
+            # The next element will be the same as what we are now
+            else:
+                continue
 
     def replay_changes(self, single_trx=False, holding_locks=False):
         """
@@ -1476,34 +1513,63 @@ class CopyPayload(Payload):
         delta.extend(new_changes)
 
         log.info("Total {} changes to replay".format(len(delta)))
-        for idx, row in enumerate(delta):
+        # Generate all three possible replay SQL here, so that we don't waste
+        # CPU time regenerating them for each replay event
+        delete_sql = sql.replay_delete_row(
+            self.new_table_name, self.delta_table_name, self.IDCOLNAME,
+            self._pk_for_filter
+        )
+        update_sql = sql.replay_update_row(
+            self.old_non_pk_column_list, self.new_table_name,
+            self.delta_table_name, self.eliminate_dups,
+            self.IDCOLNAME, self._pk_for_filter
+        )
+        insert_sql = sql.replay_insert_row(
+            self.old_column_list, self.new_table_name,
+            self.delta_table_name, self.IDCOLNAME,
+            self.eliminate_dups
+        )
+        replayed = 0
+        replayed_total = 0
+        showed_pct = 0
+        for chg_type, ids in self.divide_changes_to_group(delta):
             # We only care about replay time when we are holding a write lock
             if holding_locks and not self.bypass_replay_timeout and \
                     time.time() - time_start > self.replay_timeout:
                 raise OSCError("REPLAY_TIMEOUT")
+            replayed_total += len(ids)
             # Commit transaction after every replay_batch_szie number of
             # changes have been replayed
-            if not single_trx and idx % self.replay_batch_size == 0:
+            if not single_trx and replayed > self.replay_batch_size:
                 self.commit()
                 self.start_transaction()
-            if row[self.DMLCOLNAME] == self.DML_TYPE_DELETE:
-                self.replay_delete_row(row)
-                deleted += 1
-            elif row[self.DMLCOLNAME] == self.DML_TYPE_UPDATE:
-                self.replay_update_row(row)
-                updated += 1
-            elif row[self.DMLCOLNAME] == self.DML_TYPE_INSERT:
-                self.replay_insert_row(row)
-                inserted += 1
             else:
+                replayed += len(ids)
+
+            # Use corresponding SQL to replay each type of changes
+            if chg_type == self.DML_TYPE_DELETE:
+                self.replay_delete_row(delete_sql, ids)
+                deleted += len(ids)
+            elif chg_type == self.DML_TYPE_UPDATE:
+                self.replay_update_row(update_sql, ids)
+                updated += len(ids)
+            elif chg_type == self.DML_TYPE_INSERT:
+                self.replay_insert_row(insert_sql, ids)
+                inserted += len(ids)
+            else:
+                # We are not supposed to reach here, unless someone explicitly
+                # insert a row with unknown type into _chg table during OSC
                 raise OSCError("UNKOWN_REPLAY_TYPE",
-                               {'type_value': row[self.IDCOLNAME]})
+                               {'type_value': chg_type})
             # Print progress information after every 10% changes have been
             # replayed. If there're no more than 100 changes to replay then
             # there'll be no such progress information
-            if (idx + 1) % max(100, int(len(delta) / 10)) == 0:
+            progress_pct = int(replayed_total / len(delta) * 100)
+            if progress_pct > showed_pct:
                 log.info(
-                    "Load progress: {}/{} changes".format(idx + 1, len(delta)))
+                    "Load progress: {}/{} changes"
+                    .format(replayed_total + 1, len(delta)))
+                showed_pct += 10
         # Commit for last batch
         if not single_trx:
             self.commit()

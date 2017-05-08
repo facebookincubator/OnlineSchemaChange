@@ -457,15 +457,14 @@ def get_max_id_from(column, table_name):
 
 
 def replay_delete_row(
-        new_table_name, delta_table_name, id_col_name, row_id, pk_list):
+        new_table_name, delta_table_name, id_col_name, pk_list):
     return (
         "DELETE {new} FROM `{new}`, `{delta}` WHERE "
-        "`{delta}`.`{id_col}`={id} AND {join_clause}"
+        "`{delta}`.`{id_col}` IN %s AND {join_clause}"
     ).format(
         **{'new': escape(new_table_name),
            'delta': escape(delta_table_name),
            'id_col': escape(id_col_name),
-           'id': row_id,
            'join_clause': get_match_clause(
                new_table_name, delta_table_name,
                pk_list, separator=' AND ')})
@@ -473,29 +472,29 @@ def replay_delete_row(
 
 def replay_insert_row(
         old_column_list, new_table_name, delta_table_name,
-        id_col_name, row_id, ignore=False):
+        id_col_name, ignore=False):
     ignore = "IGNORE" if ignore else ""
     return (
         "INSERT {ignore} INTO `{new}` ({cols})"
         "SELECT {cols} FROM `{delta}` WHERE "
-        "`{delta}`.`{id_col}`={id} "
+        "`{delta}`.`{id_col}` IN %s "
     ).format(
         **{'ignore': ignore,
            'cols': list_to_col_str(old_column_list),
            'new': escape(new_table_name),
            'delta': escape(delta_table_name),
            'id_col': escape(id_col_name),
-           'id': row_id})
+           })
 
 
 def replay_update_row(
         old_non_pk_column_list, new_table_name, delta_table_name, ignore,
-        id_col_name, row_id, pk_list):
+        id_col_name, pk_list):
     ignore = "IGNORE" if ignore else ""
     return (
         "UPDATE {ignore} `{new}`, `{delta}` "
         "SET {set} "
-        "WHERE `{delta}`.`{id_col}` = {id} AND {join_clause} "
+        "WHERE `{delta}`.`{id_col}` IN %s AND {join_clause} "
     ).format(
         **{'ignore': ignore,
            'new': escape(new_table_name),
@@ -504,7 +503,6 @@ def replay_update_row(
                new_table_name, delta_table_name,
                old_non_pk_column_list, separator=', '),
            'id_col': escape(id_col_name),
-           'id': row_id,
            'join_clause': get_match_clause(
                new_table_name, delta_table_name,
                pk_list, separator=' AND ')})

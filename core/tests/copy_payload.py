@@ -479,3 +479,126 @@ class CopyPayloadTestCase(unittest.TestCase):
         payload.mysql_vars['binlog_format'] = 'ROW'
         payload.mysql_version = MySQLVersion('5.5.30-percona')
         self.assertFalse(payload.is_trigger_rbr_safe)
+
+    def test_divide_changes_all_the_same_type(self):
+        payload = CopyPayload()
+        payload.replay_group_size = 100
+        type_name = payload.DMLCOLNAME
+        id_name = payload.IDCOLNAME
+        chg_rows = [
+            {type_name: 1, id_name: 1},
+            {type_name: 1, id_name: 2},
+            {type_name: 1, id_name: 3},
+            {type_name: 1, id_name: 4},
+            {type_name: 1, id_name: 5},
+        ]
+        groups = list(payload.divide_changes_to_group(chg_rows))
+        self.assertEqual(len(groups), 1)
+        chg_type, group = groups[0]
+        self.assertEqual(chg_type, 1)
+        self.assertEqual(group, [1, 2, 3, 4, 5])
+
+    def test_divide_changes_no_change(self):
+        payload = CopyPayload()
+        payload.replay_group_size = 100
+        chg_rows = []
+        groups = list(payload.divide_changes_to_group(chg_rows))
+        self.assertEqual(len(groups), 0)
+
+    def test_divide_changes_all_different(self):
+        """
+        If all the changes are different from the previous one, they should
+        be put into different groups
+        """
+        payload = CopyPayload()
+        payload.replay_group_size = 100
+        type_name = payload.DMLCOLNAME
+        id_name = payload.IDCOLNAME
+        chg_rows = [
+            {type_name: 1, id_name: 1},
+            {type_name: 2, id_name: 2},
+            {type_name: 3, id_name: 3},
+            {type_name: 1, id_name: 4},
+            {type_name: 2, id_name: 5},
+            {type_name: 3, id_name: 6},
+        ]
+        groups = list(payload.divide_changes_to_group(chg_rows))
+        self.assertEqual(
+            groups, [
+                (1, [1]),
+                (2, [2]),
+                (3, [3]),
+                (1, [4]),
+                (2, [5]),
+                (3, [6]),
+            ])
+
+    def test_divide_changes_simple_group(self):
+        payload = CopyPayload()
+        payload.replay_group_size = 100
+        type_name = payload.DMLCOLNAME
+        id_name = payload.IDCOLNAME
+        chg_rows = [
+            {type_name: 1, id_name: 1},
+            {type_name: 2, id_name: 2},
+            {type_name: 2, id_name: 3},
+            {type_name: 2, id_name: 4},
+            {type_name: 1, id_name: 5},
+        ]
+        groups = list(payload.divide_changes_to_group(chg_rows))
+        self.assertEqual(
+            groups, [
+                (1, [1]),
+                (2, [2, 3, 4]),
+                (1, [5]),
+            ])
+
+    def test_divide_changes_no_grouping_for_update(self):
+        """
+        UPDATE dml type should not been grouped
+        """
+        payload = CopyPayload()
+        payload.replay_group_size = 100
+        type_name = payload.DMLCOLNAME
+        id_name = payload.IDCOLNAME
+        chg_rows = [
+            {type_name: 1, id_name: 1},
+            {type_name: 3, id_name: 2},
+            {type_name: 3, id_name: 3},
+            {type_name: 3, id_name: 4},
+            {type_name: 1, id_name: 5},
+        ]
+        groups = list(payload.divide_changes_to_group(chg_rows))
+        self.assertEqual(
+            groups, [
+                (1, [1]),
+                (3, [2]),
+                (3, [3]),
+                (3, [4]),
+                (1, [5]),
+            ])
+
+    def test_divide_changes_group_size_reach_limit(self):
+        """
+        If group size has exceeded the limit, we should break them into two
+        groups
+        """
+        payload = CopyPayload()
+        payload.replay_group_size = 2
+        type_name = payload.DMLCOLNAME
+        id_name = payload.IDCOLNAME
+        chg_rows = [
+            {type_name: 1, id_name: 1},
+            {type_name: 2, id_name: 2},
+            {type_name: 2, id_name: 3},
+            {type_name: 2, id_name: 4},
+            {type_name: 1, id_name: 5},
+        ]
+        groups = list(payload.divide_changes_to_group(chg_rows))
+        self.assertEqual(
+            groups, [
+                (1, [1]),
+                (2, [2, 3]),
+                (2, [4]),
+                (1, [5]),
+            ])
