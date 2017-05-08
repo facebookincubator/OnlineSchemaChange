@@ -21,7 +21,7 @@ before_script:
   - sudo chmod 777 /var/lib/mysql-files/
 
 install:
-  - python setup.py install --install-scripts=/tmp
+  - python setup.py install 
 
 script: 
-  - /tmp/test_cli --mysql-user=osc --mysql-password=osc --database test --socket=/tmp/mysql.sock 
+  - cd $TRAVIS_BUILD_DIR && ./test_cli --mysql-user=osc --mysql-password=osc --database test --socket=/tmp/mysql.sock 
