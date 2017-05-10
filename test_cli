@@ -24,7 +24,7 @@ import sys
 from core.tests import integration_test_lib
 
 
-def gen_get_conn(arg_user, arg_password, arg_socket, arg_charset=None):
+def gen_get_conn(arg_user, arg_password, arg_socket, arg_charset='utf8'):
     def default_get_mysql_connection(
             user_name=None, user_pass=None, socket=None, dbname='',
             timeout=60, connect_timeout=10, charset=None):
@@ -96,4 +96,5 @@ if __name__ == '__main__':
     # all functions in this class start with 'test' for their names
     tests = loader.loadTestsFromTestCase(test_case)
     suite.addTests(tests)
-    unittest.TextTestRunner(verbosity=2, buffer=True).run(suite)
+    result = unittest.TextTestRunner(verbosity=2, buffer=True).run(suite)
+    sys.exit(not result.wasSuccessful())
