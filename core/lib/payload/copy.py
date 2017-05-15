@@ -88,6 +88,8 @@ class CopyPayload(Payload):
         self.allow_drop_column = kwargs.get('allow_drop_column', False)
         self.detailed_mismatch_info = kwargs.get(
             'detailed_mismatch_info', False)
+        self.dump_after_checksum = kwargs.get(
+            'dump_after_checksum', False)
         self.eliminate_dups = kwargs.get('eliminate_dups', False)
         self.rm_partition = kwargs.get('rm_partition', False)
         self.force_cleanup = kwargs.get('force_cleanup', False)
@@ -537,9 +539,14 @@ class CopyPayload(Payload):
             cleanup_payload.add_file_entry(
                 "{}.{}".format(self.outfile, suffix))
         # cleanup outfiles for table dump
-        log.debug("globbing {}".format(self.outfile))
-        for outfile in glob.glob("{}.[0-9]*".format(self.outfile)):
-            cleanup_payload.add_file_entry(outfile)
+        file_prefixes = [
+            self.outfile,
+            "{}.old".format(self.outfile),
+            "{}.new".format(self.outfile)]
+        for file_prefix in file_prefixes:
+            log.debug("globbing {}".format(file_prefix))
+            for outfile in glob.glob("{}.[0-9]*".format(file_prefix)):
+                cleanup_payload.add_file_entry(outfile)
         for trigger in (
                 self.delete_trigger_name, self.update_trigger_name,
                 self.insert_trigger_name):
@@ -735,6 +742,11 @@ class CopyPayload(Payload):
             if tbl_avg_length < 20:
                 tbl_avg_length = 20
             self.select_chunk_size = self.chunk_size // tbl_avg_length
+            # This means either the avg row size is huge, or user specified
+            # a tiny select_chunk_size on CLI. Let's make it one row per outfile
+            # to avoid zero division
+            if not self.select_chunk_size:
+                self.select_chunk_size = 1
             log.info("Outfile will contain {} rows each"
                      .format(self.select_chunk_size))
             self.eta_chunks = max(int(
@@ -1506,7 +1518,7 @@ class CopyPayload(Payload):
         else:
             replay_ms = None
         max_id_now = self.get_max_delta_id()
-        if self.detailed_mismatch_info:
+        if self.detailed_mismatch_info or self.dump_after_checksum:
             # We need this information for better understanding of the checksum
             # mismatch issue
             log.info("Replaying changes happened before change ID: {}"
@@ -1790,7 +1802,7 @@ class CopyPayload(Payload):
                 use_where = True
 
     @wrap_hook
-    def checksum_by_chunk(self, table_name):
+    def checksum_by_chunk(self, table_name, dump_after_checksum=False):
         """
         Running checksum for all the existing data in new table. This is to
         make sure there's no data corruption after load and first round of
@@ -1801,10 +1813,13 @@ class CopyPayload(Payload):
         # in select_table_into_outfile
         affected_rows = 1
         use_where = False
+        outfile_id = 0
         if table_name == self.new_table_name:
             idx_for_checksum = self.find_coverage_index()
+            outfile_prefix = "{}.new".format(self.outfile)
         else:
             idx_for_checksum = self._idx_name_for_filter
+            outfile_prefix = "{}.old".format(self.outfile)
         while(affected_rows):
             checksum = self.query(
                 sql.checksum_by_chunk(
@@ -1814,6 +1829,21 @@ class CopyPayload(Payload):
                     self.select_chunk_size, use_where,
                     self.is_skip_fcache_supported,
                     idx_for_checksum))
+            # Dump the data onto local disk for further investigation
+            # This will be very helpful when there's a reproducable checksum
+            # mismatch issue
+            if dump_after_checksum:
+                self.execute_sql(
+                    sql.dump_current_chunk(
+                        table_name, self.checksum_column_list,
+                        self._pk_for_filter,
+                        self.range_start_vars_array,
+                        self.select_chunk_size,
+                        idx_for_checksum, use_where),
+                    ('{}.{}'.format(outfile_prefix, str(outfile_id)), )
+                )
+                outfile_id += 1
+
             # Refresh where condition range for next select
             if checksum:
                 self.refresh_range_start()
@@ -1925,7 +1955,9 @@ class CopyPayload(Payload):
 
         if not self.detailed_mismatch_info:
             log.info("Checksuming data from old table")
-            old_table_checksum = self.checksum_by_chunk(self.table_name)
+            old_table_checksum = self.checksum_by_chunk(
+                self.table_name,
+                dump_after_checksum=self.dump_after_checksum)
 
             # We can calculate the checksum for new table outside the
             # transaction, because the data in new table is static without
@@ -1933,7 +1965,9 @@ class CopyPayload(Payload):
             self.commit()
 
             log.info("Checksuming data from new table")
-            new_table_checksum = self.checksum_by_chunk(self.new_table_name)
+            new_table_checksum = self.checksum_by_chunk(
+                self.new_table_name,
+                dump_after_checksum=self.dump_after_checksum)
 
             log.info("Compare checksum")
             self.compare_checksum(old_table_checksum, new_table_checksum)

@@ -52,6 +52,10 @@ class Copy(CommandBase):
         parser.add_argument("--detailed-mismatch-info", action='store_true',
                             help="Use a slower but more accurate checksum "
                             "output if there's a checksum mismatch")
+        parser.add_argument("--dump-after-checksum", action='store_true',
+                            help="Dump the data onto disk after calculating "
+                            "checksum for each chunk. Use this when you're "
+                            "investigating a checksum mismatch issue")
         parser.add_argument("--allow-new-pk", action='store_true',
                             help="Allow adding primary key to a table, which "
                             "don't have PK yet. This will result in a "
