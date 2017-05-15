@@ -65,7 +65,7 @@ foreign_key_cnt = (
 )
 
 table_avg_row_len = (
-    "SELECT AVG_ROW_LENGTH from "
+    "SELECT AVG_ROW_LENGTH, TABLE_ROWS from "
     "information_schema.TABLES "
     "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s"
 )

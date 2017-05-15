@@ -78,6 +78,7 @@ class CopyPayload(Payload):
         self._cleanup_payload = CleanupPayload(*args, **kwargs)
         self.stats = {}
         self.partitions = {}
+        self.eta_chunks = 1
 
         self.repl_status = kwargs.get('repl_status', '')
         self.outfile_dir = kwargs.get('outfile_dir', '')
@@ -736,6 +737,8 @@ class CopyPayload(Payload):
             self.select_chunk_size = self.chunk_size // tbl_avg_length
             log.info("Outfile will contain {} rows each"
                      .format(self.select_chunk_size))
+            self.eta_chunks = max(int(
+                result[0]['TABLE_ROWS'] / self.select_chunk_size), 1)
         else:
             raise OSCError('FAIL_TO_GUESS_CHUNK_SIZE')
 
@@ -1210,6 +1213,7 @@ class CopyPayload(Payload):
         # To let the loop run at least once
         affected_rows = 1
         use_where = False
+        printed_chunk = 0
         while affected_rows:
             self.outfile_suffix_end = outfile_suffix
             outfile = '{}.{}'.format(self.outfile, outfile_suffix)
@@ -1225,7 +1229,14 @@ class CopyPayload(Payload):
                     'NOT_ENOUGH_SPACE',
                     {'need': util.readable_size(self.free_space_reserved),
                      'avail': util.readable_size(free_disk_space)})
+            progress_pct = int((float(outfile_suffix) / self.eta_chunks) * 100)
+            progress_chunk = int(progress_pct / 10)
+            if progress_chunk > printed_chunk and self.eta_chunks > 10:
+                log.info("Dump progress: {}/{} chunks"
+                         .format(outfile_suffix, self.eta_chunks))
+                printed_chunk = progress_chunk
         self.commit()
+        log.info("Dump finished")
         self.stats['time_in_dump'] = time.time() - stage_start_time
 
     @wrap_hook
