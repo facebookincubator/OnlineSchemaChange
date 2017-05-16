@@ -1630,10 +1630,6 @@ class CopyPayload(Payload):
         if not self.droppable_indexes:
             return
 
-        log.info(
-            "Replay changes before recreating indexes as they can be "
-            "executed faster before that")
-        self.replay_changes(single_trx=False)
         self.set_innodb_tmpdir(self.outfile_dir)
         # Execute alter table only if we have index to create
         if self.droppable_indexes:
