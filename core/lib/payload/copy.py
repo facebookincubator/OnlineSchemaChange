@@ -136,6 +136,8 @@ class CopyPayload(Payload):
             'skip_named_lock', False)
         self.skip_affected_rows_check = kwargs.get(
             'skip_affected_rows_check', False)
+        self.skip_disk_space_check = kwargs.get(
+            'skip_disk_space_check', False)
         self.where = kwargs.get('where', None)
         self.session_overrides_str = kwargs.get(
             'session_overrides', '')
@@ -641,6 +643,8 @@ class CopyPayload(Payload):
         """
         Check if we have enough disk space to execute the DDL
         """
+        if self.skip_disk_space_check:
+            return True
         self.table_size = self.get_table_size(self.table_name)
         disk_space = util.spare_disk_size(self.outfile_dir)
         # With allow_new_pk, we will create one giant outfile, and so at

@@ -178,8 +178,15 @@ class Copy(CommandBase):
                             "don't care about the potential load it will "
                             "cause to the MySQL intance")
         parser.add_argument("--skip-cleanup-after-kill",
+                            action='store_true',
                             help="Leave the triggers and shadow table behind, "
                             "if OSC was killed.")
+        parser.add_argument("--skip-disk-space-check",
+                            action='store_true',
+                            help="Skip disk space check before kicking off "
+                            "OSC. Use this when you believe the "
+                            "information_schema based disk space check is "
+                            "inaccurate")
         parser.add_argument("--where",
                             help="Only dump rows which match this WHERE "
                             "condition. This works more like a selective "
