@@ -40,7 +40,7 @@ except Exception:
 
 setup(
     name='osc',
-    version='1.0.0',
+    version='0.0.1',
     packages=find_packages(),
     url='https://github.com/facebookincubator/OnlineSchemaChange',
     description='Online Schema Change for MySQL',
