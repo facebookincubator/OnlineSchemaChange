@@ -8,15 +8,35 @@ of patent rights can be found in the PATENTS file in the same directory.
 """
 
 import sys
-from setuptools import setup, find_packages
+import logging
 
-required_pkgs = [
+from setuptools import setup, find_packages
+import pkg_resources
+
+install_requires = [
     "six",
     "pyparsing",
     "mysqlclient",
 ]
-if sys.version_info[0] == 2:  # PY2
-    required_pkgs.append("subprocess32")
+
+
+extras_require = {
+    ':python_version < "3.0"': ['subprocess32']
+}
+
+try:
+    if 'bdist_wheel' not in sys.argv:
+        for key, value in extras_require.items():
+            if key.startswith(':') and pkg_resources.evaluate_marker(key[1:]):
+                install_requires.extend(value)
+except Exception:
+    logging.getLogger(__name__).exception(
+        'Something went wrong calculating platform specific dependencies, so '
+        "you're getting them all!"
+    )
+    for key, value in extras_require.items():
+        if key.startswith(':'):
+            install_requires.extend(value)
 
 setup(
     name='osc',
@@ -25,11 +45,8 @@ setup(
     url='https://github.com/facebookincubator/OnlineSchemaChange',
     description='Online Schema Change for MySQL',
     long_description=open('README.md').read(),
-    install_requires=required_pkgs,
-    dependency_links=[
-        "http://github.com/PyMySQL/mysqlclient-python/tarball/master",
-        "http://github.com/google/python-subprocess32/tarball/master",
-    ],
+    install_requires=install_requires,
+    extras_require=extras_require,
     scripts=['osc_cli'],
     include_package_data=True,
     zip_safe=False,
