@@ -8,12 +8,14 @@ python:
   - 3.3
   - 3.4
   - 3.5
+  - 3.6
 
 before_install:
   - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then sudo apt-get install python-dev libmysqlclient-dev; fi 
   - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; then sudo apt-get install python3-dev; fi
 
 before_script:
+  - pip install -U docutils pygments
   - mysql -uroot -e 'grant all on *.* to "osc"@"localhost" identified by "osc"'
   - mysql -uroot -e 'create database if not exists test'
   - echo -e "[server]\nsocket=/tmp/mysql.sock" | sudo tee -a /etc/mysql/my.cnf
