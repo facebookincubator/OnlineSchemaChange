@@ -1279,6 +1279,25 @@ class CopyPayload(Payload):
         self.rm_file(filepath)
         self._cleanup_payload.remove_file_entry(filepath)
 
+    def change_explicit_commit(self, enable=True):
+        """
+        Turn on/off rocksdb_commit_in_the_middle to avoid commit stall for
+        large data infiles
+        """
+        v = 1 if enable else 0
+        try:
+            self.execute_sql(
+                sql.set_session_variable('rocksdb_commit_in_the_middle'), (v,))
+        except MySQLdb.OperationalError as e:
+            errnum, errmsg = e.args
+            # 1193: unknown variable
+            if errnum == 1193:
+                log.warning(
+                    "Failed to set rocksdb_commit_in_the_middle: {}"
+                    .format(errmsg))
+            else:
+                raise
+
     def change_rocksdb_bulk_load(self, enable=True):
         # rocksdb_bulk_load relies on data being dumping in the same sequence
         # as new pk. If we are changing pk, then we cannot ensure that
@@ -1320,9 +1339,11 @@ class CopyPayload(Payload):
             raise OSCError('OSC_INTERNAL_ERROR',
                            {'msg': 'Unexpected scenario. Both _pk_for_filter '
                             'and old_non_pk_column_list are empty'})
-        # Enable rocksdb bulk load before loading data
         if self._new_table.engine.upper() == 'ROCKSDB':
+            # Enable rocksdb bulk load before loading data
             self.change_rocksdb_bulk_load(enable=True)
+            # Enable rocksdb explicit commit before loading data
+            self.change_explicit_commit(enable=True)
 
         for suffix in range(1, self.outfile_suffix_end + 1):
             self.load_chunk(column_list, suffix)
@@ -1332,9 +1353,11 @@ class CopyPayload(Payload):
                 log.info("Load progress: {}/{} chunks"
                          .format(suffix, self.outfile_suffix_end))
 
-        # disable rocksdb bulk load after loading data
         if self._new_table.engine.upper() == 'ROCKSDB':
+            # Disable rocksdb bulk load after loading data
             self.change_rocksdb_bulk_load(enable=False)
+            # Disable rocksdb explicit commit after loading data
+            self.change_explicit_commit(enable=False)
         self.stats['time_in_load'] = time.time() - stage_start_time
 
     def check_no_fcache_support(self):
