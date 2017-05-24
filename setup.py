@@ -39,7 +39,7 @@ except Exception:
             install_requires.extend(value)
 
 setup(
-    name='osc',
+    name='online-schema-change',
     version='0.0.1',
     packages=find_packages(),
     author="Luke Lu",
