@@ -49,7 +49,9 @@ setup(
     long_description=open('README.rst').read(),
     install_requires=install_requires,
     extras_require=extras_require,
-    scripts=['osc_cli'],
+    entry_points={'console_scripts': [
+        'osc_cli = online_schema_change.cli:main',
+    ]},
     include_package_data=True,
     zip_safe=False,
 )
