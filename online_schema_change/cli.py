@@ -21,9 +21,9 @@ import sys
 import textwrap
 
 from collections import defaultdict
-from core.commands import commands
-from core.lib.error import OSCError
-from core.lib import hook
+from .commands import commands
+from .lib.error import OSCError
+from .lib import hook
 
 
 def main():
