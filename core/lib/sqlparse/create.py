@@ -169,19 +169,17 @@ class CreateParser(object):
         Word(alphanums + '_')('collate') +
         Optional(QUOTE).suppress()
     )
-    CHARSET_DEF = Optional(
+    CHARSET_DEF = (
         CaselessLiteral("CHARACTER SET").suppress() + CHARSET_NAME
     )
-    COLLATE_DEF = Optional(
+    COLLATE_DEF = (
         CaselessLiteral("COLLATE").suppress() + COLLATION_NAME
     )
     CHAR_DEF = (
-        CaselessLiteral("CHAR")('column_type') + OPTIONAL_COL_LEN + BINARY +
-        CHARSET_DEF + COLLATE_DEF
+        CaselessLiteral("CHAR")('column_type') + OPTIONAL_COL_LEN + BINARY
     )
     VARCHAR_DEF = (
-        CaselessLiteral("VARCHAR")('column_type') + COL_LEN + BINARY +
-        CHARSET_DEF + COLLATE_DEF
+        CaselessLiteral("VARCHAR")('column_type') + COL_LEN + BINARY
     )
     TEXT_TYPE = (
         CaselessLiteral("TINYTEXT") | CaselessLiteral("TEXT") |
@@ -189,23 +187,21 @@ class CreateParser(object):
         CaselessLiteral("DOCUMENT")
     )
     TEXT_DEF = (
-        TEXT_TYPE('column_type') + BINARY + CHARSET_DEF + COLLATE_DEF
+        TEXT_TYPE('column_type') + BINARY
     )
     ENUM_VALUE_LIST = Group(
         QUOTED_STRING_WITH_QUOTE + ZeroOrMore(COMMA + QUOTED_STRING_WITH_QUOTE)
     )('enum_value_list')
     ENUM_DEF = (
         CaselessLiteral("ENUM")('column_type') +
-        LEFT_PARENTHESES + ENUM_VALUE_LIST + RIGHT_PARENTHESES +
-        CHARSET_DEF + COLLATE_DEF
+        LEFT_PARENTHESES + ENUM_VALUE_LIST + RIGHT_PARENTHESES
     )
     SET_VALUE_LIST = Group(
         QUOTED_STRING_WITH_QUOTE + ZeroOrMore(COMMA + QUOTED_STRING_WITH_QUOTE)
     )('set_value_list')
     SET_DEF = (
         CaselessLiteral("SET")('column_type') +
-        LEFT_PARENTHESES + SET_VALUE_LIST + RIGHT_PARENTHESES +
-        CHARSET_DEF + COLLATE_DEF
+        LEFT_PARENTHESES + SET_VALUE_LIST + RIGHT_PARENTHESES
     )
     DATA_TYPE = (
         INT_DEF | FLOAT_DEF | DT_DEF |
@@ -260,7 +256,9 @@ class CreateParser(object):
             AUTO_INCRE('auto_increment') |
             UNIQ_KEY('uniq_key') |
             PRIMARY_KEY('primary') |
-            COMMENT('comment')
+            COMMENT('comment') |
+            CHARSET_DEF |
+            COLLATE_DEF
         )
     )
     COLUMN_LIST = Group(

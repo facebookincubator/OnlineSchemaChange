@@ -99,6 +99,24 @@ class SQLParserTest(unittest.TestCase):
             self.assertEqual(tbl.name, 'foo')
             self.assertEqual(tbl.charset, 'utf8')
 
+    def test_bare_column_collate(self):
+        sql = (
+            "Create table foo\n"
+            "( column1 varchar(10) collate latin1_bin )"
+        )
+        tbl = parse_create(sql)
+        self.assertEqual(tbl.name, 'foo')
+        self.assertEqual(tbl.column_list[0].collate, 'latin1_bin')
+
+    def test_bare_column_charset(self):
+        sql = (
+            "Create table foo\n"
+            "( column1 varchar(10) character set latin1 )"
+        )
+        tbl = parse_create(sql)
+        self.assertEqual(tbl.name, 'foo')
+        self.assertEqual(tbl.column_list[0].charset, 'latin1')
+
     def test_table_collate(self):
         sqls = [
             (
