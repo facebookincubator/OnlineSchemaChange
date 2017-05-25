@@ -23,7 +23,7 @@ Say we have an existing table named ``my_table`` under database
     ) ENGINE=InnoDB DEFAULT CHARSET=latin1
 
 Now if we want to run
-``ALTER TABLE ``my_table`` add column ``data`` varchar(10);`` against
+``ALTER TABLE `my_table` add column `data` varchar(10);`` against
 it. Instead of feed the ``ALTER TABLE`` statement to OSC, we just need
 to put a ``CREATE TABLE`` statement representing the desired schema into
 a file ``/tmp/foo.sql`` like below:
