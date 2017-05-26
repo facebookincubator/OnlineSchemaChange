@@ -151,5 +151,8 @@ class MySQLSocketConnection:
                     .format(db_warning, sql, args))
             return cursor.rowcount
 
+    def ping(self):
+        self.conn.ping()
+
     def close(self):
         self.conn.close()
