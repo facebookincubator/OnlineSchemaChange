@@ -107,6 +107,8 @@ class CopyPayload(Payload):
             'replay_group_size', constant.DEFAULT_REPLAY_GROUP_SIZE)
         self.skip_pk_coverage_check = kwargs.get(
             'skip_pk_coverage_check', False)
+        self.pk_coverage_size_threshold = kwargs.get(
+            'pk_coverage_size_threshold', constant.PK_COVERAGE_SIZE_THRESHOLD)
         self.skip_long_trx_check = kwargs.get(
             'skip_long_trx_check', False)
         self.ddl_file_list = kwargs.get('ddl_file_list', '')
@@ -828,6 +830,13 @@ class CopyPayload(Payload):
         # Check if we can have indexes in new table to efficiently look up
         # current old pk combinations
         if not self.validate_post_alter_pk():
+            self.table_size = self.get_table_size(self.table_name)
+            if self.table_size < self.pk_coverage_size_threshold:
+                log.warning(
+                    "No index on new table can cover old pk. Since this is "
+                    "a small table: {}, we fallback to a full table dump"
+                    .format(self.table_size))
+                self.is_full_table_dump = True
             if self.skip_pk_coverage_check:
                 log.warning(
                     "Indexes on new table cannot cover current PK of "
