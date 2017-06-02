@@ -811,6 +811,8 @@ class CopyPayload(Payload):
                              .format(idx.name))
                     self._pk_for_filter = [
                         col.name for col in idx.column_list]
+                    self._pk_for_filter_def = [
+                        col for col in idx.column_list]
                     self._idx_name_for_filter = idx.name
                     break
             else:
@@ -818,6 +820,8 @@ class CopyPayload(Payload):
                 if self.allow_new_pk:
                     self._pk_for_filter = [
                         col.name for col in self._old_table.column_list]
+                    self._pk_for_filter_def = [
+                        col for col in self._old_table.column_list]
                     self.is_full_table_dump = True
                 else:
                     raise OSCError('NEW_PK')
@@ -826,6 +830,8 @@ class CopyPayload(Payload):
         else:
             self._pk_for_filter = [
                 col.name for col in self._old_table.primary_key.column_list]
+            self._pk_for_filter_def = [
+                col for col in self._old_table.primary_key.column_list]
 
         # Check if we can have indexes in new table to efficiently look up
         # current old pk combinations
@@ -927,10 +933,11 @@ class CopyPayload(Payload):
         # We will break table into chunks when calculate checksums using
         # old primary key. We need this index to skip verify the same row
         # for multiple time if it has been changed a lot
-        if self._pk_for_filter and not self.is_full_table_dump:
+        if self._pk_for_filter_def and not self.is_full_table_dump:
             self.execute_sql(
                 sql.create_idx_on_delta_table(
-                    self.delta_table_name, self._pk_for_filter))
+                    self.delta_table_name,
+                    [col.to_sql() for col in self._pk_for_filter_def]))
 
     def create_insert_trigger(self):
         self.execute_sql(

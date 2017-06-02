@@ -272,7 +272,7 @@ def create_delta_table(delta_table_name, id_col_name, dml_col_name,
 def create_idx_on_delta_table(delta_table_name, pk_list):
     return (
         "CREATE INDEX `ix_pri` ON `{}` ({})"
-    ).format(escape(delta_table_name), list_to_col_str(pk_list))
+    ).format(escape(delta_table_name), ', '.join(pk_list))
 
 
 def create_insert_trigger(insert_trigger_name, table_name, delta_table_name,
