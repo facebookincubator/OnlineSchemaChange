@@ -432,6 +432,12 @@ class CopyPayload(Payload):
         else:
             return True
 
+    @property
+    def is_myrocks_table(self):
+        if not self._new_table.engine:
+            return False
+        return self._new_table.engine.upper() == 'ROCKSDB'
+
     def sanity_checks(self):
         """
         Check MySQL setting for requirements that we don't necessarily need to
@@ -619,6 +625,11 @@ class CopyPayload(Payload):
         Check whether the table has been referred to any existing foreign
         definition
         """
+        # MyRocks doesn't support foreign key
+        if self.is_myrocks_table:
+            log.info("SKip foreign key check because MyRocks doesn't support "
+                     "this yet")
+            return True
         foreign_keys = self.query(
             sql.foreign_key_cnt,
             (self.table_name, self._current_db,
@@ -1355,7 +1366,7 @@ class CopyPayload(Payload):
             raise OSCError('OSC_INTERNAL_ERROR',
                            {'msg': 'Unexpected scenario. Both _pk_for_filter '
                             'and old_non_pk_column_list are empty'})
-        if self._new_table.engine.upper() == 'ROCKSDB':
+        if self.is_myrocks_table:
             # Enable rocksdb bulk load before loading data
             self.change_rocksdb_bulk_load(enable=True)
             # Enable rocksdb explicit commit before loading data
@@ -1369,7 +1380,7 @@ class CopyPayload(Payload):
                 log.info("Load progress: {}/{} chunks"
                          .format(suffix, self.outfile_suffix_end))
 
-        if self._new_table.engine.upper() == 'ROCKSDB':
+        if self.is_myrocks_table:
             # Disable rocksdb bulk load after loading data
             self.change_rocksdb_bulk_load(enable=False)
             # Disable rocksdb explicit commit after loading data

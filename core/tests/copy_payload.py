@@ -602,3 +602,32 @@ class CopyPayloadTestCase(unittest.TestCase):
                 (2, [4]),
                 (1, [5]),
             ])
+
+    def test_is_myrocks_table(self):
+        payload = CopyPayload()
+        payload._new_table = parse_create(
+            "CREATE TABLE abc ( "
+            "id int primary key "
+            ") ENGINE = RocksDB "
+        )
+        self.assertTrue(payload.is_myrocks_table)
+
+    def test_is_myrocks_table_for_innodb(self):
+        payload = CopyPayload()
+        payload._new_table = parse_create(
+            "CREATE TABLE abc ( "
+            "id int primary key "
+            ") ENGINE = InnoDB "
+        )
+        self.assertFalse(payload.is_myrocks_table)
+
+    def test_myrocks_table_skip_foreign_key_check(self):
+        payload = CopyPayload()
+        payload._new_table = parse_create(
+            "CREATE TABLE abc ( "
+            "id int primary key "
+            ") ENGINE = RocksDB "
+        )
+        payload.query = Mock()
+        payload.foreign_key_check()
+        self.assertFalse(payload.query.called)
