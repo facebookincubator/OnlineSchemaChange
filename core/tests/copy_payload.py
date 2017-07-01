@@ -183,6 +183,10 @@ class CopyPayloadTestCase(unittest.TestCase):
         database = 'db'
         payload._old_table = Mock()
         payload._old_table.name = 'abc'
+        payload._new_table = Mock()
+        payload._new_table.name = 'abc'
+        payload.outfile_dir = '/path/to/file/dump'
+        payload.outfile_suffix_end = 2
 
         # add some drop table entry pretending we've done some work
         payload._cleanup_payload = CleanupPayload(db=database)
@@ -193,6 +197,10 @@ class CopyPayloadTestCase(unittest.TestCase):
             database,
             constant.NEW_TABLE_PREFIX + 'abc')
         payload._cleanup_payload.cleanup = Mock()
+        for suffix in range(1, payload.outfile_suffix_end + 1):
+            payload._cleanup_payload.add_file_entry(
+                payload.outfile + '.' + str(suffix)
+            )
 
         # If we don't skip cleanup, then we should have 2 tables to clean up
         payload.skip_cleanup_after_kill = False
@@ -202,6 +210,8 @@ class CopyPayloadTestCase(unittest.TestCase):
                     2006, 'MySQL has gone away'))
             payload.run_ddl(database, sql)
         self.assertEqual(len(payload._cleanup_payload.to_drop), 2)
+        self.assertEqual(len(payload._cleanup_payload.files_to_clean),
+                         payload.outfile_suffix_end)
         self.assertEqual(err_context.exception.err_key, 'GENERIC_MYSQL_ERROR')
 
         # If we are skipping cleanup, then there's nothing to cleanup
@@ -213,6 +223,7 @@ class CopyPayloadTestCase(unittest.TestCase):
             payload.run_ddl(database, sql)
         # There should be no cleanup entry at all if we skip the table cleanup
         self.assertEqual(payload._cleanup_payload.to_drop, [])
+        self.assertEqual(len(payload._cleanup_payload.files_to_clean), 0)
         self.assertEqual(err_context.exception.err_key, 'GENERIC_MYSQL_ERROR')
 
     def test_file_exists(self):
