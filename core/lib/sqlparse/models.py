@@ -14,6 +14,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import hashlib
+import re
 
 
 def escape(keyword):
@@ -612,3 +613,22 @@ class Table(object):
                 continue
             idx_list.append(idx)
         return idx_list
+
+    @property
+    def is_myrocks_ttl_table(self):
+        if not self.engine:
+            return False
+        if self.engine.upper() == 'ROCKSDB':
+            if self.comment:
+                # partition level ttl
+                if re.search(r'\S+_ttl_duration=[0-9]+;', self.comment):
+                    return True
+                # table level ttl
+                elif re.search(r'ttl_duration=[0-9]+;', self.comment):
+                    return True
+                else:
+                    return False
+            else:
+                return False
+        else:
+            return False

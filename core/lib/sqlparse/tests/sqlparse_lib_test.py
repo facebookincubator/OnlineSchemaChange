@@ -841,3 +841,39 @@ class ModelTableTestCase(unittest.TestCase):
         self.assertEqual(len(droppable_indexes), 1)
         for idx in droppable_indexes:
             self.assertEqual(idx.name, 'idx_name')
+
+    def test_is_myrocks_ttl_table(self):
+        sql = (
+            "Create table `foo`\n"
+            "( "
+            " `id` int auto_increment,"
+            " column2 varchar(100) default 'abc',"
+            "PRIMARY key (id) COMMENT 'this is pk' "
+            ") ENGINE=ROCKSDB COMMENT='ttl_duration=123;' "
+        )
+        sql_obj = parse_create(sql)
+        self.assertTrue(sql_obj.is_myrocks_ttl_table)
+
+    def test_is_myrocks_ttl_table_partition_ttl(self):
+        sql = (
+            "Create table `foo`\n"
+            "( "
+            " `id` int auto_increment,"
+            " column2 varchar(100) default 'abc',"
+            "PRIMARY key (id) COMMENT 'P1_cfname=p1_v1' "
+            ") ENGINE=ROCKSDB COMMENT='P1_ttl_duration=123;' "
+        )
+        sql_obj = parse_create(sql)
+        self.assertTrue(sql_obj.is_myrocks_ttl_table)
+
+    def test_is_myrocks_ttl_table_not_ttl(self):
+        sql = (
+            "Create table `foo`\n"
+            "( "
+            " `id` int auto_increment,"
+            " column2 varchar(100) default 'abc',"
+            "PRIMARY key (id) COMMENT 'P1_cfname=p1_v1' "
+            ") ENGINE=ROCKSDB COMMENT='some other comment' "
+        )
+        sql_obj = parse_create(sql)
+        self.assertFalse(sql_obj.is_myrocks_ttl_table)

@@ -68,6 +68,7 @@ class CopyPayload(Payload):
         self.select_chunk_size = 0
         self.bypass_replay_timeout = False
         self.is_slave_stopped_by_me = False
+        self.is_ttl_disabled_by_me = False
         self.stop_before_swap = False
         self.is_skip_fcache_supported = False
         self.outfile_suffix_end = 0
@@ -437,6 +438,10 @@ class CopyPayload(Payload):
         if not self._new_table.engine:
             return False
         return self._new_table.engine.upper() == 'ROCKSDB'
+
+    @property
+    def is_myrocks_ttl_table(self):
+        return self._new_table.is_myrocks_ttl_table
 
     def sanity_checks(self):
         """
@@ -1168,8 +1173,29 @@ class CopyPayload(Payload):
         self.unlock_tables()
         self.start_slave_sql()
 
+    def disable_ttl_for_myrocks(self):
+        if self.mysql_vars.get('rocksdb_enable_ttl', 'OFF') == 'ON':
+            self.execute_sql(
+                sql.set_global_variable('rocksdb_enable_ttl'), ('OFF',))
+            self.is_ttl_disabled_by_me = True
+        else:
+            log.debug("TTL not enabled for MyRocks, skip")
+
+    def enable_ttl_for_myrocks(self):
+        if self.is_ttl_disabled_by_me:
+            self.execute_sql(
+                sql.set_global_variable('rocksdb_enable_ttl'), ('ON',))
+        else:
+            log.debug("TTL not enabled for MyRocks before schema change, skip")
+
     @wrap_hook
     def start_snapshot(self):
+        # We need to disable TTL feature in MyRocks. Otherwise rows will
+        # possibly be purged during dump/load, and cause checksum mismatch
+        if self.is_myrocks_table and self.is_myrocks_ttl_table:
+            log.debug(
+                "It's schema change for MyRocks table which is using TTL")
+            self.disable_ttl_for_myrocks()
         self.execute_sql(sql.start_transaction_with_snapshot)
         current_max = self.get_max_delta_id()
         log.info("Changes with id <= {} committed before dump snapshot, "
@@ -2189,6 +2215,8 @@ class CopyPayload(Payload):
         # and locks
         try:
             self.start_slave_sql()
+            if self.is_myrocks_table and self.is_myrocks_ttl_table:
+                self.enable_ttl_for_myrocks()
             self.release_osc_lock()
             self.close_conn()
         except Exception:

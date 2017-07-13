@@ -541,6 +541,12 @@ def drop_tmp_table(table_name):
     return "DROP TEMPORARY TABLE `{}`".format(escape(table_name))
 
 
+def set_global_variable(variable):
+    return (
+        "SET GLOBAL {} = %s"
+        .format(variable))
+
+
 def set_session_variable(variable):
     return (
         "SET SESSION {} = %s"
