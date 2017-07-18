@@ -2294,9 +2294,7 @@ class CopyPayload(Payload):
                     self._current_db, self.new_table_name)
                 self._cleanup_payload.remove_drop_table_entry(
                     self._current_db, self.delta_table_name)
-                for chunk_id in range(1, self.outfile_suffix_end + 1):
-                    filepath = '{}.{}'.format(self.outfile, chunk_id)
-                    self._cleanup_payload.remove_file_entry(filepath)
+                self._cleanup_payload.remove_all_file_entries()
             if not self.keep_tmp_table:
                 self.cleanup()
             raise OSCError('GENERIC_MYSQL_ERROR',

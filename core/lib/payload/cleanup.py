@@ -95,6 +95,10 @@ class CleanupPayload(Payload):
         log.debug("Cleanup file entry removed: {}".format(filepath))
         self.files_to_clean.remove(filepath)
 
+    def remove_all_file_entries(self):
+        log.debug("Removing all cleanup file entries")
+        self.files_to_clean = []
+
     def add_sql_entry(self, sql):
         log.debug("Cleanup SQL entry added: {}".format(sql))
         self.sqls_to_execute.append(sql)
