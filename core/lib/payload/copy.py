@@ -1301,7 +1301,7 @@ class CopyPayload(Payload):
             progress_pct = int((float(outfile_suffix) / self.eta_chunks) * 100)
             progress_chunk = int(progress_pct / 10)
             if progress_chunk > printed_chunk and self.eta_chunks > 10:
-                log.info("Dump progress: {}/{} chunks"
+                log.info("Dump progress: {}/{}(ETA) chunks"
                          .format(outfile_suffix, self.eta_chunks))
                 printed_chunk = progress_chunk
         self.commit()
@@ -1670,7 +1670,7 @@ class CopyPayload(Payload):
             progress_pct = int(replayed_total / len(delta) * 100)
             if progress_pct > showed_pct:
                 log.info(
-                    "Load progress: {}/{} changes"
+                    "Replay progress: {}/{} changes"
                     .format(replayed_total + 1, len(delta)))
                 showed_pct += 10
         # Commit for last batch
