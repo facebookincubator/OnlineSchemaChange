@@ -187,7 +187,9 @@ class OSCError(Exception):
             'code': 136,
             'desc': (
                 'Unable to get MySQL lock for OSC. Please check whether there '
-                'is another OSC job already running somewhere'),
+                'is another OSC job already running somewhere. Use `cleanup '
+                '--kill` subcommand to kill the running job if you are not '
+                'interested in it anymore'),
         },
         'FAIL_TO_GUESS_CHUNK_SIZE': {
             'code': 137,
