@@ -15,6 +15,7 @@ from __future__ import unicode_literals
 
 import logging
 import os
+import time
 
 from .base import Payload
 from .. import constant
@@ -230,6 +231,9 @@ class CleanupPayload(Payload):
         """
         if self.kill_first:
             self.kill_osc()
+            log.info(
+                "Wait 5 seconds for the running OSC to cleanup its own stuff ")
+            time.sleep(5)
 
         if self.kill_only:
             return
