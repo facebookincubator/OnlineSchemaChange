@@ -191,6 +191,9 @@ class Copy(CommandBase):
                             help="Only dump rows which match this WHERE "
                             "condition. This works more like a selective "
                             "rebuild instead of a schema change")
+        parser.add_argument("--fail-for-implicit-conv", action='store_true',
+                            help="Raise an exception if the schema looks "
+                            "different from the one in file after execution")
 
     def setup_parser(self, parser, **kwargs):
         super(Copy, self).setup_parser(parser, **kwargs)

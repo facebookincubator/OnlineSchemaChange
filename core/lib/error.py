@@ -269,6 +269,16 @@ class OSCError(Exception):
                 'supported and enabled, or disable RBR before running OSC'
             )
         },
+        'IMPLICIT_CONVERSION_DETECTED': {
+            'code': 149,
+            'desc': (
+                'Implicity convesion happened after executing the CREATE '
+                'TABLE statement. It is a best practice to always store your '
+                'schema in a consistent way. Please make sure that the '
+                'statment provided in the file is copied from the output of '
+                '`SHOW CREATE TABLE`. Difference detected: \n {diff}'
+            )
+        },
         'ASSERTION_ERROR': {
             'code': 249,
             'desc': (

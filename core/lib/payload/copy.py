@@ -28,7 +28,7 @@ from .. import util
 from ..error import OSCError
 from ..hook import wrap_hook
 from ..mysql_version import MySQLVersion
-from ..sqlparse import parse_create, ParseError, is_equal
+from ..sqlparse import parse_create, ParseError, is_equal, SchemaDiff
 
 log = logging.getLogger(__name__)
 
@@ -144,6 +144,8 @@ class CopyPayload(Payload):
         self.where = kwargs.get('where', None)
         self.session_overrides_str = kwargs.get(
             'session_overrides', '')
+        self.fail_for_implicit_conv = kwargs.get(
+            'fail_for_implicit_conv', False)
         self.is_full_table_dump = False
 
     @property
@@ -482,15 +484,15 @@ class CopyPayload(Payload):
                                   (table_name, self._current_db,))
         return bool(table_exists)
 
-    def fetch_old_table(self):
+    def fetch_table_schema(self, table_name):
         """
         Use lib.sqlparse.parse_create to turn a CREATE TABLE syntax into a
         TABLE object, so that we can then do stuffs in a phythonic way later
         """
-        ddl = self.query(sql.show_create_table(self.table_name))
+        ddl = self.query(sql.show_create_table(table_name))
         if ddl:
             try:
-                self._old_table = parse_create(ddl[0]['Create Table'])
+                return parse_create(ddl[0]['Create Table'])
             except ParseError as e:
                 raise OSCError(
                     'TABLE_PARSING_ERROR',
@@ -525,7 +527,7 @@ class CopyPayload(Payload):
         if not self.table_exists(self.table_name):
             raise OSCError('TABLE_NOT_EXIST',
                            {'db': self._current_db, 'table': self.table_name})
-        self.fetch_old_table()
+        self._old_table = self.fetch_table_schema(self.table_name)
         self.partitions[self.table_name] = self.fetch_partitions(
             self.table_name)
         # The table after swap will have the same partition layout as current
@@ -933,6 +935,17 @@ class CopyPayload(Payload):
         self.partitions[self.new_table_name] = self.fetch_partitions(
             self.new_table_name)
         self.add_drop_table_entry(self.new_table_name)
+
+        # Check whether the schema is consistent after execution to avoid
+        # any implicit conversion
+        if self.fail_for_implicit_conv:
+            obj_after = self.fetch_table_schema(self.new_table_name)
+            obj_after.engine = self._new_table.engine
+            obj_after.name = self._new_table.name
+            if obj_after != self._new_table:
+                raise OSCError(
+                    'IMPLICIT_CONVERSION_DETECTED',
+                    {'diff': str(SchemaDiff(obj_after, self._new_table))})
 
     @wrap_hook
     def create_delta_table(self):
