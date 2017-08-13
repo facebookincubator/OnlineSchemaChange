@@ -3,13 +3,13 @@ We want to make contributing to this project as easy and transparent as
 possible.
 
 ## Our Development Process
-Once you submitted a diff, our github robot will sync it into our internal
+Once you submitted a diff, our GitHub robot will sync it into our internal
 repo to run all unittest and integration test suite making sure the change
 won't cause regression and bugs. In the meantime, our team will review the diff
 to make sure it meets our coding style and properly designed.
 
 Once approved the diff will be commited to our internal repo and sync back to
-github. Afterwards you'll be able to see your changes on GitHub!
+GitHub. Afterwards you'll be able to see your changes on GitHub!
 
 ## Contributor License Agreement ("CLA")
 In order to accept your pull request, we need you to submit a CLA. You only need
