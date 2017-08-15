@@ -942,10 +942,13 @@ class CopyPayload(Payload):
             obj_after = self.fetch_table_schema(self.new_table_name)
             obj_after.engine = self._new_table.engine
             obj_after.name = self._new_table.name
+            # Ignore partition difference, since there will be no implicit
+            # conversion here
+            obj_after.partition = self._new_table.partition
             if obj_after != self._new_table:
                 raise OSCError(
                     'IMPLICIT_CONVERSION_DETECTED',
-                    {'diff': str(SchemaDiff(obj_after, self._new_table))})
+                    {'diff': str(SchemaDiff(self._new_table, obj_after))})
 
     @wrap_hook
     def create_delta_table(self):

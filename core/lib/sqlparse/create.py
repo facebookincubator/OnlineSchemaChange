@@ -448,7 +448,9 @@ class CreateParser(object):
                 setattr(table, table_option,
                         result.table_options.get(table_option))
         if 'partition' in result:
-            table.partition = result.partition
+            # pyparsing will convert newline into two after parsing. So we
+            # need to dedup here
+            table.partition = result.partition.replace("\n\n", "\n")
         if 'constraint' in result:
             table.constraint = result.constraint
         for column_def in result.column_list:
