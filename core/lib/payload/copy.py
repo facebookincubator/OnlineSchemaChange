@@ -860,27 +860,35 @@ class CopyPayload(Payload):
                     "No index on new table can cover old pk. Since this is "
                     "a small table: {}, we fallback to a full table dump"
                     .format(self.table_size))
+                # All columns will be chosen if we are dumping table without
+                # chunking, this means all columns will be used as a part of
+                # the WHERE condition when replaying
                 self.is_full_table_dump = True
-            if self.skip_pk_coverage_check:
-                log.warning(
-                    "Indexes on new table cannot cover current PK of "
-                    "the old schema, which will make binary logs replay "
-                    "in an inefficient way.")
-            elif self.is_full_table_dump:
-                log.warning(
-                    "Skipping coverage index test, since we are doing full "
-                    "table dump")
+                self._pk_for_filter = [
+                    col.name for col in self._old_table.column_list]
+                self._pk_for_filter_def = [
+                    col for col in self._old_table.column_list]
             else:
-                old_pk_names = ", ".join(
-                    "`{}`".format(col.name)
-                    for col in self._old_table.primary_key.column_list)
-                raise OSCError('NO_INDEX_COVERAGE',
-                               {'pk_names': old_pk_names})
+                if self.skip_pk_coverage_check:
+                    log.warning(
+                        "Indexes on new table cannot cover current PK of "
+                        "the old schema, which will make binary logs replay "
+                        "in an inefficient way.")
+                elif self.is_full_table_dump:
+                    log.warning(
+                        "Skipping coverage index test, since we are doing "
+                        "full table dump")
+                else:
+                    old_pk_names = ", ".join(
+                        "`{}`".format(col.name)
+                        for col in self._old_table.primary_key.column_list)
+                    raise OSCError('NO_INDEX_COVERAGE',
+                                   {'pk_names': old_pk_names})
 
         if self.check_no_fcache_support():
             self.is_skip_fcache_supported = True
 
-        log.debug("PK filter for replyaing changes later: {}"
+        log.debug("PK filter for replaying changes later: {}"
                   .format(self._pk_for_filter))
 
         self.foreign_key_check()
