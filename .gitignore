@@ -8,5 +8,4 @@ build
 *.egg-info/
 *.swp
 *.swo
-arcanist/.phutil_module_cache
 autogen_docs_config.json
