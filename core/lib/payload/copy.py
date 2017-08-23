@@ -792,31 +792,7 @@ class CopyPayload(Payload):
                 return False
         return False
 
-    @wrap_hook
-    def pre_osc_check(self):
-        """
-        Pre-OSC sanity check.
-        Make sure all temporary table which will be used during data copy
-        stage doesn't exist before we actually creating one.
-        Also doing some index sanity check.
-        """
-        # Make sure temporary table we will use during copy doesn't exist
-        tables_to_check = (
-            self.new_table_name,
-            self.delta_table_name,
-            self.renamed_table_name)
-        for table_name in tables_to_check:
-            if self.table_exists(table_name):
-                raise OSCError('TABLE_ALREADY_EXIST',
-                               {'db': self._current_db, 'table': table_name})
-
-        # Make sure new table schema has primary key
-        if not all((self._new_table.primary_key,
-                    self._new_table.primary_key.column_list)):
-            raise OSCError(
-                'NO_PK_EXIST',
-                {'db': self._current_db, 'table': self.table_name})
-
+    def decide_pk_for_filter(self):
         # If we are adding a PK, then we should use all the columns in
         # old table to identify an unique row
         if not all((
@@ -850,6 +826,33 @@ class CopyPayload(Payload):
                 col.name for col in self._old_table.primary_key.column_list]
             self._pk_for_filter_def = [
                 col for col in self._old_table.primary_key.column_list]
+
+    @wrap_hook
+    def pre_osc_check(self):
+        """
+        Pre-OSC sanity check.
+        Make sure all temporary table which will be used during data copy
+        stage doesn't exist before we actually creating one.
+        Also doing some index sanity check.
+        """
+        # Make sure temporary table we will use during copy doesn't exist
+        tables_to_check = (
+            self.new_table_name,
+            self.delta_table_name,
+            self.renamed_table_name)
+        for table_name in tables_to_check:
+            if self.table_exists(table_name):
+                raise OSCError('TABLE_ALREADY_EXIST',
+                               {'db': self._current_db, 'table': table_name})
+
+        # Make sure new table schema has primary key
+        if not all((self._new_table.primary_key,
+                    self._new_table.primary_key.column_list)):
+            raise OSCError(
+                'NO_PK_EXIST',
+                {'db': self._current_db, 'table': self.table_name})
+
+        self.decide_pk_for_filter()
 
         # Check if we can have indexes in new table to efficiently look up
         # current old pk combinations

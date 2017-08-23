@@ -642,3 +642,63 @@ class CopyPayloadTestCase(unittest.TestCase):
         payload.query = Mock()
         payload.foreign_key_check()
         self.assertFalse(payload.query.called)
+
+
+class CopyPayloadPKFilterTestCase(unittest.TestCase):
+    def setUp(self):
+        self.payload = CopyPayload()
+        self.table_obj_1pk = parse_create(
+            " CREATE TABLE a ("
+            "id1 int, "
+            "id2 int, "
+            "id3 int, "
+            "PRIMARY KEY(id1) "
+            ") "
+        )
+        self.table_obj_2pk = parse_create(
+            " CREATE TABLE a ("
+            "id1 int, "
+            "id2 int, "
+            "id3 int, "
+            "PRIMARY KEY(id1, id2) "
+            ") "
+        )
+        self.table_obj_uk = parse_create(
+            " CREATE TABLE a ("
+            "id1 int, "
+            "id2 int, "
+            "id3 int, "
+            "UNIQUE KEY(id1) "
+            ") "
+        )
+        self.table_obj_no_uk = parse_create(
+            " CREATE TABLE a ("
+            "id1 int, "
+            "id2 int, "
+            "id3 int "
+            ") "
+        )
+        self.payload._current_db = 'test'
+
+    def test_decide_pk_for_filter_1pk_to_2pk(self):
+        # Adding new columns to pk should still use old pk for filtering
+        self.payload._old_table = self.table_obj_1pk
+        self.payload._new_table = self.table_obj_2pk
+        self.payload.decide_pk_for_filter()
+        self.assertEquals(self.payload._pk_for_filter, ['id1'])
+
+    def test_decide_pk_for_filter_uk_to_2pk(self):
+        # An UK should be used if there's no existing pk
+        self.payload._old_table = self.table_obj_uk
+        self.payload._new_table = self.table_obj_2pk
+        self.payload.decide_pk_for_filter()
+        self.assertEquals(self.payload._pk_for_filter, ['id1'])
+
+    def test_decide_pk_for_filter_no_uk_allow(self):
+        # An UK should be used if there's no existing pk
+        self.payload._old_table = self.table_obj_no_uk
+        self.payload._new_table = self.table_obj_1pk
+        self.payload.allow_new_pk = True
+        self.payload.decide_pk_for_filter()
+        self.assertEquals(self.payload._pk_for_filter, ['id1', 'id2', 'id3'])
+        self.assertTrue(self.payload.is_full_table_dump)
