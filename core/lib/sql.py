@@ -28,6 +28,8 @@ show_slave_status = "SHOW SLAVE STATUS"
 show_status = "SHOW STATUS LIKE %s "
 select_max_statement_time = "SELECT MAX_STATEMENT_TIME=1000 1"
 show_variables = "SHOW SESSION VARIABLES"
+show_binlogs = "SHOW BINARY LOGS"
+get_gtid_set = "select @@global.gtid_executed as gtid_set"
 
 table_existence = (
     " SELECT 1 "

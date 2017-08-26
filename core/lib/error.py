@@ -279,6 +279,15 @@ class OSCError(Exception):
                 '`SHOW CREATE TABLE`. Difference detected: \n {diff}'
             )
         },
+        'EMPTY_GTID_SET': {
+            'code': 150,
+            'desc': (
+                'We failed to get a non-empty gtid_set from '
+                '`START TRANSACTION WITH CONSISTENT SNAPSHOT`.  '
+                'Please make sure that your running MySQL version support '
+                'GTID'
+            )
+        },
         'ASSERTION_ERROR': {
             'code': 249,
             'desc': (

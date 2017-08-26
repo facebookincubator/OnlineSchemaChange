@@ -28,6 +28,24 @@ else:
 log = logging.getLogger(__name__)
 
 
+def os_run(cmd_segments, stdout_file, sudo=False):
+    """
+    Remove a file on the disk, not us os.rm because we want to add timeout to
+    the command. It's possible that the os call got hang when the disk has
+    some problems
+    """
+    with open(stdout_file, 'w') as fh:
+        if sudo:
+            cmd_segments += ['sudo']
+        log.debug("Executing cmd: {}".format(str(cmd_segments)))
+        proc = subprocess.Popen(cmd_segments, stdin=subprocess.PIPE,
+                                stdout=fh)
+        try:
+            (stdout, stderr) = proc.communicate(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            raise OSCError('SHELL_TIMEOUT', {'cmd': ' '.join(cmd_segments)})
+
 def rm(filename, sudo=False):
     """
     Remove a file on the disk, not us os.rm because we want to add timeout to
