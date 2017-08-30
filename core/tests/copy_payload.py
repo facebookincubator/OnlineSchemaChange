@@ -15,6 +15,7 @@ from __future__ import unicode_literals
 
 import MySQLdb
 import unittest
+import time
 from ..lib.payload.copy import CopyPayload
 from ..lib.payload.cleanup import CleanupPayload
 from ..lib.sqlparse import parse_create
@@ -25,8 +26,8 @@ from mock import Mock
 
 
 class CopyPayloadTestCase(unittest.TestCase):
-    def payload_setup(self):
-        payload = CopyPayload()
+    def payload_setup(self, **payload_kwargs):
+        payload = CopyPayload(**payload_kwargs)
         table_obj = parse_create(
             " CREATE TABLE a "
             "( ID int primary key ) ")
@@ -119,29 +120,79 @@ class CopyPayloadTestCase(unittest.TestCase):
             payload.set_innodb_tmpdir('mock/path')
         self.assertEqual(err_context.exception.args[0], 1111)
 
-    def test_long_select_being_killed(self):
+    def test_long_selects_being_killed(self):
+        # limit wait time to 10 ms
+        payload = self.payload_setup(lock_max_wait_before_kill_seconds=0.01)
+        mocked_conn = Mock()
+        payload.get_conn = Mock(return_value=mocked_conn)
+        # execute_sql takes 500 ms to return, more than the 10 ms limit
+        payload.execute_sql = Mock(side_effect=lambda _: time.sleep(0.5))
 
-        payload = self.payload_setup()
-        query_id = 123
-        payload.get_running_queries = Mock(return_value=[
-            {'Info': b'SELECT 1 from a', 'db': 'test', 'Id': query_id}
-        ])
-        payload.execute_sql = Mock()
-        payload.kill_query_by_id = Mock()
-        # Try lock table, and make sure kill select will be called
-        payload.lock_tables(tables=['a'])
-        payload.kill_query_by_id.assert_called_with(query_id)
-
-        # select in information_schema should be ignored
-        payload.get_running_queries = Mock(return_value=[
+        query_id = 100
+        mocked_conn.get_running_queries = Mock(return_value=[
+            {'Info': b'SELECT 1 from a', 'db': 'test', 'Id': query_id},
+            {'Info': b'SELECT 1 from `a`', 'db': 'test', 'Id': query_id + 1},
+            {'Info': b'alter table a add column `bar` text',
+             'db': 'test', 'Id': query_id + 2},
+            {'Info': b'select 1 from b', 'db': 'test', 'Id': query_id + 3},
+            {'Info': b'select 1 from `b`', 'db': 'test', 'Id': query_id + 4},
+            {'Info': b'SELECT 1 from c', 'db': 'test', 'Id': query_id + 5},
+            {'Info': b'SELECT 1 from `c`', 'db': 'test', 'Id': query_id + 6},
             {'Info': b'SELECT 1 from a', 'db': 'information_schema',
-             'Id': query_id}
+             'Id': query_id + 7},
+            {'Info': b'SELECT 1 from `a`', 'db': 'information_schema',
+             'Id': query_id + 8},
         ])
+
+        # Try lock tables
+        payload.lock_tables(tables=['a', 'b'])
+
+        # Be sure that the kill timer is finished
+        payload._last_kill_timer.join(1)
+        self.assertFalse(payload._last_kill_timer.isAlive())
+
+        # Make sure kill selects only on tables a and b
+        kill_calls = mocked_conn.kill_query_by_id.call_args_list
+        self.assertEquals(len(kill_calls), 5)
+        for idx, killed in enumerate((query_id, query_id + 1, query_id + 2,
+                                      query_id + 3, query_id + 4)):
+            args, kwargs = kill_calls[idx]
+            self.assertEquals(len(args), 1)
+            self.assertEquals(args[0], killed)
+
+    def test_selects_not_being_killed(self):
+        # limit wait time to 1 sec
+        payload = self.payload_setup(lock_max_wait_before_kill_seconds=1)
+        mocked_conn = Mock()
+        payload.get_conn = Mock(return_value=mocked_conn)
+        # execute_sql now returns right away
         payload.execute_sql = Mock()
-        payload.kill_query_by_id = Mock()
-        # Try lock table, and make sure kill select will be called
-        payload.lock_tables(tables=['a'])
-        payload.kill_query_by_id.assert_not_called()
+
+        query_id = 100
+        mocked_conn.get_running_queries = Mock(return_value=[
+            {'Info': b'SELECT 1 from a', 'db': 'test', 'Id': query_id},
+            {'Info': b'SELECT 1 from `a`', 'db': 'test', 'Id': query_id + 1},
+            {'Info': b'alter table a add column `bar` text',
+             'db': 'test', 'Id': query_id + 2},
+            {'Info': b'select 1 from b', 'db': 'test', 'Id': query_id + 3},
+            {'Info': b'select 1 from `b`', 'db': 'test', 'Id': query_id + 4},
+            {'Info': b'SELECT 1 from c', 'db': 'test', 'Id': query_id + 5},
+            {'Info': b'SELECT 1 from `c`', 'db': 'test', 'Id': query_id + 6},
+            {'Info': b'SELECT 1 from a', 'db': 'information_schema',
+             'Id': query_id + 7},
+            {'Info': b'SELECT 1 from `a`', 'db': 'information_schema',
+             'Id': query_id + 8},
+        ])
+
+        # Try lock tables
+        payload.lock_tables(tables=['a', 'b'])
+
+        # Be sure that the kill timer is finished
+        payload._last_kill_timer.join(1)
+        self.assertFalse(payload._last_kill_timer.isAlive())
+
+        # Make sure no selects were killed
+        mocked_conn.kill_query_by_id.assert_not_called()
 
     def test_set_rocksdb_bulk_load(self):
         payload = CopyPayload()

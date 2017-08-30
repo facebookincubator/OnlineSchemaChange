@@ -15,20 +15,20 @@ from __future__ import unicode_literals
 
 import glob
 import logging
-import os
 import MySQLdb
+import os
+import re
 import time
 from copy import deepcopy
+from threading import Timer
 
-from .base import Payload
-from .cleanup import CleanupPayload
-from .. import constant
-from .. import sql
-from .. import util
+from .. import constant, sql, util
 from ..error import OSCError
 from ..hook import wrap_hook
 from ..mysql_version import MySQLVersion
 from ..sqlparse import parse_create, ParseError, is_equal, SchemaDiff
+from .base import Payload
+from .cleanup import CleanupPayload
 
 log = logging.getLogger(__name__)
 
@@ -80,6 +80,7 @@ class CopyPayload(Payload):
         self.stats = {}
         self.partitions = {}
         self.eta_chunks = 1
+        self._last_kill_timer = None
 
         self.repl_status = kwargs.get('repl_status', '')
         self.outfile_dir = kwargs.get('outfile_dir', '')
@@ -125,6 +126,9 @@ class CopyPayload(Payload):
             'ddl_guard_attempts', constant.DDL_GUARD_ATTEMPTS)
         self.lock_max_attempts = kwargs.get(
             'lock_max_attempts', constant.LOCK_MAX_ATTEMPTS)
+        self.lock_max_wait_before_kill_seconds = kwargs.get(
+            'lock_max_wait_before_kill_seconds',
+            constant.LOCK_MAX_WAIT_BEFORE_KILL_SECONDS)
         self.session_timeout = kwargs.get(
             'mysql_session_timeout', constant.SESSION_TIMEOUT)
         self.idx_recreation = kwargs.get(
@@ -1070,39 +1074,51 @@ class CopyPayload(Payload):
             self.execute_sql(sql.start_slave_sql)
             self.is_slave_stopped_by_me = False
 
-    def get_running_queries(self):
+    def kill_selects(self, table_names, conn=None):
         """
-        Get a list of running queries. A wrapper of a single query to make it
-        easier for writing unittest
+        Kill current running SELECTs against the specified tables in the
+        working database so that they won't block the DDL statement we're
+        about to execute. The conn parameter allows to use a different
+        connection. A different connection is necessary when it is needed to
+        kill queries that may be blocking the current connection
         """
-        return self.query(sql.show_processlist)
+        conn = conn or self.conn
+        table_names = [tbl.lower() for tbl in table_names]
 
-    def kill_query_by_id(self, id):
-        """
-        Kill query with given query id. A wrapper of a single query to make it
-        easier for writing unittest
-        """
-        self.execute_sql(sql.kill_proc, (id,))
+        # We use regex matching to find running queries on top of the tables
+        # Better options (as in more precise) would be:
+        # 1. List the current held metadata locks, but this is not possible
+        #    without the performance schema
+        # 2. Actually parse the SQL of the running queries, but this can be
+        #    quite expensive
+        keyword_pattern = (
+            r'(\s|^)'  # whitespace or start
+            r'({})'    # keyword(s)
+            r'(\s|$)'  # whitespace or end
+        )
+        table_pattern = (
+            r'(\s|`)'    # whitespace or backtick
+            r'({})'      # table(s)
+            r'(\s|`|$)'  # whitespace, backtick or end
+        )
+        alter_or_select_pattern = \
+            re.compile(keyword_pattern.format('select|alter'))
+        information_schema_pattern = \
+            re.compile(keyword_pattern.format('information_schema'))
+        any_tables_pattern = \
+            re.compile(table_pattern.format('|'.join(table_names)))
 
-    def kill_selects(self, table_name):
-        """
-        Kill current running SELECTs against the working database. So that
-        they won't block the DDL statement we're about to execute
-        """
-        processlist = self.get_running_queries()
+        processlist = conn.get_running_queries()
         for proc in processlist:
-            if not proc['Info']:
-                sql_statement = ''
-            else:
-                sql_statement = proc['Info'].decode('utf-8', 'replace')
-            if (proc['db'] == self._current_db and
-                    sql_statement and
-                    table_name in sql_statement and
-                    'information_schema' not in sql_statement.lower() and
-                    ('select' in sql_statement.lower() or
-                     'alter' in sql_statement.lower())):
+            sql_statement = proc.get('Info') or ''
+            sql_statement = sql_statement.decode('utf-8', 'replace').lower()
+
+            if (proc['db'] == self._current_db and sql_statement and
+                    not information_schema_pattern.search(sql_statement) and
+                    any_tables_pattern.search(sql_statement) and
+                    alter_or_select_pattern.search(sql_statement)):
                 try:
-                    self.kill_query_by_id(int(proc['Id']))
+                    conn.kill_query_by_id(int(proc['Id']))
                 except MySQLdb.MySQLError as e:
                     errcode, errmsg = e.args
                     # 1094: Unknown thread id
@@ -1157,11 +1173,21 @@ class CopyPayload(Payload):
 
     @wrap_hook
     def lock_tables(self, tables):
-        for tablename in tables:
-            self.kill_selects(tablename)
         for _ in range(self.lock_max_attempts):
+            # We use a threading.Timer with a second connection in order to
+            # kill any selects on top of the tables being altered if we could
+            # not lock the tables in time
+            another_conn = self.get_conn(self._current_db)
+            kill_timer = Timer(self.lock_max_wait_before_kill_seconds,
+                               self.kill_selects, args=(tables, another_conn))
+            # keeping a reference to kill timer helps on tests
+            self._last_kill_timer = kill_timer
+            kill_timer.start()
+
             try:
                 self.execute_sql(sql.lock_tables(tables))
+                # It is best to cancel the timer as soon as possible
+                kill_timer.cancel()
                 log.info("Successfully lock table(s) for write: {}"
                          .format(', '.join(tables)))
                 break
@@ -1173,6 +1199,13 @@ class CopyPayload(Payload):
                         "Retry locking because of error: {}".format(e))
                 else:
                     raise
+            finally:
+                # guarantee that we dont leave a stray kill timer running
+                # or any open resources
+                kill_timer.cancel()
+                kill_timer.join()
+                another_conn.close()
+
         else:
             # Cannot lock write after max lock attempts
             raise OSCError(

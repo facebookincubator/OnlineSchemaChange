@@ -18,6 +18,7 @@ import logging
 import os
 import MySQLdb
 import warnings
+from . import sql
 
 log = logging.getLogger(__name__)
 
@@ -150,6 +151,20 @@ class MySQLSocketConnection:
                     "MySQL warning: {}, when executing sql: {}, args: {}"
                     .format(db_warning, sql, args))
             return cursor.rowcount
+
+    def get_running_queries(self):
+        """
+        Get a list of running queries. A wrapper of a single query to make it
+        easier for writing unittest
+        """
+        return self.query(sql.show_processlist)
+
+    def kill_query_by_id(self, id):
+        """
+        Kill query with given query id. A wrapper of a single query to make it
+        easier for writing unittest
+        """
+        self.execute(sql.kill_proc, (id,))
 
     def ping(self):
         self.conn.ping()
