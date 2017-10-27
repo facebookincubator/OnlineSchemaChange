@@ -694,6 +694,28 @@ class CopyPayloadTestCase(unittest.TestCase):
         payload.foreign_key_check()
         self.assertFalse(payload.query.called)
 
+    def test_wait_for_slow_query_none(self):
+        # If there's no slow query, we are expecting True being returned from
+        # the function
+        payload = self.payload_setup()
+        payload.get_long_trx = Mock(return_value=None)
+        result = payload.wait_until_slow_query_finish()
+        self.assertTrue(result)
+
+    def test_wait_for_slow_query_never_finish(self):
+        # If the slow query never finishes, then an OSCError should be raised
+        payload = self.payload_setup()
+        payload.max_wait_for_slow_query = 1
+        payload.get_long_trx = Mock(return_value={
+            'Time': 100,
+            'db': 'mydb',
+            'Id': 123,
+            'Info': 'select * from a'.encode()
+        })
+        with self.assertRaises(OSCError) as err_context:
+            payload.wait_until_slow_query_finish()
+        self.assertEqual(err_context.exception.err_key, 'LONG_RUNNING_TRX')
+
 
 class CopyPayloadPKFilterTestCase(unittest.TestCase):
     def setUp(self):

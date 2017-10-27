@@ -150,6 +150,8 @@ class CopyPayload(Payload):
             'session_overrides', '')
         self.fail_for_implicit_conv = kwargs.get(
             'fail_for_implicit_conv', False)
+        self.max_wait_for_slow_query = kwargs.get(
+            'max_wait_for_slow_query', 100)
         self.is_full_table_dump = False
 
     @property
@@ -771,8 +773,8 @@ class CopyPayload(Payload):
                 tbl_avg_length = 20
             self.select_chunk_size = self.chunk_size // tbl_avg_length
             # This means either the avg row size is huge, or user specified
-            # a tiny select_chunk_size on CLI. Let's make it one row per outfile
-            # to avoid zero division
+            # a tiny select_chunk_size on CLI. Let's make it one row per
+            # outfile to avoid zero division
             if not self.select_chunk_size:
                 self.select_chunk_size = 1
             log.info("Outfile will contain {} rows each"
@@ -1019,14 +1021,15 @@ class CopyPayload(Payload):
         self._cleanup_payload.add_drop_trigger_entry(
             self._current_db, self.update_trigger_name)
 
-    def check_long_trx(self):
+    def get_long_trx(self):
         """
-        Check if there's a long transaction running against table we'll touch.
+        Return a long running transaction agaisnt the table we'll touch,
+        if there's one.
         This is mainly for safety as long running transaction may block DDL,
         thus blocks more other requests
         """
         if self.skip_long_trx_check:
-            return True
+            return False
         processes = self.query(sql.show_processlist)
         for proc in processes:
             if not proc['Info']:
@@ -1037,13 +1040,26 @@ class CopyPayload(Payload):
                     proc.get('db', '') == self._current_db and
                     self.table_name in '--' + sql_statement and
                     not proc.get('Command', '') == 'Sleep'):
-                raise OSCError('LONG_RUNNING_TRX',
-                               {'pid': proc.get('Id', 0),
-                                'user': proc.get('User', ''),
-                                'host': proc.get('Host', ''),
-                                'time': proc.get('Time', ''),
-                                'command': proc.get('Command', ''),
-                                'info': sql_statement})
+                return proc
+
+    def wait_until_slow_query_finish(self):
+        for _ in range(self.max_wait_for_slow_query):
+            slow_query = self.get_long_trx()
+            if slow_query:
+                log.info("Slow query pid={} is still running"
+                         .format(slow_query.get('Id', 0)))
+                time.sleep(5)
+            else:
+                return True
+        else:
+            raise OSCError('LONG_RUNNING_TRX',
+                           {'pid': slow_query.get('Id', 0),
+                            'user': slow_query.get('User', ''),
+                            'host': slow_query.get('Host', ''),
+                            'time': slow_query.get('Time', ''),
+                            'command': slow_query.get('Command', ''),
+                            'info': slow_query['Info'].decode(
+                                'utf-8', 'replace')})
 
     def is_repl_running(self):
         """
@@ -1218,6 +1234,7 @@ class CopyPayload(Payload):
 
     @wrap_hook
     def create_triggers(self):
+        self.wait_until_slow_query_finish()
         self.stop_slave_sql()
         self.ddl_guard()
         log.debug('Locking table: {} before creating trigger'
@@ -2317,7 +2334,6 @@ class CopyPayload(Payload):
             if self.has_desired_schema():
                 return
             self.pre_osc_check()
-            self.check_long_trx()
             self.create_copy_table()
             self.create_delta_table()
             self.create_triggers()

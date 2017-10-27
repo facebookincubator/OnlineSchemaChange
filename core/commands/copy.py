@@ -194,6 +194,10 @@ class Copy(CommandBase):
         parser.add_argument("--fail-for-implicit-conv", action='store_true',
                             help="Raise an exception if the schema looks "
                             "different from the one in file after execution")
+        parser.add_argument("--max-wait-for-slow-query",
+                            help="How many attempts with 5 seconds sleep "
+                            "in between we should have waited for "
+                            "slow query to finish before error out")
 
     def setup_parser(self, parser, **kwargs):
         super(Copy, self).setup_parser(parser, **kwargs)
