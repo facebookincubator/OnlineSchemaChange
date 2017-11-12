@@ -95,8 +95,9 @@ class CommandBase(object):
                             help="MySQL user password to connect to the "
                             "instance",
                             required=require_password)
-        parser.add_argument("--charset",
-                            help="Character set used for MySQL connection")
+        parser.add_argument("--charset", default='ascii',
+                            help="Character set used for MySQL connection "
+                            "(defaults to '%(default)s').")
         parser.add_argument("--force",
                             help="Ignore non-critical errors and continue "
                             "making schema changes for all the given "
