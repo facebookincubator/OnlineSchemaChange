@@ -21,6 +21,7 @@ from ..lib import util
 from ..lib import constant
 from ..lib.error import OSCError
 from ..lib.payload.copy import CopyPayload
+from ..lib.payload.rbr import RBRPayload
 
 log = logging.getLogger(__name__)
 
@@ -34,6 +35,8 @@ class Copy(CommandBase):
     NAME = 'copy'
 
     def setup_optional_args(self, parser):
+        parser.add_argument("--rbr", action='store_true',
+                            help="Use RBR binlogs to catchup")
         parser.add_argument("--rebuild", action='store_true',
                             help="Force an OSC operation even current table "
                             "already has the desired schema")
@@ -221,9 +224,14 @@ class Copy(CommandBase):
                                {'filepath': filepath})
 
     def op(self, sudo=False):
-        self.payload = CopyPayload(get_conn_func=self.get_conn_func,
-                                   sudo=sudo,
-                                   **vars(self.args))
+        if self.args.rbr:
+            self.payload = RBRPayload(get_conn_func=self.get_conn_func,
+                                       sudo=sudo,
+                                       **vars(self.args))
+        else:
+            self.payload = CopyPayload(get_conn_func=self.get_conn_func,
+                                       sudo=sudo,
+                                       **vars(self.args))
 
         log.debug("Running schema change")
         self.payload.run()
