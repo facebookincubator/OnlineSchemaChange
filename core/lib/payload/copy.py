@@ -151,7 +151,7 @@ class CopyPayload(Payload):
         self.fail_for_implicit_conv = kwargs.get(
             'fail_for_implicit_conv', False)
         self.max_wait_for_slow_query = kwargs.get(
-            'max_wait_for_slow_query', 100)
+            'max_wait_for_slow_query', constant.MAX_WAIT_FOR_SLOW_QUERY)
         self.is_full_table_dump = False
 
     @property
