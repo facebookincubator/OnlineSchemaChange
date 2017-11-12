@@ -20,7 +20,7 @@ before_script:
   - mysql -uroot -e 'create database if not exists test'
   - echo -e "[server]\nsocket=/tmp/mysql.sock" | sudo tee -a /etc/mysql/my.cnf
   - sudo service mysql restart
-  - sudo chmod 777 /var/lib/mysql-files/
+  - sudo chmod 777 -R /var/lib/mysql
 
 install:
   - python setup.py install 
