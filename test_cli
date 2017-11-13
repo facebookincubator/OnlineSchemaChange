@@ -96,5 +96,6 @@ if __name__ == '__main__':
     # all functions in this class start with 'test' for their names
     tests = loader.loadTestsFromTestCase(test_case)
     suite.addTests(tests)
-    result = unittest.TextTestRunner(verbosity=2, buffer=True).run(suite)
+    result = unittest.TextTestRunner(verbosity=2,
+                                     failfast=True, buffer=True).run(suite)
     sys.exit(not result.wasSuccessful())
