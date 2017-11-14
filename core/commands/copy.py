@@ -194,8 +194,8 @@ class Copy(CommandBase):
         parser.add_argument("--fail-for-implicit-conv", action='store_true',
                             help="Raise an exception if the schema looks "
                             "different from the one in file after execution")
-        parser.add_argument("--max-wait-for-slow-query",
-                            type=int,
+        parser.add_argument("--max-wait-for-slow-query", type=int,
+                            default=constant.MAX_WAIT_FOR_SLOW_QUERY,
                             help="How many attempts with 5 seconds sleep "
                             "in between we should have waited for "
                             "slow query to finish before error out")
