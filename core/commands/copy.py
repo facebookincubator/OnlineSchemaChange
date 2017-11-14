@@ -195,6 +195,7 @@ class Copy(CommandBase):
                             help="Raise an exception if the schema looks "
                             "different from the one in file after execution")
         parser.add_argument("--max-wait-for-slow-query",
+                            type=int,
                             help="How many attempts with 5 seconds sleep "
                             "in between we should have waited for "
                             "slow query to finish before error out")
