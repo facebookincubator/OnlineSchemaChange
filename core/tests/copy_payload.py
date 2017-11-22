@@ -716,6 +716,31 @@ class CopyPayloadTestCase(unittest.TestCase):
             payload.wait_until_slow_query_finish()
         self.assertEqual(err_context.exception.err_key, 'LONG_RUNNING_TRX')
 
+    def test_is_high_pri_ddl_supported_yes_8_0(self):
+        payload = self.payload_setup()
+        payload.mysql_version = MySQLVersion('8.0.1-fb')
+        self.assertTrue(payload.is_high_pri_ddl_supported)
+
+    def test_is_high_pri_ddl_supported_yes_5_6_88(self):
+        payload = self.payload_setup()
+        payload.mysql_version = MySQLVersion('5.6.88-fb')
+        self.assertTrue(payload.is_high_pri_ddl_supported)
+
+    def test_is_high_pri_ddl_supported_yes_5_7(self):
+        payload = self.payload_setup()
+        payload.mysql_version = MySQLVersion('5.7.1-fb')
+        self.assertTrue(payload.is_high_pri_ddl_supported)
+
+    def test_is_high_pri_ddl_supported_no(self):
+        payload = self.payload_setup()
+        payload.mysql_version = MySQLVersion('5.6.1-fb')
+        self.assertFalse(payload.is_high_pri_ddl_supported)
+
+    def test_is_high_pri_ddl_supported_no_for_non_fb(self):
+        payload = self.payload_setup()
+        payload.mysql_version = MySQLVersion('5.7.1')
+        self.assertFalse(payload.is_high_pri_ddl_supported)
+
 
 class CopyPayloadPKFilterTestCase(unittest.TestCase):
     def setUp(self):

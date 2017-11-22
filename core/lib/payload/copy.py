@@ -424,6 +424,28 @@ class CopyPayload(Payload):
         return True
 
     @property
+    def is_high_pri_ddl_supported(self):
+        """
+        Only fb-mysql supports having DDL killing blocking queries by
+        setting high_priority_ddl=1
+        """
+        if self.mysql_version.is_fb:
+            if self.mysql_version >= MySQLVersion('5.6.35'):
+                return True
+            else:
+                return False
+        else:
+            return False
+
+    def enable_priority_ddl(self):
+        """
+        Enable high priority DDL if current MySQL supports it
+        """
+        if self.is_high_pri_ddl_supported:
+            self.execute_sql(
+                sql.set_session_variable('high_priority_ddl'), (1,))
+
+    @property
     def is_trigger_rbr_safe(self):
         """
         Only fb-mysql is safe for RBR if we create trigger on master alone
@@ -475,6 +497,7 @@ class CopyPayload(Payload):
         self.sanity_checks()
         self.set_tx_isolation()
         self.set_sql_mode()
+        self.enable_priority_ddl()
         self.override_session_vars()
         self.get_osc_lock()
 
@@ -1239,7 +1262,8 @@ class CopyPayload(Payload):
         self.ddl_guard()
         log.debug('Locking table: {} before creating trigger'
                   .format(self.table_name))
-        self.lock_tables(tables=[self.table_name])
+        if not self.is_high_pri_ddl_supported:
+            self.lock_tables(tables=[self.table_name])
 
         # Because we've already hold the WRITE LOCK on the table, it's now safe
         # to deal with operations that require metadata lock

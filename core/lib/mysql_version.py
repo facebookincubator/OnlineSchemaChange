@@ -77,3 +77,67 @@ class MySQLVersion(object):
         Return if current running MySQL is a Facebook fork
         """
         return self.fork == FB_FORK_NAME
+
+    def __gt__(self, other):
+        if self.major > other.major:
+            return True
+        elif self.major == other.major:
+            if self.minor > other.minor:
+                return True
+            elif self.minor == other.minor:
+                if self.release > other.release:
+                    return True
+                else:
+                    return False
+            else:
+                return False
+        else:
+            return False
+
+    def __lt__(self, other):
+        if self.major < other.major:
+            return True
+        elif self.major == other.major:
+            if self.minor < other.minor:
+                return True
+            elif self.minor == other.minor:
+                if self.release < other.release:
+                    return True
+                else:
+                    return False
+            else:
+                return False
+        else:
+            return False
+
+    def __ge__(self, other):
+        if self.major > other.major:
+            return True
+        elif self.major == other.major:
+            if self.minor > other.minor:
+                return True
+            elif self.minor == other.minor:
+                if self.release >= other.release:
+                    return True
+                else:
+                    return False
+            else:
+                return False
+        else:
+            return False
+
+    def __le__(self, other):
+        if self.major < other.major:
+            return True
+        elif self.major == other.major:
+            if self.minor < other.minor:
+                return True
+            elif self.minor == other.minor:
+                if self.release <= other.release:
+                    return True
+                else:
+                    return False
+            else:
+                return False
+        else:
+            return False

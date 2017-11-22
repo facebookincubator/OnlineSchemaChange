@@ -52,3 +52,41 @@ class MySQLVersionTest(unittest.TestCase):
         self.assertTrue(v_obj.major == 5)
         self.assertTrue(v_obj.minor == 6)
         self.assertTrue(v_obj.release == 30)
+
+    def test_lt_gt_major_difference(self):
+        left = '5.6.30-log'
+        right = '8.0.1-log'
+        v_left = MySQLVersion(left)
+        v_right = MySQLVersion(right)
+        self.assertTrue(v_left < v_right)
+        self.assertTrue(v_left <= v_right)
+        self.assertTrue(v_right > v_left)
+        self.assertTrue(v_right >= v_left)
+
+    def test_lt_gt_minor_difference(self):
+        left = '5.6.30-log'
+        right = '5.7.1-log'
+        v_left = MySQLVersion(left)
+        v_right = MySQLVersion(right)
+        self.assertTrue(v_left < v_right)
+        self.assertTrue(v_left <= v_right)
+        self.assertTrue(v_right > v_left)
+        self.assertTrue(v_right >= v_left)
+
+    def test_lt_gt_release_difference(self):
+        left = '5.6.30-log'
+        right = '5.6.50-log'
+        v_left = MySQLVersion(left)
+        v_right = MySQLVersion(right)
+        self.assertTrue(v_left < v_right)
+        self.assertTrue(v_left <= v_right)
+        self.assertTrue(v_right > v_left)
+        self.assertTrue(v_right >= v_left)
+
+    def test_le_ge(self):
+        left = '5.6.30-log'
+        right = '5.6.30-log'
+        v_left = MySQLVersion(left)
+        v_right = MySQLVersion(right)
+        self.assertTrue(v_left <= v_right)
+        self.assertTrue(v_right >= v_left)
