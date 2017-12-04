@@ -215,11 +215,20 @@ class Copy(CommandBase):
                 raise OSCError('OUTFILE_DIR_NOT_DIR',
                                {'dir': self.args.outfile_dir})
 
-        # Ensure all the given ddl files are readable
+        # Ensure all the given ddl files are readable and
+        # can be decoded with the current charset
         for filepath in self.args.ddl_file_list:
             if not util.is_file_readable(filepath):
                 raise OSCError('FAILED_TO_READ_DDL_FILE',
                                {'filepath': filepath})
+            charset = getattr(self.args, 'charset')
+            try:
+                with open(filepath, 'r') as file_obj:
+                    file_obj.read().decode(charset)
+            except UnicodeDecodeError:
+                raise OSCError('FAILED_TO_DECODE_DDL_FILE',
+                               {'filepath': filepath,
+                                'charset': charset})
 
     def op(self, sudo=False):
         self.payload = CopyPayload(get_conn_func=self.get_conn_func,
