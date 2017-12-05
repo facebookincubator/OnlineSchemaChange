@@ -279,6 +279,13 @@ class OSCError(Exception):
                 '`SHOW CREATE TABLE`. Difference detected: \n {diff}'
             )
         },
+        'FAILED_TO_DECODE_DDL_FILE': {
+            'code': 150,
+            'desc': (
+                "Failed to decode DDL file '{filepath}' "
+                "with charset '{charset}'. Use --charset "
+                "to set the proper charset."),
+        },
         'ASSERTION_ERROR': {
             'code': 249,
             'desc': (
