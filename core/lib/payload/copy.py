@@ -239,7 +239,10 @@ class CopyPayload(Payload):
         Name of the physical intermediate table for data loading. Used almost
         everywhere
         """
-        return constant.DELTA_TABLE_PREFIX + self._old_table.name
+        if len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 10:
+            return constant.DELTA_TABLE_PREFIX + self._old_table.name
+        else:
+            return constant.SHORT_DELTA_TABLE_PREFIX + self._old_table.name
 
     @property
     def table_name(self):
@@ -259,14 +262,20 @@ class CopyPayload(Payload):
         """
         Name of the physical temporary table for loading data during OSC
         """
-        return constant.NEW_TABLE_PREFIX + self.table_name
+        if len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 10:
+            return constant.NEW_TABLE_PREFIX + self.table_name
+        else:
+            return constant.SHORT_NEW_TABLE_PREFIX + self.table_name
 
     @property
     def renamed_table_name(self):
         """
         Name of the old table after swap.
         """
-        return constant.RENAMED_TABLE_PREFIX + self._old_table.name
+        if len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 10:
+            return constant.RENAMED_TABLE_PREFIX + self._old_table.name
+        else:
+            return constant.SHORT_RENAMED_TABLE_PREFIX + self._old_table.name
 
     @property
     def insert_trigger_name(self):
@@ -274,7 +283,10 @@ class CopyPayload(Payload):
         Name of the "AFTER INSERT" trigger on the old table to capture changes
         during data dump/load
         """
-        return constant.INSERT_TRIGGER_PREFIX + self._old_table.name
+        if len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 10:
+            return constant.INSERT_TRIGGER_PREFIX + self._old_table.name
+        else:
+            return constant.SHORT_INSERT_TRIGGER_PREFIX + self._old_table.name
 
     @property
     def update_trigger_name(self):
@@ -282,7 +294,10 @@ class CopyPayload(Payload):
         Name of the "AFTER UPDATE" trigger on the old table to capture changes
         during data dump/load
         """
-        return constant.UPDATE_TRIGGER_PREFIX + self._old_table.name
+        if len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 10:
+            return constant.UPDATE_TRIGGER_PREFIX + self._old_table.name
+        else:
+            return constant.SHORT_UPDATE_TRIGGER_PREFIX + self._old_table.name
 
     @property
     def delete_trigger_name(self):
@@ -290,7 +305,10 @@ class CopyPayload(Payload):
         Name of the "AFTER DELETE" trigger on the old table to capture changes
         during data dump/load
         """
-        return constant.DELETE_TRIGGER_PREFIX + self._old_table.name
+        if len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 10:
+            return constant.DELETE_TRIGGER_PREFIX + self._old_table.name
+        else:
+            return constant.SHORT_DELETE_TRIGGER_PREFIX + self._old_table.name
 
     @property
     def outfile(self):
@@ -1152,7 +1170,7 @@ class CopyPayload(Payload):
 
         processlist = conn.get_running_queries()
         for proc in processlist:
-            sql_statement = proc.get('Info') or ''
+            sql_statement = proc.get('Info') or ''.encode('utf-8')
             sql_statement = sql_statement.decode('utf-8', 'replace').lower()
 
             if (proc['db'] == self._current_db and sql_statement and
