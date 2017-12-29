@@ -81,6 +81,7 @@ class CopyPayload(Payload):
         self.partitions = {}
         self.eta_chunks = 1
         self._last_kill_timer = None
+        self.table_swapped = False
 
         self.repl_status = kwargs.get('repl_status', '')
         self.outfile_dir = kwargs.get('outfile_dir', '')
@@ -2313,6 +2314,7 @@ class CopyPayload(Payload):
         # SQL execution error: [1100] Table 't' was not locked with LOCK TABLES
         self.execute_sql(
             sql.rename_table(self.table_name, self.renamed_table_name))
+        self.table_swapped = True
         self.add_drop_table_entry(self.renamed_table_name)
         self.execute_sql(
             sql.rename_table(self.new_table_name, self.table_name))
@@ -2327,6 +2329,21 @@ class CopyPayload(Payload):
         self.execute_sql(sql.set_session_variable('autocommit'), (1,))
         self.start_slave_sql()
 
+    def rename_back(self):
+        """
+        If the orignal table was successfully renamed to _old but the second
+        rename operation failed, rollback the first renaming
+        """
+        if (
+                self.table_swapped and
+                self.table_exists(self.renamed_table_name) and
+                not self.table_exists(self.table_name)
+        ):
+            self.unlock_tables()
+            self.execute_sql(
+                sql.rename_table(self.renamed_table_name,
+                                 self.table_name))
+
     @wrap_hook
     def cleanup(self):
         """
@@ -2336,6 +2353,7 @@ class CopyPayload(Payload):
         # Close current connection to free up all the temporary resource
         # and locks
         try:
+            self.rename_back()
             self.start_slave_sql()
             if self.is_myrocks_table and self.is_myrocks_ttl_table:
                 self.enable_ttl_for_myrocks()
