@@ -697,9 +697,10 @@ class CopyPayload(Payload):
                            {'db': self._current_db,
                             'table': self.table_name})
 
-    def get_table_size(self, table_name):
+    def get_table_size_from_IS(self, table_name):
         """
-        Given a table_name return its current size in Bytes
+        Given a table_name return its current size in Bytes from
+        information_schema
 
         @param table_name:  Name of the table to fetch size
         @type  table_name:  string
@@ -710,14 +711,42 @@ class CopyPayload(Payload):
             return result[0]['Data_length'] + result[0]['Index_length']
         return 0
 
+    def get_table_size_for_myrocks(self, table_name):
+        """
+        Given a table_name return its raw data size before compression.
+        MyRocks is very good at compression, the on disk dump size
+        is much bigger than the actual MyRocks table size, hence we will
+        use raw size for the esitmation of the maximum disk usage
+
+        @param table_name:  Name of the table to fetch size
+        @type  table_name:  string
+        """
+        result = self.query(sql.get_myrocks_table_size(),
+                            (self._current_db, self.table_name,))
+        if result:
+            return result[0]['raw_size']
+        return 0
+
+    def get_table_size(self, table_name):
+        """
+        Given a table_name return its current size in Bytes
+
+        @param table_name:  Name of the table to fetch size
+        @type  table_name:  string
+        """
+        if self.is_myrocks_table:
+            return self.get_table_size_for_myrocks(table_name)
+        else:
+            return self.get_table_size_from_IS(table_name)
+
     def check_disk_size(self):
         """
         Check if we have enough disk space to execute the DDL
         """
         if self.skip_disk_space_check:
             return True
-        self.table_size = self.get_table_size(self.table_name)
-        disk_space = util.spare_disk_size(self.outfile_dir)
+        self.table_size = int(self.get_table_size(self.table_name))
+        disk_space = int(util.spare_disk_size(self.outfile_dir))
         # With allow_new_pk, we will create one giant outfile, and so at
         # some point will have the entire new table and the entire outfile
         # both existing simultaneously.

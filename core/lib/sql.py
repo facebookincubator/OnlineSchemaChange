@@ -252,6 +252,23 @@ def show_table_stats(db_name):
         .format(escape(db_name)))
 
 
+def get_myrocks_table_size():
+    return """
+        SELECT SUM(DATA_SIZE) as raw_size
+        FROM
+            INFORMATION_SCHEMA.ROCKSDB_INDEX_FILE_MAP
+        WHERE
+            INDEX_NUMBER = (
+                SELECT INDEX_NUMBER
+                FROM
+                    INFORMATION_SCHEMA.ROCKSDB_DDL
+                WHERE
+                    TABLE_SCHEMA = %s
+                    AND TABLE_NAME = %s
+                    AND INDEX_NAME = 'PRIMARY')
+        """
+
+
 def create_delta_table(delta_table_name, id_col_name, dml_col_name,
                        mysql_engine, old_column_list, old_table_name):
     return (
