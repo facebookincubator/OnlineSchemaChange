@@ -43,6 +43,8 @@ def rm(filename, sudo=False):
                             stdout=subprocess.PIPE)
     try:
         (stdout, stderr) = proc.communicate(timeout=10)
+        # return True if returncode is success (0)
+        return not proc.returncode
     except subprocess.TimeoutExpired:
         proc.kill()
         raise OSCError('SHELL_TIMEOUT', {'cmd': ' '.join(cmd_args)})

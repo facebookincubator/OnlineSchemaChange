@@ -258,7 +258,7 @@ class Payload(object):
         @param filename:  Full path of the file needs to be removed
         @type  filename:  string
         """
-        util.rm(filename, sudo=self.sudo)
+        return util.rm(filename, sudo=self.sudo)
 
     def get_osc_lock(self):
         """

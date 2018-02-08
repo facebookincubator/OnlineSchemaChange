@@ -1006,6 +1006,9 @@ class CopyPayload(Payload):
         table_diff = self.query(
             sql.column_diff,
             (self.new_table_name, self.table_name, self._current_db,))
+        self.partitions[self.new_table_name] = self.fetch_partitions(
+            self.new_table_name)
+        self.add_drop_table_entry(self.new_table_name)
         if table_diff:
             if self.allow_drop_column:
                 for diff_column in table_diff:
@@ -1022,10 +1025,6 @@ class CopyPayload(Payload):
             for col in self._pk_for_filter:
                 if col in self.dropped_column_name_list:
                     raise OSCError('PRI_COL_DROPPED', {'pri_col': col})
-
-        self.partitions[self.new_table_name] = self.fetch_partitions(
-            self.new_table_name)
-        self.add_drop_table_entry(self.new_table_name)
 
         # Check whether the schema is consistent after execution to avoid
         # any implicit conversion
@@ -1481,8 +1480,8 @@ class CopyPayload(Payload):
         # Delete the outfile once we have the data in new table to free
         # up space as soon as possible
         filepath = '{}.{}'.format(self.outfile, chunk_id)
-        self.rm_file(filepath)
-        self._cleanup_payload.remove_file_entry(filepath)
+        if self.rm_file(filepath):
+            self._cleanup_payload.remove_file_entry(filepath)
 
     def change_explicit_commit(self, enable=True):
         """
