@@ -723,8 +723,9 @@ class CopyPayload(Payload):
         """
         result = self.query(sql.get_myrocks_table_size(),
                             (self._current_db, self.table_name,))
+
         if result:
-            return result[0]['raw_size']
+            return result[0]['raw_size'] or 0
         return 0
 
     def get_table_size(self, table_name):
@@ -745,6 +746,7 @@ class CopyPayload(Payload):
         """
         if self.skip_disk_space_check:
             return True
+
         self.table_size = int(self.get_table_size(self.table_name))
         disk_space = int(util.spare_disk_size(self.outfile_dir))
         # With allow_new_pk, we will create one giant outfile, and so at
