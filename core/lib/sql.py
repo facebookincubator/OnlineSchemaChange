@@ -82,6 +82,12 @@ column_diff = (
     "   c2.COLUMN_NAME IS NULL"
 )
 
+partition_method = (
+    "SELECT MIN(PARTITION_METHOD) pm "
+    "FROM information_schema.partitions "
+    "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s GROUP BY TABLE_NAME"
+)
+
 
 """
 Section for SQL components

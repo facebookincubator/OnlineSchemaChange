@@ -114,32 +114,39 @@ class CleanupPayload(Payload):
             if entry['type'] == 'trigger':
                 db = entry['db']
                 trigger_name = entry['name']
-                sql = "DROP TRIGGER IF EXISTS `{}`".format(
+                sql_query = "DROP TRIGGER IF EXISTS `{}`".format(
                     escape(trigger_name))
-                self.sqls_to_execute.append((sql, db))
+                self.sqls_to_execute.append((sql_query, db))
 
         log.info("Generating drop table queries")
         for entry in self.to_drop:
             if entry['type'] == 'table':
                 db = entry['db']
                 table = entry['name']
-                # MySQL doesn't allow remove all the partitions in a
-                # partitioned table, so we will leave single partition there
-                # before drop the table
-                if entry['partitions']:
-                    entry['partitions'].pop()
-                    # Gradually drop partitions, so that we will not hold
-                    # metadata lock for too long and block requests with
-                    # single drop table
-                    for partition_name in entry['partitions']:
-                        sql = (
-                            "ALTER TABLE `{}` "
-                            "DROP PARTITION `{}`"
-                        ).format(
-                            escape(table), escape(partition_name))
-                        self.sqls_to_execute.append((sql, db))
-                sql = "DROP TABLE IF EXISTS `{}`".format(table)
-                self.sqls_to_execute.append((sql, db))
+
+                partition_method = self.get_partition_method(db, table)
+                if partition_method in ('RANGE', 'LIST'):
+                    # MySQL doesn't allow remove all the partitions in a
+                    # partitioned table, so we will leave single partition
+                    # there before drop the table
+                    if entry['partitions']:
+                        entry['partitions'].pop()
+
+                        # Gradually drop partitions, so that we will not hold
+                        # metadata lock for too long and block requests with
+                        # single drop table
+                        log.debug("{}/{} using {} partitioning method".format(
+                                  db, table, partition_method))
+                        for partition_name in entry['partitions']:
+                            sql_query = (
+                                "ALTER TABLE `{}` "
+                                "DROP PARTITION `{}`"
+                            ).format(escape(table), escape(partition_name))
+                            self.sqls_to_execute.append((sql_query, db))
+
+                sql_query = "DROP TABLE IF EXISTS `{}`".format(table)
+                self.sqls_to_execute.append((sql_query, db))
+
         self.to_drop = []
 
     def add_drop_table_entry(self, db, table, partitions=None):

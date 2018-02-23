@@ -144,6 +144,16 @@ class Payload(object):
                   .format(repl_status_now))
         return repl_status_now == self.repl_status
 
+    def get_partition_method(self, db, table):
+        """
+        Get partition method for the db/table
+        """
+        result = self.query(sql.partition_method, (db, table,))
+
+        if result:
+            return result[0]['pm'] or False
+        return False
+
     def query(self, sql, args=None):
         """
         Execute sql again MySQL instance and return the result
