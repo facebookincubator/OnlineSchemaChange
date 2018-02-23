@@ -692,10 +692,18 @@ class CopyPayload(Payload):
             sql.foreign_key_cnt,
             (self.table_name, self._current_db,
              self.table_name, self._current_db,))
-        if foreign_keys and foreign_keys[0]['count'] > 0:
+        if foreign_keys:
+            fk = "CONSTRAINT `{}` FOREIGN KEY (`{}`) REFERENCES `{}` (`{}`)".\
+                format(
+                    foreign_keys[0]['constraint_name'],
+                    foreign_keys[0]['col_name'],
+                    foreign_keys[0]['ref_tab'],
+                    foreign_keys[0]['ref_col_name'],
+                )
             raise OSCError("FOREIGN_KEY_FOUND",
                            {'db': self._current_db,
-                            'table': self.table_name})
+                            'table': self.table_name,
+                            'fk': fk})
 
     def get_table_size_from_IS(self, table_name):
         """

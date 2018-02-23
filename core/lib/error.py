@@ -239,7 +239,8 @@ class OSCError(Exception):
         'FOREIGN_KEY_FOUND': {
             'code': 144,
             'desc': ("{db}.{table} is referencing or being referenced "
-                     "in at least one foreign key")
+                     "in at least one foreign key: "
+                     "{fk}")
         },
         'WRONG_ENGINE': {
             'code': 145,

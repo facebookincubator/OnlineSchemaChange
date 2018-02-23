@@ -50,7 +50,9 @@ fetch_partition = (
 )
 
 foreign_key_cnt = (
-    "SELECT COUNT(*) AS count"
+    "SELECT rc.CONSTRAINT_NAME AS constraint_name,"
+    " kcu.COLUMN_NAME col_name,kcu.REFERENCED_COLUMN_NAME ref_col_name,"
+    " kcu.REFERENCED_TABLE_NAME ref_tab"
     "  FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS AS rc"
     "  JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE AS kcu"
     "   USING (CONSTRAINT_SCHEMA,CONSTRAINT_NAME)"
