@@ -266,7 +266,7 @@ def get_myrocks_table_size():
         FROM
             INFORMATION_SCHEMA.ROCKSDB_INDEX_FILE_MAP
         WHERE
-            INDEX_NUMBER = (
+            INDEX_NUMBER IN (
                 SELECT INDEX_NUMBER
                 FROM
                     INFORMATION_SCHEMA.ROCKSDB_DDL
