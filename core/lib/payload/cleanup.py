@@ -63,9 +63,10 @@ class CleanupPayload(Payload):
                 log.exception("Failed to cleanup file: {}".format(filepath))
 
         # Drop table and triggers
-        self.gen_drop_sqls()
         if not self._conn:
             self._conn = self.get_conn(db)
+
+        self.gen_drop_sqls()
         self.set_no_binlog()
         self.execute_sql('USE `{}`'.format(escape(db)))
         current_db = db

@@ -158,8 +158,6 @@ class Payload(object):
         """
         Execute sql again MySQL instance and return the result
         """
-        self.init_conn()
-
         self._sql_now = sql
         self._sql_args_now = args
         log.debug("Running the following SQL on MySQL: {} {}"
