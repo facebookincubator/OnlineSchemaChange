@@ -1491,6 +1491,7 @@ class CopyPayload(Payload):
         # up space as soon as possible
         filepath = '{}.{}'.format(self.outfile, chunk_id)
         if self.rm_file(filepath):
+            util.sync_dir(self.outfile_dir)
             self._cleanup_payload.remove_file_entry(filepath)
 
     def change_explicit_commit(self, enable=True):

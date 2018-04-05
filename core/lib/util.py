@@ -50,6 +50,16 @@ def rm(filename, sudo=False):
         raise OSCError('SHELL_TIMEOUT', {'cmd': ' '.join(cmd_args)})
 
 
+def sync_dir(dirname):
+    """
+    Calling fsync on the directory. This is for synching
+    deleted files to storage devices to prevent trim stalls.
+    """
+    dirfd = os.open(dirname, os.O_DIRECTORY)
+    os.fsync(dirfd)
+    os.close(dirfd)
+
+
 def is_file_readable(filepath):
     """
     Check if the file given is readable to the user we are currently running
