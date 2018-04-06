@@ -15,6 +15,7 @@ from __future__ import unicode_literals
 
 import logging
 import os
+import codecs
 
 from .base import CommandBase
 from ..lib import util
@@ -223,8 +224,8 @@ class Copy(CommandBase):
                                {'filepath': filepath})
             charset = getattr(self.args, 'charset')
             try:
-                with open(filepath, 'r') as file_obj:
-                    file_obj.read().decode(charset)
+                with codecs.open(filepath, encoding=charset, mode='r') as fh:
+                    fh.read()
             except UnicodeDecodeError:
                 raise OSCError('FAILED_TO_DECODE_DDL_FILE',
                                {'filepath': filepath,
