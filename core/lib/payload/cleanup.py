@@ -15,6 +15,7 @@ from __future__ import unicode_literals
 
 import logging
 import os
+import re
 import time
 
 from .base import Payload
@@ -214,6 +215,20 @@ class CleanupPayload(Payload):
                     self.add_drop_trigger_entry(
                         row['db'], row['trigger_name'])
 
+    def search_for_files(self):
+        """
+        List all the files that may have been left over by OSC in previous runs
+
+        TODO: cleaning up is also done a lot in copy.py, so a future
+        improvement here could be to refactor OSC in such a way that the
+        cleanup part can be easily reused. T28154647
+        """
+        datadir = self.query(sql.select_as('@@datadir', 'dir'))[0]['dir']
+        for root, _, files in os.walk(datadir):
+            for fname in files:
+                if re.match('__osc_.*\..*', fname):
+                    self.add_file_entry(os.path.join(root, fname))
+
     def kill_osc(self):
         """
         Kill the running OSC process if there's one running.
@@ -251,6 +266,7 @@ class CleanupPayload(Payload):
         # in the trigger was dropped first.
         self.search_for_triggers()
         self.search_for_tables()
+        self.search_for_files()
 
         # cleanup is a critical part, We need to make sure there's no other
         # OSC running
