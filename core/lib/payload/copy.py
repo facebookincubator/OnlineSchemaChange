@@ -134,6 +134,8 @@ class CopyPayload(Payload):
             'mysql_session_timeout', constant.SESSION_TIMEOUT)
         self.idx_recreation = kwargs.get(
             'idx_recreation', False)
+        self.rocksdb_bulk_load_allow_sk = kwargs.get(
+            'rocksdb_bulk_load_allow_sk', False)
         self.rebuild = kwargs.get('rebuild', False)
         self.keep_tmp_table = kwargs.get(
             'keep_tmp_table_after_exception', False)
@@ -1521,9 +1523,26 @@ class CopyPayload(Payload):
             return
 
         v = 1 if enable else 0
+
+        #  rocksdb_bulk_load and rocksdb_bulk_load_allow_sk have the
+        #  following sequence requirement so setting values accordingly.
+        #  SET SESSION rocksdb_bulk_load_allow_sk=1;
+        #  SET SESSION rocksdb_bulk_load=1;
+        #  ... (bulk loading)
+        #  SET SESSION rocksdb_bulk_load=0;
+        #  SET SESSION rocksdb_bulk_load_allow_sk=0;
         try:
+            if self.rocksdb_bulk_load_allow_sk and enable:
+                self.execute_sql(
+                    sql.set_session_variable('rocksdb_bulk_load_allow_sk'),
+                    (v,))
             self.execute_sql(
                 sql.set_session_variable('rocksdb_bulk_load'), (v,))
+            if self.rocksdb_bulk_load_allow_sk and not enable:
+                self.execute_sql(
+                    sql.set_session_variable('rocksdb_bulk_load_allow_sk'),
+                    (v,))
+
         except MySQLdb.OperationalError as e:
             errnum, errmsg = e.args
             # 1193: unknown variable

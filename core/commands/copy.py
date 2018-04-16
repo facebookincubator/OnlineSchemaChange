@@ -71,6 +71,11 @@ class Copy(CommandBase):
                             "data, and recreate them afterwards. This can "
                             "prevent index fragmentation, but will also slow "
                             "down the whole process slower")
+        parser.add_argument("--rocksdb-bulk-load-allow-sk",
+                            action='store_true',
+                            help="Enabling rocksdb_bulk_load_allow_sk "
+                            "session variable. This turns on bulk loading "
+                            "on secondary keys.")
         parser.add_argument("--force-cleanup", action='store_true',
                             help="Force cleanup before executing DDL."
                             "This is useful when you are sure there's no "
