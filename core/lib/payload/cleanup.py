@@ -226,7 +226,7 @@ class CleanupPayload(Payload):
         datadir = self.query(sql.select_as('@@datadir', 'dir'))[0]['dir']
         for root, _, files in os.walk(datadir):
             for fname in files:
-                if re.match('__osc_.*\..*', fname):
+                if re.match('__osc_.*\.[0-9]+', fname):
                     self.add_file_entry(os.path.join(root, fname))
 
     def kill_osc(self):
