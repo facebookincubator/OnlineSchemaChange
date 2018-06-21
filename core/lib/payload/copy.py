@@ -450,9 +450,6 @@ class CopyPayload(Payload):
         Only fb-mysql supports having DDL killing blocking queries by
         setting high_priority_ddl=1
         """
-        # Temporarily turnning off for a known bug in high_pri_ddl
-        return False
-
         if self.mysql_version.is_fb:
             if self.mysql_version >= MySQLVersion('5.6.35'):
                 return True
