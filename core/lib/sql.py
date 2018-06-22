@@ -501,7 +501,7 @@ def replay_insert_row(
     ignore = "IGNORE" if ignore else ""
     return (
         "INSERT {ignore} INTO `{new}` ({cols})"
-        "SELECT {cols} FROM `{delta}` WHERE "
+        "SELECT {cols} FROM `{delta}` FORCE INDEX (PRIMARY) WHERE "
         "`{delta}`.`{id_col}` IN %s "
     ).format(
         **{'ignore': ignore,
