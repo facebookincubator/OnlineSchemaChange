@@ -115,8 +115,9 @@ class CopyPayload(Payload):
         self.skip_long_trx_check = kwargs.get(
             'skip_long_trx_check', False)
         self.ddl_file_list = kwargs.get('ddl_file_list', '')
-        self.free_space_reserved = kwargs.get(
-            'free_space_reserved', constant.DEFAULT_RESERVED_SPACE)
+        self.free_space_reserved_percent = kwargs.get(
+            'free_space_reserved_percent',
+            constant.DEFAULT_RESERVED_SPACE_PERCENT)
         self.chunk_size = kwargs.get(
             'chunk_size', constant.CHUNK_BYTES)
         self.long_trx_time = kwargs.get(
@@ -755,7 +756,7 @@ class CopyPayload(Payload):
             return True
 
         self.table_size = int(self.get_table_size(self.table_name))
-        disk_space = int(util.spare_disk_size(self.outfile_dir))
+        disk_space = int(util.disk_partition_free(self.outfile_dir))
         # With allow_new_pk, we will create one giant outfile, and so at
         # some point will have the entire new table and the entire outfile
         # both existing simultaneously.
@@ -1443,6 +1444,7 @@ class CopyPayload(Payload):
         affected_rows = 1
         use_where = False
         printed_chunk = 0
+        disk_partition_size = util.disk_partition_size(self.outfile_dir)
         while affected_rows:
             self.outfile_suffix_end = outfile_suffix
             outfile = '{}.{}'.format(self.outfile, outfile_suffix)
@@ -1452,11 +1454,13 @@ class CopyPayload(Payload):
                 self.refresh_range_start()
                 use_where = True
                 outfile_suffix += 1
-            free_disk_space = util.spare_disk_size(self.outfile_dir)
-            if free_disk_space < self.free_space_reserved:
+            free_disk_space = util.disk_partition_free(self.outfile_dir)
+            free_space_factor = self.free_space_reserved_percent / 100
+            free_space_reserved = disk_partition_size * free_space_factor
+            if free_disk_space < free_space_reserved:
                 raise OSCError(
                     'NOT_ENOUGH_SPACE',
-                    {'need': util.readable_size(self.free_space_reserved),
+                    {'need': util.readable_size(free_space_reserved),
                      'avail': util.readable_size(free_disk_space)})
             progress_pct = int((float(outfile_suffix) / self.eta_chunks) * 100)
             progress_chunk = int(progress_pct / 10)

@@ -36,7 +36,7 @@ class OSCError(Exception):
             'code': 104,
             'desc': 'no ddl_file_list specified',
         },
-        'UNABLE_TO_GET_DISK_SPACE': {
+        'UNABLE_TO_GET_FREE_DISK_SPACE': {
             'code': 105,
             'desc': 'Unable to read free disk size for path: {path}',
         },
@@ -46,6 +46,10 @@ class OSCError(Exception):
                 "Outfile {file} already exists. Please cleanup or use "
                 "--force-cleanup if you are sure it's left behind by last "
                 "unclean OSC stop"),
+        },
+        'UNABLE_TO_GET_PARTITION_SIZE': {
+            'code': 107,
+            'desc': 'Unable to read partition size from path: {path}',
         },
         'DB_NOT_GIVEN': {
             'code': 110,

@@ -87,7 +87,7 @@ def is_file_readable(filepath):
     return st.st_mode & stat.S_IROTH != 0
 
 
-def spare_disk_size(path):
+def disk_partition_free(path):
     """
     For given file path, return the size of free space in bytes of the
     underlying disk
@@ -104,7 +104,27 @@ def spare_disk_size(path):
         return vfs.f_bavail * vfs.f_bsize
     except Exception:
         log.exception("Exception when trying to get disk free space: ")
-        raise OSCError('UNABLE_TO_GET_DISK_SPACE', {'path': path})
+        raise OSCError('UNABLE_TO_GET_FREE_DISK_SPACE', {'path': path})
+
+
+def disk_partition_size(path):
+    """
+    For given file path, return the total size in bytes of the
+    underlying disk partition
+
+    @param path:  Full path in the partition for which the size we need to get
+    @type  path:  string
+
+    @return:  total size in btyes
+    @rtype :  int
+
+    """
+    try:
+        vfs = os.statvfs(path)
+        return vfs.f_blocks * vfs.f_bsize
+    except Exception:
+        log.exception("Exception when trying to get partition size: ")
+        raise OSCError('UNABLE_TO_GET_PARTITION_SIZE', {'path': path})
 
 
 def readable_size(nbytes):
