@@ -27,7 +27,6 @@ show_processlist = "SHOW FULL PROCESSLIST"
 show_slave_status = "SHOW SLAVE STATUS"
 show_status = "SHOW STATUS LIKE %s "
 select_max_statement_time = "SELECT MAX_STATEMENT_TIME=1000 1"
-show_variables = "SHOW SESSION VARIABLES"
 
 table_existence = (
     " SELECT 1 "

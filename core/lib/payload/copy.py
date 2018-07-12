@@ -25,7 +25,6 @@ from threading import Timer
 from .. import constant, sql, util
 from ..error import OSCError
 from ..hook import wrap_hook
-from ..mysql_version import MySQLVersion
 from ..sqlparse import parse_create, ParseError, is_equal, SchemaDiff
 from .base import Payload
 from .cleanup import CleanupPayload
@@ -60,7 +59,6 @@ class CopyPayload(Payload):
         super(CopyPayload, self).__init__(*args, **kwargs)
         self._current_db = None
         self._pk_for_filter = []
-        self.mysql_vars = {}
         self._idx_name_for_filter = 'PRIMARY'
         self._new_table = None
         self._old_table = None
@@ -425,17 +423,6 @@ class CopyPayload(Payload):
             self.execute_sql(
                 sql.set_session_variable(var_name), (var_value,))
 
-    def get_mysql_settings(self):
-        result = self.query(sql.show_variables)
-        for row in result:
-            self.mysql_vars[row['Variable_name']] = row['Value']
-
-    def init_mysql_version(self):
-        """
-        Parse the mysql_version string into a version object
-        """
-        self.mysql_version = MySQLVersion(self.mysql_vars['version'])
-
     def is_var_enabled(self, var_name):
         if var_name not in self.mysql_vars:
             return False
@@ -444,28 +431,6 @@ class CopyPayload(Payload):
         if self.mysql_vars[var_name] == '0':
             return False
         return True
-
-    @property
-    def is_high_pri_ddl_supported(self):
-        """
-        Only fb-mysql supports having DDL killing blocking queries by
-        setting high_priority_ddl=1
-        """
-        if self.mysql_version.is_fb:
-            if self.mysql_version >= MySQLVersion('5.6.35'):
-                return True
-            else:
-                return False
-        else:
-            return False
-
-    def enable_priority_ddl(self):
-        """
-        Enable high priority DDL if current MySQL supports it
-        """
-        if self.is_high_pri_ddl_supported:
-            self.execute_sql(
-                sql.set_session_variable('high_priority_ddl'), (1,))
 
     @property
     def is_trigger_rbr_safe(self):

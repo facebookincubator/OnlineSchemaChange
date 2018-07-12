@@ -68,6 +68,9 @@ class CleanupPayload(Payload):
             self._conn = self.get_conn(db)
 
         self.gen_drop_sqls()
+        self.get_mysql_settings()
+        self.init_mysql_version()
+        self.enable_priority_ddl()
         self.set_no_binlog()
         self.execute_sql('USE `{}`'.format(escape(db)))
         current_db = db
