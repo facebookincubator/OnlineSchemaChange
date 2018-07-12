@@ -980,7 +980,12 @@ class CopyPayload(Payload):
         self.execute_sql(tmp_table_ddl)
         table_diff = self.query(
             sql.column_diff,
-            (self.new_table_name, self.table_name, self._current_db,))
+            (
+                self._current_db,
+                self.new_table_name,
+                self.table_name,
+                self._current_db,
+            ))
         self.partitions[self.new_table_name] = self.fetch_partitions(
             self.new_table_name)
         self.add_drop_table_entry(self.new_table_name)
