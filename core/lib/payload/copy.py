@@ -877,6 +877,20 @@ class CopyPayload(Payload):
         # If we have PK in existing schema, then we use current PK as an unique
         # row finder
         else:
+            # if any of the columns of the primary key is prefixed, we want to
+            # use full_table_dump, instead of chunking, so that it doesn't fill
+            # up the disk
+            for col in self._old_table.primary_key.column_list:
+                if col.length:
+                    log.info('Found prefixed column/s as part of the PK. '
+                             'Will do full table dump (no chunking).')
+                    self._pk_for_filter = [
+                        col.name for col in self._old_table.column_list]
+                    self._pk_for_filter_def = [
+                        col for col in self._old_table.column_list]
+                    self.is_full_table_dump = True
+                    break
+
             self._pk_for_filter = [
                 col.name for col in self._old_table.primary_key.column_list]
             self._pk_for_filter_def = [
@@ -1350,11 +1364,12 @@ class CopyPayload(Payload):
         stage_start_time = time.time()
         try:
             outfile = '{}.1'.format(self.outfile)
-            affected_rows = self.execute_sql(
-                sql.select_full_table_into_file(
-                    self._pk_for_filter, self.table_name,
-                    self.is_skip_fcache_supported, self.where),
-                (outfile, ))
+            sql_string = sql.select_full_table_into_file(
+                self._pk_for_filter + self.old_non_pk_column_list,
+                self.table_name,
+                self.is_skip_fcache_supported,
+                self.where)
+            affected_rows = self.execute_sql(sql_string, (outfile, ))
             self.outfile_suffix_end = 1
             self.stats['outfile_lines'] = affected_rows
             self._cleanup_payload.add_file_entry(outfile)
@@ -1371,20 +1386,19 @@ class CopyPayload(Payload):
     @wrap_hook
     def select_chunk_into_outfile(self, outfile, use_where):
         try:
-            affected_rows = self.execute_sql(
-                sql.select_full_table_into_file_by_chunk(
-                    self.table_name,
-                    self.range_start_vars_array,
-                    self.range_end_vars_array,
-                    self._pk_for_filter,
-                    self.old_non_pk_column_list,
-                    self.select_chunk_size,
-                    use_where,
-                    self.is_skip_fcache_supported,
-                    self.where,
-                    self._idx_name_for_filter
-                ),
-                (outfile, ))
+            sql_string = sql.select_full_table_into_file_by_chunk(
+                self.table_name,
+                self.range_start_vars_array,
+                self.range_end_vars_array,
+                self._pk_for_filter,
+                self.old_non_pk_column_list,
+                self.select_chunk_size,
+                use_where,
+                self.is_skip_fcache_supported,
+                self.where,
+                self._idx_name_for_filter
+            )
+            affected_rows = self.execute_sql(sql_string, (outfile, ))
         except MySQLdb.OperationalError as e:
             errnum, errmsg = e.args
             # 1086: File exists
@@ -1408,6 +1422,7 @@ class CopyPayload(Payload):
         # We can not break the table into chunks when there's no existing pk
         # We'll have to use one big file for copy data
         if self.is_full_table_dump:
+            log.info('Dumping full table in one go.')
             return self.select_full_table_into_outfile()
         outfile_suffix = 1
         # To let the loop run at least once
@@ -1456,13 +1471,13 @@ class CopyPayload(Payload):
 
     @wrap_hook
     def load_chunk(self, column_list, chunk_id):
-        self.execute_sql(
-            sql.load_data_infile(
-                self.new_table_name, column_list, ignore=self.eliminate_dups),
-            ('{}.{}'.format(self.outfile, chunk_id),))
+        sql_string = sql.load_data_infile(
+            self.new_table_name, column_list, ignore=self.eliminate_dups)
+        log.debug(sql_string)
+        filepath = '{}.{}'.format(self.outfile, chunk_id)
+        self.execute_sql(sql_string, (filepath,))
         # Delete the outfile once we have the data in new table to free
         # up space as soon as possible
-        filepath = '{}.{}'.format(self.outfile, chunk_id)
         if self.rm_file(filepath):
             util.sync_dir(self.outfile_dir)
             self._cleanup_payload.remove_file_entry(filepath)
