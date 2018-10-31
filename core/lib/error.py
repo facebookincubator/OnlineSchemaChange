@@ -210,7 +210,7 @@ class OSCError(Exception):
             'code': 139,
             'desc': ("You're adding new primary key to table. This will "
                      "cause a long running transaction open during the data "
-                     "dump stage. Specify --alow-new-pk if you don't think "
+                     "dump stage. Specify --allow-new-pk if you don't think "
                      "this will be a performance issue for you")
         },
         'MAX_ATTEMPT_EXCEEDED': {
