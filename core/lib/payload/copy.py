@@ -1103,6 +1103,7 @@ class CopyPayload(Payload):
                 sql_statement = ''
             else:
                 sql_statement = proc['Info'].decode('utf-8', 'replace')
+            proc['Info'] = sql_statement
             # Time can be None if the connection is in "Connect" state
             if ((proc.get('Time') or 0) > self.long_trx_time and
                     proc.get('db', '') == self._current_db and
