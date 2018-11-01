@@ -1104,7 +1104,7 @@ class CopyPayload(Payload):
             else:
                 sql_statement = proc['Info'].decode('utf-8', 'replace')
             # Time can be None if the connection is in "Connect" state
-            if (proc.get('Time') or 0 > self.long_trx_time and
+            if ((proc.get('Time') or 0) > self.long_trx_time and
                     proc.get('db', '') == self._current_db and
                     self.table_name in '--' + sql_statement and
                     not proc.get('Command', '') == 'Sleep'):
