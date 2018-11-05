@@ -1121,14 +1121,17 @@ class CopyPayload(Payload):
             else:
                 return True
         else:
-            raise OSCError('LONG_RUNNING_TRX',
-                           {'pid': slow_query.get('Id', 0),
-                            'user': slow_query.get('User', ''),
-                            'host': slow_query.get('Host', ''),
-                            'time': slow_query.get('Time', ''),
-                            'command': slow_query.get('Command', ''),
-                            'info': slow_query['Info'].decode(
-                                'utf-8', 'replace')})
+            raise OSCError(
+                'LONG_RUNNING_TRX',
+                {
+                    'pid': slow_query.get('Id', 0),
+                    'user': slow_query.get('User', ''),
+                    'host': slow_query.get('Host', ''),
+                    'time': slow_query.get('Time', ''),
+                    'command': slow_query.get('Command', ''),
+                    'info': slow_query.get('Info', '').decode('utf-8', 'replace')
+                }
+            )
 
     def is_repl_running(self):
         """
