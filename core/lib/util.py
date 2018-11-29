@@ -42,7 +42,7 @@ def rm(filename, sudo=False):
     proc = subprocess.Popen(cmd_args, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE)
     try:
-        (stdout, stderr) = proc.communicate(timeout=10)
+        (stdout, stderr) = proc.communicate(timeout=20)
         # return True if returncode is success (0)
         return not proc.returncode
     except subprocess.TimeoutExpired:
