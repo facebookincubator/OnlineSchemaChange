@@ -1129,7 +1129,7 @@ class CopyPayload(Payload):
                     'host': slow_query.get('Host', ''),
                     'time': slow_query.get('Time', ''),
                     'command': slow_query.get('Command', ''),
-                    'info': slow_query.get('Info', '').decode('utf-8', 'replace')
+                    'info': slow_query.get('Info', b'').decode('utf-8', 'replace')
                 }
             )
 
