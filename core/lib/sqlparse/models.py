@@ -573,7 +573,7 @@ class Table(object):
         So you can tell whether two schema has the same structure by comparing
         their checksum value.
         """
-        md5_obj = hashlib.md5(self.to_sql())
+        md5_obj = hashlib.md5(self.to_sql().encode('utf-8'))
         return md5_obj.hexdigest()
 
     def droppable_indexes(self, keep_unique_key=False):
