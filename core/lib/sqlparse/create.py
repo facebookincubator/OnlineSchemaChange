@@ -444,9 +444,9 @@ class CreateParser(object):
             'comment'
         ]
         for table_option in table_options:
-            if table_option in result.table_options:
+            if table_option in result:
                 setattr(table, table_option,
-                        result.table_options.get(table_option))
+                        result.get(table_option))
         if 'partition' in result:
             # pyparsing will convert newline into two after parsing. So we
             # need to dedup here
