@@ -710,7 +710,7 @@ class CopyPayloadTestCase(unittest.TestCase):
             'Time': 100,
             'db': 'mydb',
             'Id': 123,
-            'Info': 'select * from a'.encode()
+            'Info': 'select * from a'
         })
         with self.assertRaises(OSCError) as err_context:
             payload.wait_until_slow_query_finish()
