@@ -429,6 +429,8 @@ class CreateParser(object):
     @classmethod
     def parse(cls, sql):
         try:
+            if not isinstance(sql, str):
+                sql = sql.decode('utf-8')
             result = cls.generate_rule().parseString(sql)
         except ParseException as e:
             raise ParseError(
