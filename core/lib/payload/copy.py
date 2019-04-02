@@ -1101,11 +1101,11 @@ class CopyPayload(Payload):
         for proc in processes:
             if not proc['Info']:
                 sql_statement = ''
-
-            if isinstance(proc['Info'], bytes):
-                sql_statement = proc['Info'].decode('utf-8', 'replace')
             else:
-                sql_statement = proc['Info']
+                if isinstance(proc['Info'], bytes):
+                    sql_statement = proc['Info'].decode('utf-8', 'replace')
+                else:
+                    sql_statement = proc['Info']
 
             proc['Info'] = sql_statement
             # Time can be None if the connection is in "Connect" state
