@@ -60,6 +60,9 @@ class CreateParser(object):
     If you want have more information how these characters are
     matching, add .setDebug(True) after the specific token you want to debug
     """
+
+    _parser = None
+
     # Basic token
     WORD_CREATE = CaselessLiteral("CREATE").suppress()
     WORD_TABLE = CaselessLiteral("TABLE").suppress()
@@ -427,11 +430,17 @@ class CreateParser(object):
         )
 
     @classmethod
+    def get_parser(cls):
+        if not cls._parser:
+            cls._parser = cls.generate_rule()
+        return cls._parser
+
+    @classmethod
     def parse(cls, sql):
         try:
             if not isinstance(sql, str):
                 sql = sql.decode('utf-8')
-            result = cls.generate_rule().parseString(sql)
+            result = cls.get_parser().parseString(sql)
         except ParseException as e:
             raise ParseError(
                 "Failed to parse SQL, unsupported syntax: {}"
