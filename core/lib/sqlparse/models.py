@@ -446,6 +446,8 @@ class EnumColumn(Column):
         column_segment.append('{}({})'.format(
             self.column_type, ', '.join(self.enum_list)
         ))
+        if self.charset is not None:
+            column_segment.append('CHARACTER SET {}'.format(self.charset))
         if self.collate is not None:
             column_segment.append('COLLATE {}'.format(self.collate))
         if self.nullable:
