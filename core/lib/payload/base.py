@@ -40,7 +40,7 @@ class Payload(object):
         self.outfile_dir = ''
         self.repl_status = ''
         self._mysql_vars = {}
-        self.session_timeout = 10
+        self.session_timeout = 1200
         self.sql_list = []
         self.force = False
         self.standardize = False
