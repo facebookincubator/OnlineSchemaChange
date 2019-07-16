@@ -124,5 +124,4 @@ if you want to contribute to this project.
 License
 -------
 
-OnlineSchemaChange is BSD-licensed. We also provide an additional patent
-grant.
+OnlineSchemaChange is BSD-licensed.

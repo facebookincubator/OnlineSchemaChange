@@ -2,8 +2,7 @@
 -- All rights reserved.
 -- 
 -- This source code is licensed under the BSD-style license found in the
--- LICENSE file in the root directory of this source tree. An additional grant
--- of patent rights can be found in the PATENTS file in the same directory.
+-- LICENSE file in the root directory of this source tree.
 
 CREATE WRONG SYNTAX TABLE IF NOT EXISTS `table1` (
   `id1` bigint(20) unsigned NOT NULL DEFAULT '0' ,
