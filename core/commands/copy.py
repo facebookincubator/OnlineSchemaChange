@@ -228,7 +228,8 @@ class Copy(CommandBase):
             if not util.is_file_readable(filepath):
                 raise OSCError('FAILED_TO_READ_DDL_FILE',
                                {'filepath': filepath})
-            charset = getattr(self.args, 'charset')
+            charset_str = 'charset'
+            charset = getattr(self.args, charset_str)
             try:
                 with codecs.open(filepath, encoding=charset, mode='r') as fh:
                     fh.read()
