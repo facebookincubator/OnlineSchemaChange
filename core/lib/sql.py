@@ -415,7 +415,7 @@ def select_full_table_into_file_by_chunk(
             old_pk_list,
             range_start_vars_array)
         if where_filter:
-            where_clause = " WHERE ({}) AND {} ".format(
+            where_clause = " WHERE ({}) AND ({}) ".format(
                 where_filter, row_range)
         else:
             where_clause = " WHERE {} ".format(row_range)
