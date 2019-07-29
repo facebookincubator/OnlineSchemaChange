@@ -77,6 +77,13 @@ class MySQLVersion(object):
         """
         return self.fork == FB_FORK_NAME
 
+    @property
+    def is_mysql8(self):
+        """
+        Return if current running MySQL is msyql8
+        """
+        return self.major == 8
+
     def __gt__(self, other):
         if self.major > other.major:
             return True

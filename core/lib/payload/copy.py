@@ -379,8 +379,14 @@ class CopyPayload(Payload):
         """
         Setting the session isolation level to RR for OSC
         """
-        self.execute_sql(
-            sql.set_session_variable('tx_isolation'), ('REPEATABLE-READ',))
+        # https://dev.mysql.com/worklog/task/?id=9636
+        # MYSQL_5_TO_8_MIGRATION
+        if self.mysql_version.is_mysql8:
+            self.execute_sql(
+                sql.set_session_variable('transaction_isolation'), ('REPEATABLE-READ',))
+        else:
+            self.execute_sql(
+                sql.set_session_variable('tx_isolation'), ('REPEATABLE-READ',))
 
     def set_sql_mode(self):
         """
