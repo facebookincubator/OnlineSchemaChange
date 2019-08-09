@@ -1363,7 +1363,8 @@ class CopyPayload(Payload):
         # Only replay changes in this range (last_replayed_id, max_id_now]
         new_changes = self.query(
             sql.get_replay_row_ids(
-                self.IDCOLNAME, self.DMLCOLNAME, self.delta_table_name),
+                self.IDCOLNAME, self.DMLCOLNAME, self.delta_table_name, None,
+                self.mysql_version.is_mysql8),
             (self.last_replayed_id, current_max, ))
         self._replayed_chg_ids.extend([r[self.IDCOLNAME] for r in new_changes])
         self.last_replayed_id = current_max
@@ -1614,15 +1615,18 @@ class CopyPayload(Payload):
         Check whether current MySQL instance support MAX_STATEMENT_TIME
         which is only supported by WebScaleSQL
         """
-        # the max_statement_time is count in miliseconds
-        try:
-            self.query(sql.select_max_statement_time)
-            return True
-        except Exception:
-            # if any excpetion raised here, we'll treat it as
-            # MAX_STATEMENT_TIME is not supported
-            log.info("MAX_STATEMENT_TIME doesn't support in this MySQL")
-            return False
+        if self.mysql_version.is_mysql8:
+            return self.is_var_enabled('max_execution_time')
+        else:
+            # the max_statement_time is count in miliseconds
+            try:
+                self.query(sql.select_max_statement_time)
+                return True
+            except Exception:
+                # if any excpetion raised here, we'll treat it as
+                # MAX_STATEMENT_TIME is not supported
+                log.warning("MAX_STATEMENT_TIME doesn't support in this MySQL")
+                return False
 
     def append_to_exclude_id(self):
         """
@@ -1791,7 +1795,7 @@ class CopyPayload(Payload):
         new_changes = self.query(
             sql.get_replay_row_ids(
                 self.IDCOLNAME, self.DMLCOLNAME, self.delta_table_name,
-                replay_ms
+                replay_ms, self.mysql_version.is_mysql8
             ),
             (self.last_replayed_id, max_id_now, ))
         self._replayed_chg_ids.extend([r[self.IDCOLNAME] for r in new_changes])

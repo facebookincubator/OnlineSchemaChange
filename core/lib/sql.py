@@ -543,9 +543,13 @@ def get_chg_row(id_col_name, dml_col_name, tmp_table_include_id):
 
 
 def get_replay_row_ids(
-        id_col_name, dml_col_name, tmp_table_include_id, timeout_ms=None):
+        id_col_name, dml_col_name, tmp_table_include_id, timeout_ms=None,
+        is_mysql8=False):
     if timeout_ms:
-        statement_timeout_sql = "MAX_STATEMENT_TIME={}".format(timeout_ms)
+        if is_mysql8:
+            statement_timeout_sql = "/*+ MAX_EXECUTION_TIME({}) */".format(timeout_ms)
+        else:
+            statement_timeout_sql = "MAX_STATEMENT_TIME={}".format(timeout_ms)
     else:
         statement_timeout_sql = ''
     return (
