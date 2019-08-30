@@ -2261,16 +2261,16 @@ class CopyPayload(Payload):
         for i in range(self.replay_max_attempt):
             log.info("Catchup Attempt: {}".format(i + 1))
             start_time = time.time()
-            self.start_transaction()
-            self.replay_changes(single_trx=False)
             # If checksum is required, then we need to make sure total time
             # spent in replay+checksum is below replay_timeout.
-            if checksum:
+            if checksum and self.need_checksum():
                 self.start_transaction()
                 log.info("Catch up in order to compare checksum for the "
                          "rows that have been changed")
                 self.replay_changes(single_trx=True)
                 self.checksum_for_changes(single_trx=False)
+            else:
+                self.replay_changes(single_trx=False)
             time_in_replay = time.time() - start_time
             if time_in_replay < self.replay_timeout:
                 log.info("Time spent in last round of replay is {:.2f}, which "
