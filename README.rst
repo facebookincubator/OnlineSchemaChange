@@ -78,21 +78,12 @@ OnlineSchemaChange requires
 
 **System packages**
 
-For Python2
-
-.. code:: sh
-
-    sudo apt-get install python-dev libmysqlclient-dev # Debian / Ubuntu
-    sudo yum install python-devel mysql-devel # Red Hat / CentOS
-
-For Python3
-
 .. code:: sh
 
     sudo apt-get install python3-dev # debian / Ubuntu
     sudo yum install python3-devel # Red Hat / CentOS
 
-**Python requirements** \* python >= 2.7 \* python module: six,
+**Python requirements** \* python >= 3.3 \* python module:
 `pyparsing <http://pyparsing.wikispaces.com/>`__,
 `MySQLdb <http://github.com/PyMySQL/mysqlclient-python/tarball/master>`__
 

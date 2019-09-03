@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Copyright (c) 2017-present, Facebook, Inc.
 All rights reserved.
@@ -8,16 +8,10 @@ LICENSE file in the root directory of this source tree.
 """
 
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
-
 import MySQLdb
 import unittest
 import argparse
 import logging
-import six
 import sys
 
 from core.tests import integration_test_lib
@@ -47,9 +41,6 @@ def gen_get_conn(arg_user, arg_password, arg_socket, arg_charset='utf8'):
 
 
 if __name__ == '__main__':
-    if six.PY2:
-        reload(sys) # noqa
-        sys.setdefaultencoding("utf-8")
     # Construct a argparser
     parser = argparse.ArgumentParser(
         description='A CLI to generate OSC test case from given directory '
