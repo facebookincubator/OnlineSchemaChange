@@ -980,6 +980,17 @@ class CopyPayload(Payload):
         self._cleanup_payload.add_drop_table_entry(
             self._current_db, table_name, self.partitions.get(table_name, []))
 
+    def get_default_collations(self):
+        """
+        Get a list of supported character set and their corresponding default
+        collations
+        """
+        collations = self.query(sql.default_collation)
+        charset_collations = {}
+        for r in collations:
+            charset_collations[r['CHARACTER_SET_NAME']] = r['COLLATION_NAME']
+        return charset_collations
+
     @wrap_hook
     def create_copy_table(self):
         """
@@ -1029,6 +1040,21 @@ class CopyPayload(Payload):
             # Ignore partition difference, since there will be no implicit
             # conversion here
             obj_after.partition = self._new_table.partition
+            # Pre-populate to avoid collation difference, because 8.0 will
+            # always show collate using the server default when a charset is
+            # defined for text column
+            if self.mysql_version.is_mysql8:
+                default_collations = self.get_default_collations()
+                for column in self._new_table.column_list:
+                    if column.charset is not None and column.collate is None:
+                        default_collate = default_collations.get(column.charset)
+                        if default_collate:
+                            column.collate = default_collate
+                            log.warning(
+                                "Overriding collation to be {} for column {} "
+                                "for schema comparison"
+                                .format(column.collate, column.name))
+
             if obj_after != self._new_table:
                 raise OSCError(
                     'IMPLICIT_CONVERSION_DETECTED',

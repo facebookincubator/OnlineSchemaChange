@@ -83,6 +83,10 @@ partition_method = (
     "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s GROUP BY TABLE_NAME"
 )
 
+default_collation = (
+    "SELECT COLLATION_NAME,CHARACTER_SET_NAME "
+    "FROM INFORMATION_SCHEMA.COLLATIONS WHERE IS_DEFAULT = 'Yes' "
+)
 
 """
 Section for SQL components
