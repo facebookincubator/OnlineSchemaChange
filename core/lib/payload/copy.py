@@ -1853,6 +1853,7 @@ class CopyPayload(Payload):
             if not single_trx and replayed > self.replay_batch_size:
                 self.commit()
                 self.start_transaction()
+                replayed = 0
             else:
                 replayed += len(ids)
 
