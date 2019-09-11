@@ -83,7 +83,7 @@ OnlineSchemaChange requires
     sudo apt-get install python3-dev # debian / Ubuntu
     sudo yum install python3-devel # Red Hat / CentOS
 
-**Python requirements** \* python >= 3.4 \* python module:
+**Python requirements** \* python >= 3.5 \* python module:
 `pyparsing <http://pyparsing.wikispaces.com/>`__,
 `MySQLdb <http://github.com/PyMySQL/mysqlclient-python/tarball/master>`__
 
