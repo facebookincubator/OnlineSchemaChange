@@ -579,6 +579,14 @@ def set_session_variable(variable):
         .format(variable))
 
 
+def get_global_variable(variable):
+    return "SHOW GLOBAL VARIABLES LIKE '{}'".format(variable)
+
+
+def get_session_variable(variable):
+    return "SHOW SESSION VARIABLES LIKE '{}'".format(variable)
+
+
 def add_index(table_name, indexes):
     """Generate sql to add indexes using ALTER TABLE
 

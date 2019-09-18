@@ -129,6 +129,8 @@ class CopyPayload(Payload):
             'idx_recreation', False)
         self.rocksdb_bulk_load_allow_sk = kwargs.get(
             'rocksdb_bulk_load_allow_sk', False)
+        self.unblock_table_creation_without_pk = kwargs.get(
+            'unblock_table_creation_without_pk', False)
         self.rebuild = kwargs.get('rebuild', False)
         self.keep_tmp_table = kwargs.get(
             'keep_tmp_table_after_exception', False)
@@ -2481,6 +2483,7 @@ class CopyPayload(Payload):
                 self.cleanup_with_force()
             if self.has_desired_schema():
                 return
+            self.unblock_no_pk_creation()
             self.pre_osc_check()
             self.create_copy_table()
             self.create_delta_table()
@@ -2495,6 +2498,7 @@ class CopyPayload(Payload):
             log.info("== Stage 5: Catch up to reduce time for holding lock ==")
             self.replay_till_good2go(checksum=True)
             self.swap_tables()
+            self.reset_no_pk_creation()
             self.cleanup()
             self.print_stats()
             self.stats['wall_time'] = time.time() - time_started

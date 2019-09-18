@@ -282,6 +282,21 @@ class Payload(object):
         else:
             return False
 
+    @property
+    def get_block_no_pk_creation_variable(self):
+        """
+        Only fb-mysql supports blocking creation of tables without PK before 8.0
+        'block_create_no_primary_key' is GLOBAL-only variable
+        Return a tuple with variable name and scope, None if it's not supported.
+        """
+        if self.mysql_version.is_mysql8:
+            return 'sql_require_primary_key', 'session'
+        else:
+            if self.mysql_version.is_fb:
+                return 'block_create_no_primary_key', 'global'
+
+        return None, None
+
     def enable_priority_ddl(self):
         """
         Enable high priority DDL if current MySQL supports it
@@ -289,6 +304,50 @@ class Payload(object):
         if self.is_high_pri_ddl_supported:
             self.execute_sql(
                 sql.set_session_variable('high_priority_ddl'), (1,))
+
+    def get_require_pk(self):
+        """
+        Get current state of blocking creation of tables without PK
+        """
+        var_name, scope = self.get_block_no_pk_creation_variable
+        if var_name:
+            if scope == 'global':
+                row = self.query(sql.get_global_variable(var_name))
+            else:
+                row = self.query(sql.get_session_variable(var_name))
+
+            if row:
+                return row[0]['Value']
+
+        return None
+
+    def set_unset_require_pk(self, value='ON'):
+        """
+        Set/unset blocking creation of tables without PK if current MySQL supports it
+        """
+        var_name, scope = self.get_block_no_pk_creation_variable
+        if var_name:
+            if scope == 'global':
+                sql_str = sql.set_global_variable(var_name)
+            else:
+                sql_str = sql.set_session_variable(var_name)
+
+            self.execute_sql(sql_str, (value,))
+
+    def unblock_no_pk_creation(self):
+        """
+        Enable unblocking of table creation without PK if current MySQL supports it
+        """
+        if self.unblock_table_creation_without_pk:
+            self.prev_require_pk_state = self.get_require_pk()
+            self.set_unset_require_pk()
+
+    def reset_no_pk_creation(self):
+        """
+        Reset blocking of table creation without PK to its original state
+        """
+        if self.unblock_table_creation_without_pk:
+            self.set_unset_require_pk(value=self.prev_require_pk_state)
 
     def rm_file(self, filename):
         """Wrapper of the util.rm function. This is here mainly to make it

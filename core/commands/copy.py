@@ -200,6 +200,8 @@ class Copy(CommandBase):
                             help="How many attempts with 5 seconds sleep "
                             "in between we should have waited for "
                             "slow query to finish before error out")
+        parser.add_argument("--unblock-table-creation-without-pk", action='store_true',
+                            help="Allow creating new tables without PK.")
 
     def setup_parser(self, parser, **kwargs):
         super(Copy, self).setup_parser(parser, **kwargs)
