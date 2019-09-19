@@ -11,7 +11,7 @@ import unittest
 from ..lib.payload.direct import DirectPayload
 from ..lib.error import OSCError
 from ..lib import db as db_lib
-from mock import MagicMock
+from unittest.mock import MagicMock
 import MySQLdb
 
 

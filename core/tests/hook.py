@@ -10,7 +10,7 @@ LICENSE file in the root directory of this source tree.
 import unittest
 from ..lib.hook import SQLHook
 from ..lib.error import OSCError
-from mock import Mock, patch
+from unittest.mock import Mock, patch
 
 
 class SQLHookTest(unittest.TestCase):

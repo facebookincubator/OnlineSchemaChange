@@ -16,7 +16,7 @@ from ..lib.sqlparse import parse_create
 from ..lib.error import OSCError
 from ..lib.mysql_version import MySQLVersion
 from ..lib import constant
-from mock import Mock
+from unittest.mock import Mock
 
 
 class CopyPayloadTestCase(unittest.TestCase):
