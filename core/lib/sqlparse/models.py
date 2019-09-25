@@ -140,9 +140,9 @@ class TableIndex(object):
         col_list_str = []
         for col_str in self.column_list:
             col_list_str.append(str(col_str))
+        idx_str.append("KEY LIST: {}".format(','.join(col_list_str)))
         if self.using:
             idx_str.append("USING: {}".format(self.using))
-        idx_str.append("KEY LIST: {}".format(','.join(col_list_str)))
         idx_str.append("KEY_BLOCK_SIZE: {}".format(self.key_block_size))
         idx_str.append("COMMENT: {}".format(self.comment))
         return '/ '.join(idx_str)
@@ -175,14 +175,14 @@ class TableIndex(object):
                     segments.append('KEY `{}`'.format(escape(self.name)))
         else:
             segments.append('KEY')
-        if self.using is not None:
-            segments.append('USING {}'.format(self.using))
 
         segments.append(
             "({})"
             .format(', '.join([col.to_sql() for col in self.column_list]))
         )
 
+        if self.using is not None:
+            segments.append('USING {}'.format(self.using))
         if self.key_block_size is not None:
             segments.append('KEY_BLOCK_SIZE={}'.format(self.key_block_size))
         if self.comment is not None:
