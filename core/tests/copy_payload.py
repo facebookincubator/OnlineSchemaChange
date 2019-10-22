@@ -143,7 +143,7 @@ class CopyPayloadTestCase(unittest.TestCase):
 
         # Be sure that the kill timer is finished
         payload._last_kill_timer.join(1)
-        self.assertFalse(payload._last_kill_timer.isAlive())
+        self.assertFalse(payload._last_kill_timer.is_alive())
 
         # Make sure kill selects only on tables a and b
         kill_calls = mocked_conn.kill_query_by_id.call_args_list
@@ -183,7 +183,7 @@ class CopyPayloadTestCase(unittest.TestCase):
 
         # Be sure that the kill timer is finished
         payload._last_kill_timer.join(1)
-        self.assertFalse(payload._last_kill_timer.isAlive())
+        self.assertFalse(payload._last_kill_timer.is_alive())
 
         # Make sure no selects were killed
         mocked_conn.kill_query_by_id.assert_not_called()
