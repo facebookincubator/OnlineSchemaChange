@@ -8,7 +8,7 @@ LICENSE file in the root directory of this source tree.
 """
 
 import unittest
-from ...sqlparse import parse_create, SchemaDiff
+from ...sqlparse import parse_create, SchemaDiff, get_type_conv_columns
 
 
 class SQLParserTest(unittest.TestCase):
@@ -185,3 +185,27 @@ class SQLParserTest(unittest.TestCase):
         tbl_diff = SchemaDiff(tbl_1, tbl_2)
         self.assertEqual(len(tbl_diff.diffs()['added']), 1)
         self.assertEqual(len(tbl_diff.diffs()['removed']), 1)
+
+    def test_type_conv_columns(self):
+        sql1 = (
+            "Create table foo ("
+            "column1 int default 0, "
+            "column2 varchar(10) default '', "
+            "column3 int default 0 "
+            ")"
+        )
+        sql2 = (
+            "Create table foo ("
+            "column1 int default 0, "
+            "column2 varchar(20) default '', "
+            "column3 bigint default 0 "
+            ")"
+        )
+        tbl_1 = parse_create(sql1)
+        tbl_2 = parse_create(sql2)
+        type_conv_columns = get_type_conv_columns(tbl_1, tbl_2)
+
+        # Both column type and length change is considered as type conversion
+        self.assertEqual(len(type_conv_columns), 2)
+        self.assertEqual(type_conv_columns[0].name, 'column2')
+        self.assertEqual(type_conv_columns[1].name, 'column3')

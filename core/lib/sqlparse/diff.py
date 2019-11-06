@@ -89,3 +89,32 @@ class SchemaDiff(object):
 
     def diffs(self):
         return self._calculate_diff()
+
+
+def get_type_conv_columns(old_obj, new_obj):
+    """
+    Return a list of columns that involve type conversion when transit from left to
+    right
+    """
+    type_conv_cols = []
+
+    current_cols = {c.name: c for c in old_obj.column_list}
+    new_cols = {c.name: c for c in new_obj.column_list}
+
+    # find columns that will involve type conversions
+    for name, old_col in current_cols.items():
+        new_col = new_cols.get(name)
+
+        # this column isn't in the new schema, so it
+        # doesn't matter
+        if new_col is None:
+            continue
+
+        # Type changes are considered as type conversion
+        if new_col.column_type != old_col.column_type:
+            type_conv_cols.append(old_col)
+        else:
+            # Length change also considered as type conversion
+            if new_col.length != old_col.length:
+                type_conv_cols.append(old_col)
+    return type_conv_cols

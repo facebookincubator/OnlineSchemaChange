@@ -14,6 +14,7 @@ from __future__ import unicode_literals
 
 from .create import parse_create, ParseError
 from .models import is_equal
-from .diff import SchemaDiff
+from .diff import SchemaDiff, get_type_conv_columns
 
-__all__ = ['parse_create', 'ParseError', 'is_equal', 'SchemaDiff']
+__all__ = [
+    'parse_create', 'ParseError', 'is_equal', 'SchemaDiff', 'get_type_conv_columns']
