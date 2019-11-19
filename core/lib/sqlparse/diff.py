@@ -14,6 +14,7 @@ from __future__ import unicode_literals
 
 
 from .models import is_equal
+import copy
 
 
 class TableOptionDiff(object):
@@ -38,13 +39,36 @@ class SchemaDiff(object):
         diffs = {
             'removed': [],
             'added': [],
+            # Customized messages
+            'msgs': []
         }
+        # We are copying here since we want to change the col list.
+        # Shallow copy should be enough here
+        col_left_copy = copy.copy(self.left.column_list)
+        col_right_copy = copy.copy(self.right.column_list)
         for col in self.left.column_list:
             if col not in self.right.column_list:
                 diffs['removed'].append(col)
+                col_left_copy.remove(col)
+
         for col in self.right.column_list:
             if col not in self.left.column_list:
                 diffs['added'].append(col)
+                col_right_copy.remove(col)
+
+        # Two tables have different col order
+        if sorted(col_left_copy, key=lambda col: col.name) == sorted(
+                col_right_copy, key=lambda col: col.name):
+            old_order = []
+            new_order = []
+            for col1, col2 in zip(col_left_copy, col_right_copy):
+                if col1 != col2:
+                    old_order.append(col1.name)
+                    new_order.append(col2.name)
+            if old_order:
+                diffs["msgs"].append("Column order mismatch was detected:")
+                diffs["msgs"].append("- " + ", ".join(old_order))
+                diffs["msgs"].append("+ " + ", ".join(new_order))
 
         for idx in self.left.indexes:
             if idx not in self.right.indexes:
@@ -84,6 +108,8 @@ class SchemaDiff(object):
                 diff_strs.append('- ' + diff.to_sql())
             for diff in diffs['added']:
                 diff_strs.append('+ ' + diff.to_sql())
+            for diff in diffs["msgs"]:
+                diff_strs.append(diff)
             diff_str = "\n".join(diff_strs)
             return diff_str
 

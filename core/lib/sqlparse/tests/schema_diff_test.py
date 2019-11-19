@@ -43,6 +43,43 @@ class SQLParserTest(unittest.TestCase):
         self.assertEqual(len(tbl_diff.diffs()['removed']), 0)
         self.assertEqual(len(tbl_diff.diffs()['added']), 1)
 
+    def test_col_order(self):
+        sql1 = (
+            "Create table foo ("
+            " column2 varchar(10) ,"
+            " column1 int ,"
+            " column3 int)"
+        )
+        sql2 = (
+            "Create table foo ("
+            " column1 int , "
+            " column2 varchar(10) ,"
+            " column3 int)"
+
+        )
+        tbl_1 = parse_create(sql1)
+        tbl_2 = parse_create(sql2)
+        tbl_diff = SchemaDiff(tbl_1, tbl_2)
+        self.assertEqual(len(tbl_diff.diffs()['msgs']), 3)
+
+    def test_col_order_with_new_col(self):
+        sql1 = (
+            "Create table foo ("
+            " column2 varchar(10) ,"
+            " column1 int)"
+        )
+        sql2 = (
+            "Create table foo ("
+            " column1 int , "
+            " column2 varchar(10) ,"
+            " column3 int)"
+        )
+        tbl_1 = parse_create(sql1)
+        tbl_2 = parse_create(sql2)
+        tbl_diff = SchemaDiff(tbl_1, tbl_2)
+        self.assertEqual(len(tbl_diff.diffs()['msgs']), 3)
+        self.assertEqual(len(tbl_diff.diffs()['added']), 1)
+
     def test_column_type_changed(self):
         sql1 = (
             "Create table foo "
