@@ -982,6 +982,16 @@ class CopyPayload(Payload):
         self._cleanup_payload.add_drop_table_entry(
             self._current_db, table_name, self.partitions.get(table_name, []))
 
+    def get_collations(self):
+        """
+        Get a list of supported collations with their corresponding charsets
+        """
+        collations = self.query(sql.all_collation)
+        collation_charsets = {}
+        for r in collations:
+            collation_charsets[r['COLLATION_NAME']] = r['CHARACTER_SET_NAME']
+        return collation_charsets
+
     def get_default_collations(self):
         """
         Get a list of supported character set and their corresponding default
@@ -1047,6 +1057,7 @@ class CopyPayload(Payload):
             # defined for text column
             if self.mysql_version.is_mysql8:
                 default_collations = self.get_default_collations()
+                collation_charsets = self.get_collations()
                 for column in self._new_table.column_list:
                     if column.charset is not None and column.collate is None:
                         default_collate = default_collations.get(column.charset)
@@ -1056,6 +1067,15 @@ class CopyPayload(Payload):
                                 "Overriding collation to be {} for column {} "
                                 "for schema comparison"
                                 .format(column.collate, column.name))
+                    # Similar case where collation is specified without charset
+                    if column.charset is None and column.collate is not None:
+                        charset = collation_charsets.get(column.collate)
+                        if charset:
+                            column.charset = charset
+                            log.warning(
+                                "Overriding charset to be {} for column {} "
+                                "for schema comparison"
+                                .format(column.charset, column.name))
 
             if obj_after != self._new_table:
                 raise OSCError(

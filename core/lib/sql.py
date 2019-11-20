@@ -88,6 +88,11 @@ default_collation = (
     "FROM INFORMATION_SCHEMA.COLLATIONS WHERE IS_DEFAULT = 'Yes' "
 )
 
+all_collation = (
+    "SELECT COLLATION_NAME,CHARACTER_SET_NAME "
+    "FROM INFORMATION_SCHEMA.COLLATIONS"
+)
+
 """
 Section for SQL components
 Following functions only generates SQL components which can be a part of SQL.
@@ -677,14 +682,14 @@ def checksum_by_chunk_with_assign(
     bit_xor_assign_list = []
     for idx, assign_section in enumerate(assign):
         bit_xor_assign_list.append(
-            wrap_checksum_function(assign_section) +
-            ' AS `{}`'.format(escape(pk_list[idx]))
+            wrap_checksum_function(assign_section)
+            + ' AS `{}`'.format(escape(pk_list[idx]))
         )
     bit_xor_assign = ', '.join(bit_xor_assign_list)
 
     bit_xor_non_pk_list = [
-        wrap_checksum_function('`{}`'.format(escape(col))) +
-        ' AS `{}`'.format(escape(col))
+        wrap_checksum_function('`{}`'.format(escape(col)))
+        + ' AS `{}`'.format(escape(col))
         for col in columns
     ]
     bit_xor_non_pk = ', '.join(bit_xor_non_pk_list)
