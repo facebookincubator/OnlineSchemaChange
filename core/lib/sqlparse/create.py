@@ -72,6 +72,7 @@ class CreateParser(object):
     QUOTE = Literal("'") | Literal('"')
     BACK_QUOTE = Optional(Literal('`')).suppress()
     LENGTH = Word(nums)
+    DECIMAL = Combine(Word(nums) + DOT + Word(nums))
     OBJECT_NAME = Word(alphanums + "_" + "-" + "<" + ">" + ":")
     QUOTED_STRING_WITH_QUOTE = QuotedString(
         quoteChar="'", escQuote="''", escChar='\\', multiline=True,
@@ -225,6 +226,7 @@ class CreateParser(object):
                 CaselessLiteral("CURRENT_TIMESTAMP")('default') +
                 Optional(COL_LEN)('ts_len')
             ) |
+            DECIMAL('default') |
             Word(alphanums + '_' + '-' + '+')('default')
         )
     )

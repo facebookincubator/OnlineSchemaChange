@@ -332,6 +332,22 @@ class SQLParserTest(unittest.TestCase):
             self.assertEqual(tbl.column_list[0].default, "0")
             self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
+    def test_default_value_double(self):
+        sqls = []
+        sqls.append(
+            "Create table foo\n ( "
+            "column1 double default 0.0, "
+            "column2 double default 0, "
+            "column3 double default '0'"
+            ") "
+        )
+        for sql in sqls:
+            tbl = parse_create(sql)
+            self.assertEqual(tbl.column_list[0].default, "0.0")
+            self.assertEqual(tbl.column_list[1].default, "0")
+            self.assertEqual(tbl.column_list[2].default, "'0'")
+            self.assertEqual(tbl, parse_create(tbl.to_sql()))
+
     def test_default_value_string(self):
         sqls = []
         sqls.append(
