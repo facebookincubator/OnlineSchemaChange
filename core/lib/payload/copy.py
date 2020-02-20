@@ -2302,6 +2302,8 @@ class CopyPayload(Payload):
         log.info("Replay at most {} more round(s) until we can finish in {} "
                  "seconds"
                  .format(self.replay_max_attempt, self.replay_timeout))
+        # Temporarily enable slow query log for slow replay statements
+        self.execute_sql(sql.set_session_variable('long_query_time'), (1,))
         for i in range(self.replay_max_attempt):
             log.info("Catchup Attempt: {}".format(i + 1))
             start_time = time.time()
