@@ -470,6 +470,14 @@ class CopyPayload(Payload):
         if not self.is_trigger_rbr_safe:
             raise OSCError('NOT_RBR_SAFE')
 
+    def skip_cache_fill_for_myrocks(self):
+        """
+        Skip block cache fill for dumps and scans to avoid cache polution
+        """
+        if 'rocksdb_skip_fill_cache' in self.mysql_vars:
+            self.execute_sql(
+                sql.set_session_variable('rocksdb_skip_fill_cache'), (1,))
+
     @wrap_hook
     def init_connection(self, db):
         """
@@ -487,6 +495,7 @@ class CopyPayload(Payload):
         self.set_tx_isolation()
         self.set_sql_mode()
         self.enable_priority_ddl()
+        self.skip_cache_fill_for_myrocks()
         self.override_session_vars()
         self.get_osc_lock()
 
