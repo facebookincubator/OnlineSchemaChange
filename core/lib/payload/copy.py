@@ -1970,6 +1970,7 @@ class CopyPayload(Payload):
         # Analyze table has a query result, we have to use query here.
         # Otherwise we'll get a out of sync error
         self.query(sql.analyze_table(self.new_table_name))
+        self.query(sql.analyze_table(self.delta_table_name))
 
     def compare_checksum(self, old_table_checksum, new_table_checksum):
         """
