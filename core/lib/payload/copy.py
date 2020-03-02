@@ -137,6 +137,8 @@ class CopyPayload(Payload):
         self.skip_checksum = kwargs.get('skip_checksum', False)
         self.skip_checksum_for_modified = kwargs.get(
             'skip_checksum_for_modified', False)
+        self.skip_delta_checksum = kwargs.get(
+            'skip_delta_checksum', False)
         self.skip_named_lock = kwargs.get(
             'skip_named_lock', False)
         self.skip_affected_rows_check = kwargs.get(
@@ -2528,7 +2530,7 @@ class CopyPayload(Payload):
             self.analyze_table()
             self.checksum()
             log.info("== Stage 5: Catch up to reduce time for holding lock ==")
-            self.replay_till_good2go(checksum=True)
+            self.replay_till_good2go(checksum=self.skip_delta_checksum)
             self.swap_tables()
             self.reset_no_pk_creation()
             self.cleanup()

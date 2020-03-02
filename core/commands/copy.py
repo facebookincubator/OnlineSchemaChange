@@ -162,6 +162,13 @@ class Copy(CommandBase):
                             help="Skip checksum data after loading, if you're "
                             "sure about what you're doing and don't want "
                             "waste time in checksuming")
+        parser.add_argument("--skip-delta-checksum",
+                            action='store_true',
+                            help="Skip checksum for data that has been changed "
+                            "during previous fulltable scan based checksum. "
+                            "This checksum is quite resource consuming and can be "
+                            "skipped, if we've gained enough confidence in the "
+                            "previous checksum scan")
         parser.add_argument("--skip-checksum-for-modified",
                             action='store_true',
                             help="Skip checksum data for modified columns "
