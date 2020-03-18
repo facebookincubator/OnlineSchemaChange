@@ -208,8 +208,8 @@ class CopyPayload(Payload):
         """
         return [
             col.name for col in self._old_table.column_list
-            if col.name not in self._pk_for_filter and
-            col.name not in self.dropped_column_name_list
+            if col.name not in self._pk_for_filter
+            and col.name not in self.dropped_column_name_list
         ]
 
     @property
@@ -1014,6 +1014,49 @@ class CopyPayload(Payload):
             charset_collations[r['CHARACTER_SET_NAME']] = r['COLLATION_NAME']
         return charset_collations
 
+    def populate_charset_collation_for_80(self):
+        """
+        Populate charset/collation for column and table if one of them is missing.
+        Doing this handle the auto charset/collation population behaviour in 8.0
+        """
+        default_collations = self.get_default_collations()
+        collation_charsets = self.get_collations()
+        for column in self._new_table.column_list:
+            if column.charset is not None and column.collate is None:
+                default_collate = default_collations.get(column.charset)
+                if default_collate:
+                    column.collate = default_collate
+                    log.warning(
+                        "Overriding collation to be {} for column {} "
+                        "for schema comparison"
+                        .format(column.collate, column.name))
+            # Similar case where collation is specified without charset
+            if column.charset is None and column.collate is not None:
+                charset = collation_charsets.get(column.collate)
+                if charset:
+                    column.charset = charset
+                    log.warning(
+                        "Overriding charset to be {} for column {} "
+                        "for schema comparison"
+                        .format(column.charset, column.name))
+
+        # Take care of table property
+        if self._new_table.charset is not None and self._new_table.collate is None:
+            default_collate = default_collations.get(self._new_table.charset)
+            if default_collate:
+                self._new_table.collate = default_collate
+                log.warning(
+                    "Overriding collation to be {} for table for schema comparison"
+                    .format(self._new_table.collate))
+
+        if self._new_table.charset is None and self._new_table.collate is not None:
+            charset = collation_charsets.get(self._new_table.collate)
+            if charset:
+                self._new_table.charset = charset
+                log.warning(
+                    "Overriding charset to be {} for table for schema comparison"
+                    .format(self._new_table.charset))
+
     @wrap_hook
     def create_copy_table(self):
         """
@@ -1067,26 +1110,7 @@ class CopyPayload(Payload):
             # always show collate using the server default when a charset is
             # defined for text column
             if self.mysql_version.is_mysql8:
-                default_collations = self.get_default_collations()
-                collation_charsets = self.get_collations()
-                for column in self._new_table.column_list:
-                    if column.charset is not None and column.collate is None:
-                        default_collate = default_collations.get(column.charset)
-                        if default_collate:
-                            column.collate = default_collate
-                            log.warning(
-                                "Overriding collation to be {} for column {} "
-                                "for schema comparison"
-                                .format(column.collate, column.name))
-                    # Similar case where collation is specified without charset
-                    if column.charset is None and column.collate is not None:
-                        charset = collation_charsets.get(column.collate)
-                        if charset:
-                            column.charset = charset
-                            log.warning(
-                                "Overriding charset to be {} for column {} "
-                                "for schema comparison"
-                                .format(column.charset, column.name))
+                self.populate_charset_collation_for_80()
 
             if obj_after != self._new_table:
                 raise OSCError(
@@ -1168,10 +1192,10 @@ class CopyPayload(Payload):
 
             proc['Info'] = sql_statement
             # Time can be None if the connection is in "Connect" state
-            if ((proc.get('Time') or 0) > self.long_trx_time and
-                    proc.get('db', '') == self._current_db and
-                    self.table_name in '--' + sql_statement and
-                    not proc.get('Command', '') == 'Sleep'):
+            if ((proc.get('Time') or 0) > self.long_trx_time
+                    and proc.get('db', '') == self._current_db
+                    and self.table_name in '--' + sql_statement
+                    and not proc.get('Command', '') == 'Sleep'):
                 return proc
 
     def wait_until_slow_query_finish(self):
@@ -1265,10 +1289,10 @@ class CopyPayload(Payload):
             sql_statement = proc.get('Info') or ''.encode('utf-8')
             sql_statement = sql_statement.decode('utf-8', 'replace').lower()
 
-            if (proc['db'] == self._current_db and sql_statement and
-                    not information_schema_pattern.search(sql_statement) and
-                    any_tables_pattern.search(sql_statement) and
-                    alter_or_select_pattern.search(sql_statement)):
+            if (proc['db'] == self._current_db and sql_statement
+                    and not information_schema_pattern.search(sql_statement)
+                    and any_tables_pattern.search(sql_statement)
+                    and alter_or_select_pattern.search(sql_statement)):
                 try:
                     conn.kill_query_by_id(int(proc['Id']))
                 except MySQLdb.MySQLError as e:
@@ -2456,9 +2480,9 @@ class CopyPayload(Payload):
         rename operation failed, rollback the first renaming
         """
         if (
-                self.table_swapped and
-                self.table_exists(self.renamed_table_name) and
-                not self.table_exists(self.table_name)
+                self.table_swapped
+                and self.table_exists(self.renamed_table_name)
+                and not self.table_exists(self.table_name)
         ):
             self.unlock_tables()
             self.execute_sql(

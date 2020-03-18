@@ -710,6 +710,38 @@ class CopyPayloadTestCase(unittest.TestCase):
             payload.wait_until_slow_query_finish()
         self.assertEqual(err_context.exception.err_key, 'LONG_RUNNING_TRX')
 
+    def test_auto_table_collation_population(self):
+        payload = self.payload_setup()
+        sql = """
+        CREATE TABLE abc (
+        ID int primary key
+        ) charset = latin1
+        """
+        payload._new_table = parse_create(sql)
+        default_collate = 'latin1_swedish_ci'
+        payload.get_default_collations = Mock(return_value={'latin1': default_collate})
+        payload.get_collations = Mock(return_value={default_collate: 'latin1'})
+        payload.populate_charset_collation_for_80()
+
+        # Collation should be populated if charset is provided
+        self.assertEqual(payload._new_table.collate, default_collate)
+
+    def test_auto_table_charset_population(self):
+        payload = self.payload_setup()
+        sql = """
+        CREATE TABLE abc (
+        ID int primary key
+        ) collate = latin1_swedish_ci
+        """
+        payload._new_table = parse_create(sql)
+        default_collate = 'latin1_swedish_ci'
+        payload.get_default_collations = Mock(return_value={'latin1': default_collate})
+        payload.get_collations = Mock(return_value={default_collate: 'latin1'})
+        payload.populate_charset_collation_for_80()
+
+        # charset should be populated if collate is provided
+        self.assertEqual(payload._new_table.charset, 'latin1')
+
     """
     Following test disabled until the high_pri_ddl is fixed
     def test_is_high_pri_ddl_supported_yes_8_0(self):
