@@ -723,8 +723,8 @@ class CopyPayloadTestCase(unittest.TestCase):
         payload.get_collations = Mock(return_value={default_collate: 'latin1'})
         payload.populate_charset_collation_for_80()
 
-        # Collation should be populated if charset is provided
-        self.assertEqual(payload._new_table.collate, default_collate)
+        # Collation should not be populated only if charset is provided
+        self.assertEqual(payload._new_table.collate, None)
 
     def test_auto_table_charset_population(self):
         payload = self.payload_setup()
@@ -770,6 +770,7 @@ class CopyPayloadTestCase(unittest.TestCase):
         self.assertFalse(payload.is_high_pri_ddl_supported)
 
     """
+
 
 class CopyPayloadPKFilterTestCase(unittest.TestCase):
     def setUp(self):

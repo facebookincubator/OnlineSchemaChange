@@ -1012,6 +1012,12 @@ class CopyPayload(Payload):
         charset_collations = {}
         for r in collations:
             charset_collations[r['CHARACTER_SET_NAME']] = r['COLLATION_NAME']
+
+        # Populate utf8mb4 override
+        utf8_override = self.query(
+            sql.get_global_variable('default_collation_for_utf8mb4'))
+        if utf8_override and 'utf8mb4' in charset_collations:
+            charset_collations['utf8mb4'] = utf8_override[0]['Value']
         return charset_collations
 
     def populate_charset_collation_for_80(self):
@@ -1041,7 +1047,7 @@ class CopyPayload(Payload):
                         .format(column.charset, column.name))
 
         # Take care of table property
-        if self._new_table.charset is not None and self._new_table.collate is None:
+        if self._new_table.charset == 'utf8mb4' and self._new_table.collate is None:
             default_collate = default_collations.get(self._new_table.charset)
             if default_collate:
                 self._new_table.collate = default_collate
