@@ -392,7 +392,8 @@ class CopyPayload(Payload):
         Setting the sql_mode to STRICT for the connection we will using for OSC
         """
         self.execute_sql(
-            sql.set_session_variable('sql_mode'), ('STRICT_ALL_TABLES',))
+            sql.set_session_variable('sql_mode'),
+            ('STRICT_ALL_TABLES,NO_AUTO_VALUE_ON_ZERO',))
 
     def parse_session_overrides_str(self, overrides_str):
         """
