@@ -13,7 +13,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 
-from .models import is_equal
+from .models import is_equal, escape
 import copy
 
 
@@ -115,6 +115,96 @@ class SchemaDiff(object):
 
     def diffs(self):
         return self._calculate_diff()
+
+    def _gen_col_sql(self):
+        """
+        Generate the column section for ALTER TABLE statement
+        """
+        segments = []
+        left_column_names = {col.name: col for col in self.left.column_list}
+        right_column_names = {col.name: col for col in self.right.column_list}
+
+        # Drop columns
+        for col in self.left.column_list:
+            if col.name not in right_column_names.keys():
+                segments.append("DROP `{}`".format(escape(col.name)))
+
+        # Add columns
+        for idx, col in enumerate(self.right.column_list):
+            if col.name not in left_column_names.keys():
+                if idx == 0:
+                    position = 'FIRST'
+                else:
+                    position = 'AFTER `{}`'.format(escape(
+                        self.right.column_list[idx - 1].name))
+                segments.append("ADD {} {}".format(col.to_sql(), position))
+
+        # Modify columns
+        for col in self.right.column_list:
+            if col.name in left_column_names and col != left_column_names[col.name]:
+                segments.append("MODIFY {}".format(col.to_sql()))
+
+        return segments
+
+    def _gen_idx_sql(self):
+        """
+        Generate the index section for ALTER TABLE statement
+        """
+        segments = []
+        # Drop index
+        for idx in self.left.indexes:
+            if idx not in self.right.indexes:
+                segments.append("DROP KEY `{}`".format(escape(idx.name)))
+
+        # Add index
+        for idx in self.right.indexes:
+            if idx not in self.left.indexes:
+                segments.append("ADD {}".format(idx.to_sql()))
+
+        if self.left.primary_key and not self.right.primary_key:
+            segments.append("DROP PRIMARY KEY")
+        elif not self.left.primary_key.column_list \
+                and self.right.primary_key.column_list:
+            segments.append("ADD {}".format(self.right.primary_key.to_sql()))
+        elif self.left.primary_key != self.right.primary_key:
+            segments.append("DROP PRIMARY KEY")
+            segments.append("ADD {}".format(self.right.primary_key.to_sql()))
+
+        return segments
+
+    def _gen_tbl_attr_sql(self):
+        """
+        Generate the table attribute section for ALTER TABLE statement
+        """
+        segments = []
+        attrs_to_check = [
+            'charset', 'collate', 'row_format', 'key_block_size', 'comment'
+        ]
+        if not self.ignore_partition:
+            attrs_to_check.append('partition')
+
+        for attr in attrs_to_check:
+            tbl_option_old = getattr(self.left, attr)
+            tbl_option_new = getattr(self.right, attr)
+            if not is_equal(tbl_option_old, tbl_option_new):
+                segments.append("{}={}".format(attr, tbl_option_new))
+
+        return segments
+
+    def to_sql(self):
+        """
+        Generate an ALTER TABLE statement that can bring the schema from left to
+        right
+        """
+        segments = []
+
+        segments.extend(self._gen_col_sql())
+        segments.extend(self._gen_idx_sql())
+        segments.extend(self._gen_tbl_attr_sql())
+
+        if segments:
+            return "ALTER TABLE `{}` {}".format(
+                escape(self.right.name), ", ".join(segments))
 
 
 def get_type_conv_columns(old_obj, new_obj):
