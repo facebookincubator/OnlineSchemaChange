@@ -771,6 +771,34 @@ class CopyPayloadTestCase(unittest.TestCase):
 
     """
 
+    def test_detailed_checksum(self):
+        payload = self.payload_setup()
+        payload.find_coverage_index = Mock()
+        payload.dump_current_chunk = Mock()
+        payload.checksum_for_single_chunk = Mock(
+            return_value={'col1': 'abce123', 'col2': 'fghi456', '_osc_chunk_cnt': 0}
+        )
+
+        # No error should be raised if there's no mismatch
+        payload.detailed_checksum()
+        self.assertFalse(payload.dump_current_chunk.called)
+
+    def test_detailed_checksum_mismatch(self):
+        payload = self.payload_setup()
+        payload.find_coverage_index = Mock()
+        payload.dump_current_chunk = Mock()
+        payload.checksum_for_single_chunk = Mock(
+            side_effect=[
+                {'col1': 'abcd123', 'col2': 'fghi456', '_osc_chunk_cnt': 0},
+                {'col1': '123abcd', 'col2': 'fghi456', '_osc_chunk_cnt': 0},
+            ]
+        )
+
+        # Error should be raised if there's an mismatch
+        with self.assertRaises(OSCError):
+            payload.detailed_checksum()
+            self.assertTrue(payload.dump_current_chunk.called)
+
 
 class CopyPayloadPKFilterTestCase(unittest.TestCase):
     def setUp(self):

@@ -2136,7 +2136,9 @@ class CopyPayload(Payload):
             new_checksum = self.checksum_for_single_chunk(
                 self.new_table_name, use_where, new_idx_for_checksum)
             affected_rows = old_checksum['_osc_chunk_cnt']
-            if old_checksum.values() != new_checksum.values():
+            # Need to convert to List here because dict_values type will always
+            # claim two sides as different
+            if list(old_checksum.values()) != list(new_checksum.values()):
                 log.info(
                     "Checksum mismatch detected for chunk {}: "
                     .format(chunk_id))
