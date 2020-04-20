@@ -152,6 +152,8 @@ class CopyPayload(Payload):
             'fail_for_implicit_conv', False)
         self.max_wait_for_slow_query = kwargs.get(
             'max_wait_for_slow_query', constant.MAX_WAIT_FOR_SLOW_QUERY)
+        self.max_replay_batch_size = kwargs.get(
+            'max_replay_batch_size', constant.MAX_REPLAY_BATCH_SIZE)
         self.is_full_table_dump = False
 
     @property
@@ -1846,7 +1848,8 @@ class CopyPayload(Payload):
             else:
                 continue
 
-    def replay_changes(self, single_trx=False, holding_locks=False):
+    def replay_changes(
+            self, single_trx=False, holding_locks=False, delta_id_limit=None):
         """
         Loop through all the existing events in __osc_chg table and replay
         the change
@@ -1868,7 +1871,11 @@ class CopyPayload(Payload):
             replay_ms = self.replay_timeout * 1000
         else:
             replay_ms = None
-        max_id_now = self.get_max_delta_id()
+        if delta_id_limit:
+            max_id_now = delta_id_limit
+        else:
+            max_id_now = self.get_max_delta_id()
+
         if self.detailed_mismatch_info or self.dump_after_checksum:
             # We need this information for better understanding of the checksum
             # mismatch issue
@@ -2361,7 +2368,17 @@ class CopyPayload(Payload):
                 self.replay_changes(single_trx=True)
                 self.checksum_for_changes(single_trx=False)
             else:
-                self.replay_changes(single_trx=False)
+                # Break replay into smaller chunks if it's too big
+                max_id_now = self.get_max_delta_id()
+                while max_id_now - self.last_replayed_id > \
+                        self.max_replay_batch_size:
+                    delta_id_limit = self.last_replayed_id + \
+                        self.max_replay_batch_size
+                    log.info("Replay up to {}".format(delta_id_limit))
+                    self.replay_changes(
+                        single_trx=False, delta_id_limit=delta_id_limit)
+                self.replay_changes(single_trx=False, delta_id_limit=max_id_now)
+
             time_in_replay = time.time() - start_time
             if time_in_replay < self.replay_timeout:
                 log.info("Time spent in last round of replay is {:.2f}, which "
