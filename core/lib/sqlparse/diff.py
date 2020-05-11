@@ -121,27 +121,74 @@ class SchemaDiff(object):
         Generate the column section for ALTER TABLE statement
         """
         segments = []
-        left_column_names = {col.name: col for col in self.left.column_list}
-        right_column_names = {col.name: col for col in self.right.column_list}
+        old_columns = {col.name: col for col in self.left.column_list}
+        new_columns = {col.name: col for col in self.right.column_list}
+        old_column_names = [col.name for col in self.left.column_list]
+        new_column_names = [col.name for col in self.right.column_list]
 
         # Drop columns
         for col in self.left.column_list:
-            if col.name not in right_column_names.keys():
+            if col.name not in new_columns.keys():
                 segments.append("DROP `{}`".format(escape(col.name)))
+                old_column_names.remove(col.name)
 
         # Add columns
+        handled_cols = []
         for idx, col in enumerate(self.right.column_list):
-            if col.name not in left_column_names.keys():
+            if col.name not in old_columns.keys():
                 if idx == 0:
                     position = 'FIRST'
+                    old_column_names = [col.name] + old_column_names
                 else:
                     position = 'AFTER `{}`'.format(escape(
                         self.right.column_list[idx - 1].name))
+                    old_column_names = [col.name] + old_column_names
+                    new_idx = old_column_names.index(
+                        self.right.column_list[idx - 1].name) + 1
+                    old_column_names = old_column_names[:new_idx] + [col.name] \
+                        + old_column_names[new_idx:]
+                handled_cols.append(col.name)
                 segments.append("ADD {} {}".format(col.to_sql(), position))
+
+        # Adjust position
+        # The idea here is to compare column ancestor if they are the same between
+        # old and new column list, this means the position of this particular
+        # column hasn't been changed. Otherwise add a MODIFY clause to change the
+        # position
+        for idx, col_name in enumerate(new_column_names):
+            # If the column is recently added, then skip because it's already
+            # in the DDL
+            if col_name in handled_cols:
+                continue
+            # Get column definition
+            col = new_columns[col_name]
+            old_pos = old_column_names.index(col_name) - 1
+
+            # If the first column is diferent, we need to adjust the sequence
+            if idx == 0:
+                if old_pos == -1:
+                    continue
+                segments.append("MODIFY {} FIRST".format(col.to_sql()))
+                handled_cols.append(col_name)
+                continue
+
+            # If this column has the same ancestoer then it means there's no sequence
+            # adjustment needed
+            if new_column_names[idx - 1] == old_column_names[old_pos - 1]:
+                continue
+
+            segments.append("MODIFY {} AFTER `{}`".format(
+                col.to_sql(), escape(new_column_names[idx - 1])
+            ))
+            handled_cols.append(col_name)
 
         # Modify columns
         for col in self.right.column_list:
-            if col.name in left_column_names and col != left_column_names[col.name]:
+            if col.name in old_columns and col != old_columns[col.name]:
+                # If the column has been taken care of because of sequence change
+                # previously we can skip the work here
+                if col.name in handled_cols:
+                    continue
                 segments.append("MODIFY {}".format(col.to_sql()))
 
         return segments
