@@ -2566,6 +2566,7 @@ class CopyPayload(Payload):
             if self.force_cleanup:
                 self.cleanup_with_force()
             if self.has_desired_schema():
+                self.release_osc_lock()
                 return
             self.unblock_no_pk_creation()
             self.pre_osc_check()
