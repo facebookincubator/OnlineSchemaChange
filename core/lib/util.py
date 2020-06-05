@@ -8,6 +8,7 @@ LICENSE file in the root directory of this source tree.
 """
 
 import os
+import re
 import stat
 import logging
 
@@ -175,3 +176,22 @@ class RangeChain(object):
 
     def missing_points(self):
         return self._gap
+
+
+def dirname_for_db(db_name):
+    try:
+        converted_chars = []
+        for char in db_name:
+            if re.match("[a-zA-Z0-9_]", char):
+                converted_chars.append(char)
+            else:
+                hex_base = re.sub("^0x", "", str(hex(ord(char))))
+                while len(hex_base) < 4:
+                    hex_base = "0" + hex_base
+                new_char = "@{}".format(hex_base)
+                converted_chars.append(new_char)
+        return "".join(converted_chars)
+    except Exception:
+        log.exception(
+            "Unable to convert db name %s to a valid directory name", db_name)
+        raise

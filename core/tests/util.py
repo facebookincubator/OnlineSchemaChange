@@ -8,7 +8,7 @@ LICENSE file in the root directory of this source tree.
 """
 
 import unittest
-from ..lib.util import RangeChain
+from ..lib.util import RangeChain, dirname_for_db
 
 
 class RangeChainTest(unittest.TestCase):
@@ -63,3 +63,16 @@ class RangeChainTest(unittest.TestCase):
         chain.extend([9, 10, 11, 12, ])
         with self.assertRaises(Exception):
             chain.fill(3)
+
+
+class DirnameForDbTest(unittest.TestCase):
+    def test_normal_db_name(self):
+        db_name = "some_db1"
+        result = dirname_for_db(db_name)
+        self.assertEqual(db_name, result)
+
+    def test_hyphenated_db_name(self):
+        db_name = "some-db1"
+        expected = "some@002ddb1"
+        result = dirname_for_db(db_name)
+        self.assertEqual(expected, result)

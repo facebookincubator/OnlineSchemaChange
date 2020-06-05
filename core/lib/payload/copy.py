@@ -634,7 +634,7 @@ class CopyPayload(Payload):
                 else:
                     self.outfile_dir = os.path.join(
                         result[0]['folder'],
-                        self._current_db)
+                        self._current_db_dir)
                 log.info("Will use {} storing dump outfile"
                          .format(self.outfile_dir))
                 return
@@ -2560,6 +2560,7 @@ class CopyPayload(Payload):
             time_started = time.time()
             self._new_table = parse_create(sql)
             self._current_db = db
+            self._current_db_dir = util.dirname_for_db(db)
             self.init_connection(db)
             self.init_table_obj()
             self.determine_outfile_dir()
