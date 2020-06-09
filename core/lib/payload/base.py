@@ -286,16 +286,18 @@ class Payload(object):
     def get_block_no_pk_creation_variable(self):
         """
         Only fb-mysql supports blocking creation of tables without PK before 8.0
-        'block_create_no_primary_key' is GLOBAL-only variable
-        Return a tuple with variable name and scope, None if it's not supported.
+        'block_create_no_primary_key' is GLOBAL/SESSION variable now but it also
+        used to be GLOBAL-only.
+        Return a tuple with variable name and 2 scopes, None if it's not supported.
+        The caller should try the first scope, and if that fails, use the second.
         """
         if self.mysql_version.is_mysql8:
-            return 'sql_require_primary_key', 'session'
+            return 'sql_require_primary_key', 'session', 'session'
         else:
             if self.mysql_version.is_fb:
-                return 'block_create_no_primary_key', 'global'
+                return 'block_create_no_primary_key', 'session', 'global'
 
-        return None, None
+        return None, None, None
 
     def enable_priority_ddl(self):
         """
@@ -305,34 +307,60 @@ class Payload(object):
             self.execute_sql(
                 sql.set_session_variable('high_priority_ddl'), (1,))
 
+    def query_variable(self, var_name, scope):
+        """
+        Query system variable and return its value.
+        """
+        if scope == 'global':
+            row = self.query(sql.get_global_variable(var_name))
+        else:
+            row = self.query(sql.get_session_variable(var_name))
+
+        if row:
+            return row[0]['Value']
+
+    def set_variable(self, var_name, scope, value):
+        """
+        Set system variable value.
+        """
+        if scope == 'global':
+            sql_str = sql.set_global_variable(var_name)
+        else:
+            sql_str = sql.set_session_variable(var_name)
+
+        self.execute_sql(sql_str, (value,))
+
     def get_require_pk(self):
         """
         Get current state of blocking creation of tables without PK
         """
-        var_name, scope = self.get_block_no_pk_creation_variable
+        var_name, scope, scope2 = self.get_block_no_pk_creation_variable
         if var_name:
-            if scope == 'global':
-                row = self.query(sql.get_global_variable(var_name))
-            else:
-                row = self.query(sql.get_session_variable(var_name))
+            try:
+                return self.query_variable(var_name, scope)
+            except MySQLdb.MySQLError as e:
+                # If first scope is incorrect, use second scope.
+                # 1238: ER_INCORRECT_GLOBAL_LOCAL_VAR
+                if e.args and e.args[0] == 1238:
+                    return self.query_variable(var_name, scope2)
+                raise
 
-            if row:
-                return row[0]['Value']
-
-        return None
-
-    def set_unset_require_pk(self, value='ON'):
+    def set_unset_require_pk(self, value='OFF'):
         """
         Set/unset blocking creation of tables without PK if current MySQL supports it
         """
-        var_name, scope = self.get_block_no_pk_creation_variable
+        var_name, scope, scope2 = self.get_block_no_pk_creation_variable
         if var_name:
-            if scope == 'global':
-                sql_str = sql.set_global_variable(var_name)
-            else:
-                sql_str = sql.set_session_variable(var_name)
-
-            self.execute_sql(sql_str, (value,))
+            try:
+                self.set_variable(var_name, scope, value)
+            except MySQLdb.MySQLError as e:
+                # If first scope is incorrect, use second scope.
+                # 1228: ER_LOCAL_VARIABLE
+                # 1229: ER_GLOBAL_VARIABLE
+                if e.args and e.args[0] in (1228, 1229):
+                    self.set_variable(var_name, scope2, value)
+                else:
+                    raise
 
     def unblock_no_pk_creation(self):
         """
