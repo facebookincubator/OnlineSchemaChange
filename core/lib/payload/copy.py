@@ -243,8 +243,11 @@ class CopyPayload(Payload):
         """
         if len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 10:
             return constant.DELTA_TABLE_PREFIX + self._old_table.name
-        else:
+        elif (len(self._old_table.name) >= constant.MAX_TABLE_LENGTH - 10
+                and len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 2):
             return constant.SHORT_DELTA_TABLE_PREFIX + self._old_table.name
+        else:
+            return constant.DELTA_TABLE_PREFIX + constant.GENERIC_TABLE_NAME
 
     @property
     def table_name(self):
@@ -266,8 +269,11 @@ class CopyPayload(Payload):
         """
         if len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 10:
             return constant.NEW_TABLE_PREFIX + self.table_name
-        else:
+        elif (len(self._old_table.name) >= constant.MAX_TABLE_LENGTH - 10
+                and len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 2):
             return constant.SHORT_NEW_TABLE_PREFIX + self.table_name
+        else:
+            return constant.NEW_TABLE_PREFIX + constant.GENERIC_TABLE_NAME
 
     @property
     def renamed_table_name(self):
@@ -276,8 +282,11 @@ class CopyPayload(Payload):
         """
         if len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 10:
             return constant.RENAMED_TABLE_PREFIX + self._old_table.name
-        else:
+        elif (len(self._old_table.name) >= constant.MAX_TABLE_LENGTH - 10
+                and len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 2):
             return constant.SHORT_RENAMED_TABLE_PREFIX + self._old_table.name
+        else:
+            return constant.RENAMED_TABLE_PREFIX + constant.GENERIC_TABLE_NAME
 
     @property
     def insert_trigger_name(self):
@@ -287,8 +296,11 @@ class CopyPayload(Payload):
         """
         if len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 10:
             return constant.INSERT_TRIGGER_PREFIX + self._old_table.name
-        else:
+        elif (len(self._old_table.name) >= constant.MAX_TABLE_LENGTH - 10
+                and len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 2):
             return constant.SHORT_INSERT_TRIGGER_PREFIX + self._old_table.name
+        else:
+            return constant.INSERT_TRIGGER_PREFIX + constant.GENERIC_TABLE_NAME
 
     @property
     def update_trigger_name(self):
@@ -298,8 +310,11 @@ class CopyPayload(Payload):
         """
         if len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 10:
             return constant.UPDATE_TRIGGER_PREFIX + self._old_table.name
-        else:
+        elif (len(self._old_table.name) >= constant.MAX_TABLE_LENGTH - 10
+                and len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 2):
             return constant.SHORT_UPDATE_TRIGGER_PREFIX + self._old_table.name
+        else:
+            return constant.UPDATE_TRIGGER_PREFIX + constant.GENERIC_TABLE_NAME
 
     @property
     def delete_trigger_name(self):
@@ -309,8 +324,11 @@ class CopyPayload(Payload):
         """
         if len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 10:
             return constant.DELETE_TRIGGER_PREFIX + self._old_table.name
-        else:
+        elif (len(self._old_table.name) >= constant.MAX_TABLE_LENGTH - 10
+                and len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 2):
             return constant.SHORT_DELETE_TRIGGER_PREFIX + self._old_table.name
+        else:
+            return constant.DELETE_TRIGGER_PREFIX + constant.GENERIC_TABLE_NAME
 
     @property
     def outfile(self):

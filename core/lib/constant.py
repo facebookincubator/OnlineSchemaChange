@@ -18,6 +18,9 @@ INSERT_TRIGGER_PREFIX = '__osc_ins_'
 UPDATE_TRIGGER_PREFIX = '__osc_upd_'
 DELETE_TRIGGER_PREFIX = '__osc_del_'
 
+# tables with 64 character length names need a generic place-holder name
+GENERIC_TABLE_NAME = 'online_schema_change_temp_tbl'
+
 # Special prefixes for tables that have longer table names
 SHORT_NEW_TABLE_PREFIX = 'n!'
 SHORT_DELTA_TABLE_PREFIX = 'c!'
