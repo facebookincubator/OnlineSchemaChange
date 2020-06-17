@@ -24,30 +24,30 @@ select_max_statement_time = "SELECT MAX_STATEMENT_TIME=1000 1"
 
 table_existence = (
     " SELECT 1 "
-    " FROM information_schema.columns c1 "
-    " WHERE c1.table_name = %s AND "
+    " FROM information_schema.COLUMNS c1 "
+    " WHERE c1.TABLE_NAME = %s AND "
     "   c1.TABLE_SCHEMA = %s "
 )
 
 trigger_existence = (
     "SELECT TRIGGER_NAME, ACTION_TIMING, EVENT_MANIPULATION "
-    "FROM INFORMATION_SCHEMA.TRIGGERS "
+    "FROM information_schema.TRIGGERS "
     "WHERE "
     "EVENT_OBJECT_TABLE = %s AND "
     "EVENT_OBJECT_SCHEMA = %s "
 )
 
 fetch_partition = (
-    "SELECT PARTITION_NAME FROM INFORMATION_SCHEMA.PARTITIONS "
-    "WHERE TABLE_SCHEMA = %s and TABLE_NAME = %s"
+    "SELECT PARTITION_NAME FROM information_schema.PARTITIONS "
+    "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s"
 )
 
 foreign_key_cnt = (
     "SELECT rc.CONSTRAINT_NAME AS constraint_name,"
     " kcu.COLUMN_NAME col_name,kcu.REFERENCED_COLUMN_NAME ref_col_name,"
     " kcu.REFERENCED_TABLE_NAME ref_tab"
-    "  FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS AS rc"
-    "  JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE AS kcu"
+    "  FROM information_schema.REFERENTIAL_CONSTRAINTS AS rc"
+    "  JOIN information_schema.KEY_COLUMN_USAGE AS kcu"
     "   USING (CONSTRAINT_SCHEMA,CONSTRAINT_NAME)"
     " WHERE rc.REFERENCED_TABLE_NAME IS NOT NULL AND"
     " ("
@@ -60,37 +60,37 @@ foreign_key_cnt = (
 )
 
 table_avg_row_len = (
-    "SELECT AVG_ROW_LENGTH, TABLE_ROWS from "
+    "SELECT AVG_ROW_LENGTH, TABLE_ROWS FROM "
     "information_schema.TABLES "
     "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s"
 )
 
 column_diff = (
     " SELECT c1.COLUMN_NAME "
-    " FROM information_schema.columns c1 "
-    " LEFT join ("
-    "   SELECT * FROM information_schema.columns "
-    "   WHERE table_schema = %s AND table_name = %s"
+    " FROM information_schema.COLUMNS c1 "
+    " LEFT JOIN ("
+    "   SELECT * FROM information_schema.COLUMNS "
+    "   WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s"
     " ) c2 ON c1.COLUMN_NAME = c2.COLUMN_NAME "
-    " WHERE c1.table_name = %s AND "
+    " WHERE c1.TABLE_NAME = %s AND "
     "   c1.TABLE_SCHEMA = %s AND "
     "   c2.COLUMN_NAME IS NULL"
 )
 
 partition_method = (
     "SELECT MIN(PARTITION_METHOD) pm "
-    "FROM information_schema.partitions "
+    "FROM information_schema.PARTITIONS "
     "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s GROUP BY TABLE_NAME"
 )
 
 default_collation = (
     "SELECT COLLATION_NAME,CHARACTER_SET_NAME "
-    "FROM INFORMATION_SCHEMA.COLLATIONS WHERE IS_DEFAULT = 'Yes' "
+    "FROM information_schema.COLLATIONS WHERE IS_DEFAULT = 'Yes' "
 )
 
 all_collation = (
     "SELECT COLLATION_NAME,CHARACTER_SET_NAME "
-    "FROM INFORMATION_SCHEMA.COLLATIONS"
+    "FROM information_schema.COLLATIONS"
 )
 
 """
@@ -266,12 +266,12 @@ def get_myrocks_table_size():
     return """
         SELECT SUM(DATA_SIZE) as raw_size
         FROM
-            INFORMATION_SCHEMA.ROCKSDB_INDEX_FILE_MAP
+            information_schema.ROCKSDB_INDEX_FILE_MAP
         WHERE
             INDEX_NUMBER IN (
                 SELECT INDEX_NUMBER
                 FROM
-                    INFORMATION_SCHEMA.ROCKSDB_DDL
+                    information_schema.ROCKSDB_DDL
                 WHERE
                     TABLE_SCHEMA = %s
                     AND TABLE_NAME = %s
@@ -803,21 +803,21 @@ def rename_table(from_name, to_name):
 
 def get_all_osc_tables(db=None):
     sql = (
-        "SELECT table_schema as db, table_name "
-        "FROM information_schema.tables "
-        "WHERE left(table_name, length(%s)) = %s "
+        "SELECT TABLE_SCHEMA as db, TABLE_NAME "
+        "FROM information_schema.TABLES "
+        "WHERE left(TABLE_NAME, length(%s)) = %s "
     )
     if db:
-        sql += "AND table_schema = %s "
+        sql += "AND TABLE_SCHEMA = %s "
     return sql
 
 
 def get_all_osc_triggers(db=None):
     sql = (
-        "SELECT trigger_schema as db, trigger_name "
-        "FROM information_schema.triggers "
-        "WHERE left(trigger_name, length(%s)) = %s "
+        "SELECT TRIGGER_SCHEMA as db, TRIGGER_NAME "
+        "FROM information_schema.TRIGGERS "
+        "WHERE left(TRIGGER_NAME, length(%s)) = %s "
     )
     if db:
-        sql += "AND trigger_schema = %s "
+        sql += "AND TRIGGER_SCHEMA = %s "
     return sql
