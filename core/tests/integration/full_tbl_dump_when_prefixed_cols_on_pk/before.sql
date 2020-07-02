@@ -10,6 +10,6 @@ CREATE TABLE IF NOT EXISTS `table1` (
   `name` varchar(4000) NOT NULL DEFAULT '0' ,
   `data` mediumtext COLLATE latin1_bin NOT NULL,
   PRIMARY KEY (`id`, `name`(10)) COMMENT 'id'
-) ENGINE=InnoDB;
+);
 insert into table1 values (1, 'aaa', 'a');
 insert into table1 values (2, 'bbb', 'a');

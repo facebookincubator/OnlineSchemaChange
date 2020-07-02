@@ -9,7 +9,7 @@ CREATE TABLE `table1` (
   `id` bigint(20) unsigned NOT NULL DEFAULT '0' ,
   `data` mediumtext COLLATE latin1_bin NOT NULL,
   PRIMARY KEY (`id`) COMMENT 'id'
-) ENGINE=InnoDB DEFAULT CHARSET=latin1
+) DEFAULT CHARSET=latin1
 /*!50100 PARTITION BY HASH (id)
 PARTITIONS 2 */;
 INSERT INTO table1 VALUES (1,'a');

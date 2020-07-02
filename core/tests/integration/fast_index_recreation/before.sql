@@ -13,6 +13,6 @@ CREATE TABLE IF NOT EXISTS `table1` (
   PRIMARY KEY (`id`) COMMENT 'id',
   KEY `key1` (`id2`),
   KEY `key2` (`id3`)
-) ENGINE=InnoDB;
+);
 insert into table1 values (1, 1, 1, 'a');
 insert into table1 values (2, 2, 2, 'a');

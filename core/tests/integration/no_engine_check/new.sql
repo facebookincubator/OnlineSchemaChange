@@ -10,4 +10,4 @@ CREATE TABLE IF NOT EXISTS `table1` (
   `id3` bigint(20) unsigned NOT NULL DEFAULT '0' ,
   `id4` bigint(20) unsigned NOT NULL DEFAULT '0' ,
   PRIMARY KEY (`id1`, `id2`, `id3`) COMMENT 'id'
-) ENGINE=InnoDB;
+);

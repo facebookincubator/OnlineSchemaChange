@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS `table1` (
   `id` bigint(20) unsigned NOT NULL DEFAULT '0' ,
   `data` mediumtext COLLATE latin1_bin NOT NULL,
 unique key (`id`)
-) ENGINE=InnoDB;
+);
 insert into table1 values (1,'a');
 insert into table1 values (2,'a');
 insert into table1 values (3,'a');

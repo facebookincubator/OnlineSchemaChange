@@ -8,4 +8,4 @@ CREATE TABLE `table1` (
   `id` bigint(20) unsigned NOT NULL DEFAULT '0' ,
   `data` varchar(20) COLLATE latin1_general_cs NOT NULL,
   PRIMARY KEY (`data`) COMMENT 'id'
-) ENGINE=InnoDB;
+);

@@ -9,10 +9,10 @@ CREATE TABLE IF NOT EXISTS `table1` (
   `id` bigint(20) unsigned NOT NULL DEFAULT '0' ,
   `data` mediumtext COLLATE latin1_bin NOT NULL,
   PRIMARY KEY (`id`) COMMENT 'id'
-) ENGINE=InnoDB
+)
 /*!50100 PARTITION BY RANGE (id)
-(PARTITION p1 VALUES LESS THAN (2) ENGINE = InnoDB,
- PARTITION p2 VALUES LESS THAN (3) ENGINE = InnoDB,
- PARTITION p3 VALUES LESS THAN MAXVALUE ENGINE = InnoDB) */;
+(PARTITION p1 VALUES LESS THAN (2),
+ PARTITION p2 VALUES LESS THAN (3),
+ PARTITION p3 VALUES LESS THAN MAXVALUE) */;
 insert into table1 values (1,'a');
 insert into table1 values (2,'b');

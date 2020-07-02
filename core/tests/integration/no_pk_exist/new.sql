@@ -8,4 +8,4 @@ CREATE TABLE IF NOT EXISTS `table1` (
   `id1` bigint(20) unsigned NOT NULL DEFAULT '0' ,
   `id2` bigint(20) unsigned NOT NULL DEFAULT '0' ,
   `id3` bigint(20) unsigned NOT NULL DEFAULT '0'
-) ENGINE=InnoDB;
+);

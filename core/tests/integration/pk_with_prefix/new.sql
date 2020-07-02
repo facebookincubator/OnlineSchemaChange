@@ -9,4 +9,4 @@ CREATE TABLE `table1` (
   `name` varchar(4000) NOT NULL DEFAULT '0' ,
   `data` mediumtext COLLATE latin1_bin NOT NULL,
   PRIMARY KEY (`id`, `name`(10)) COMMENT 'id'
-) ENGINE=InnoDB;
+);

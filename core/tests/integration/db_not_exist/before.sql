@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS `table1` (
   `id3` bigint(20) unsigned NOT NULL DEFAULT '0' ,
   `id4` bigint(20) unsigned NOT NULL DEFAULT '0' ,
   PRIMARY KEY (`id1`, `id2`, `id3`, `id4`) COMMENT 'id'
-) ENGINE=InnoDB;
+);
 insert into table1 values (1,1,1,1);
 insert into table1 values (1,1,1,2);
 insert into table1 values (1,1,1,3);

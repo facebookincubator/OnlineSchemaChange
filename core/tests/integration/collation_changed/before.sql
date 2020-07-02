@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS `table1` (
   `id` bigint(20) unsigned NOT NULL DEFAULT '0' ,
   `data` varchar(20) NOT NULL,
   PRIMARY KEY (`data`) COMMENT 'id'
-) ENGINE=InnoDB;
+);
 insert into table1 values (1,'a11');
 insert into table1 values (2,'b22');
 insert into table1 values (3,'c33');

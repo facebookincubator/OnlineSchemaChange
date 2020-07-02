@@ -9,4 +9,4 @@ CREATE TABLE `table1` (
   `id2` bigint(20) unsigned NOT NULL DEFAULT '0' ,
   `data` mediumtext COLLATE latin1_bin NOT NULL,
   PRIMARY KEY (`id2`) COMMENT 'id2'
-) ENGINE=InnoDB;
+);

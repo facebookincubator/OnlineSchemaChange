@@ -8,4 +8,4 @@ CREATE TABLE IF NOT EXISTS `table1` (
   `id` bigint(20) unsigned NOT NULL DEFAULT '0' ,
   `v` varchar(10) COLLATE latin1_bin NOT NULL,
   PRIMARY KEY (`id`) COMMENT 'id'
-) ENGINE=InnoDB;
+);

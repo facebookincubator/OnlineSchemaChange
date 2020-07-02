@@ -8,6 +8,6 @@ CREATE TABLE `table1` (
   `id` bigint(20) unsigned NOT NULL DEFAULT '0' ,
   `data` mediumtext CHARACTER SET latin1 COLLATE latin1_bin NOT NULL,
   PRIMARY KEY (`id`) COMMENT 'id'
-) ENGINE=InnoDB DEFAULT CHARSET=latin1
+) DEFAULT CHARSET=latin1
 /*!50100 PARTITION BY HASH (id)
 PARTITIONS 2 */;

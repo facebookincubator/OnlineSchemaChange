@@ -9,6 +9,6 @@ CREATE TABLE IF NOT EXISTS `(╯°□°）╯︵ ┻━┻` (
   `id` bigint(20) unsigned NOT NULL DEFAULT '0' ,
   `data` mediumtext COLLATE latin1_bin NOT NULL,
   PRIMARY KEY (`id`) COMMENT 'id'
-) ENGINE=InnoDB;
+);
 insert into `(╯°□°）╯︵ ┻━┻` values (1,'a');
 insert into `(╯°□°）╯︵ ┻━┻` values (2,'a');

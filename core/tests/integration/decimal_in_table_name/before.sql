@@ -9,6 +9,6 @@ CREATE TABLE IF NOT EXISTS `table.1` (
   `id` bigint(20) unsigned NOT NULL DEFAULT '0' ,
   `data` mediumtext COLLATE latin1_bin NOT NULL,
   PRIMARY KEY (`id`) COMMENT 'id'
-) ENGINE=InnoDB;
+);
 insert into `table.1` values (1,'a');
 insert into `table.1` values (2,'a');

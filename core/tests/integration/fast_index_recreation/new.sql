@@ -14,4 +14,4 @@ CREATE TABLE IF NOT EXISTS `table1` (
   KEY `key1` (`id2`),
   KEY `key2` (`id3`),
   KEY `key3` (`id4`)
-) ENGINE=InnoDB;
+);
