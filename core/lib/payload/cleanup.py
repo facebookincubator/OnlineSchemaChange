@@ -183,14 +183,14 @@ class CleanupPayload(Payload):
                     (constant.PREFIX, constant.PREFIX, db,))
                 for row in results:
                     self.add_drop_table_entry(
-                        db, row['table_name'])
+                        db, row['TABLE_NAME'])
         else:
                 results = self.query(
                     sql.get_all_osc_tables(),
                     (constant.PREFIX, constant.PREFIX, ))
                 for row in results:
                     self.add_drop_table_entry(
-                        row['db'], row['table_name'])
+                        row['db'], row['TABLE_NAME'])
 
     def search_for_triggers(self):
         """
@@ -203,14 +203,14 @@ class CleanupPayload(Payload):
                     (constant.PREFIX, constant.PREFIX, db,))
                 for row in results:
                     self.add_drop_trigger_entry(
-                        db, row['trigger_name'])
+                        db, row['TRIGGER_NAME'])
         else:
                 results = self.query(
                     sql.get_all_osc_triggers(),
                     (constant.PREFIX, constant.PREFIX, ))
                 for row in results:
                     self.add_drop_trigger_entry(
-                        row['db'], row['trigger_name'])
+                        row['db'], row['TRIGGER_NAME'])
 
     def search_for_files(self):
         """
