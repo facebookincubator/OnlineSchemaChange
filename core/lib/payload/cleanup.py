@@ -12,6 +12,7 @@ import os
 import re
 import time
 
+import MySQLdb
 from .base import Payload
 from .. import constant
 from .. import util
@@ -69,6 +70,7 @@ class CleanupPayload(Payload):
         self.execute_sql('USE `{}`'.format(escape(db)))
         current_db = db
         for stmt, stmt_db in self.sqls_to_execute:
+            cleanupError = False
             try:
                 # Switch to the database we are going to work on to avoid
                 # cross db SQL execution
@@ -77,15 +79,27 @@ class CleanupPayload(Payload):
                     current_db = stmt_db
                 log.info("Executing db: {} sql: {}".format(stmt_db, stmt))
                 self.execute_sql(stmt)
+            except MySQLdb.OperationalError as e:
+                errnum, _ = e.args
+                # 1507 means the partition doesn't exist, which
+                #     is most likely competing partition maintenance
+                # 1508 means we tried to drop the last partition in a table
+                if errnum in [1507, 1508]:
+                    continue
+                cleanupError = True
+                error = e
             except Exception as e:
-                log.error("Failed to execute sql for cleanup")
-                raise OSCError(
-                    'CLEANUP_EXECUTION_ERROR',
-                    {'sql': stmt, 'msg': str(e)})
+                cleanupError = True
+                error = e
             finally:
                 # cleanup all the queries no matter they are executed or not
                 # to prevent them from being executed again in the next run
                 self.sqls_to_execute = []
+            if cleanupError:
+                log.error("Failed to execute sql for cleanup")
+                raise OSCError(
+                    'CLEANUP_EXECUTION_ERROR',
+                    {'sql': stmt, 'msg': str(error)})
 
     def add_file_entry(self, filepath):
         log.debug("Cleanup file entry added: {}".format(filepath))
@@ -137,6 +151,8 @@ class CleanupPayload(Payload):
                         log.debug("{}/{} using {} partitioning method".format(
                                   db, table, partition_method))
                         for partition_name in entry['partitions']:
+                            # As of version 8.0.17, MySQL does not support
+                            # "DROP PARTITION IF EXISTS".
                             sql_query = (
                                 "ALTER TABLE `{}` "
                                 "DROP PARTITION `{}`"
@@ -168,7 +184,7 @@ class CleanupPayload(Payload):
 
     def run_ddl(self):
         """
-        Try to search all the garbadge left over by OSC and clean them
+        Try to search all the garbage left over by OSC and clean them
         """
         self.cleanup()
 
@@ -185,12 +201,12 @@ class CleanupPayload(Payload):
                     self.add_drop_table_entry(
                         db, row['TABLE_NAME'])
         else:
-                results = self.query(
-                    sql.get_all_osc_tables(),
-                    (constant.PREFIX, constant.PREFIX, ))
-                for row in results:
-                    self.add_drop_table_entry(
-                        row['db'], row['TABLE_NAME'])
+            results = self.query(
+                sql.get_all_osc_tables(),
+                (constant.PREFIX, constant.PREFIX, ))
+            for row in results:
+                self.add_drop_table_entry(
+                    row['db'], row['TABLE_NAME'])
 
     def search_for_triggers(self):
         """
@@ -205,12 +221,12 @@ class CleanupPayload(Payload):
                     self.add_drop_trigger_entry(
                         db, row['TRIGGER_NAME'])
         else:
-                results = self.query(
-                    sql.get_all_osc_triggers(),
-                    (constant.PREFIX, constant.PREFIX, ))
-                for row in results:
-                    self.add_drop_trigger_entry(
-                        row['db'], row['TRIGGER_NAME'])
+            results = self.query(
+                sql.get_all_osc_triggers(),
+                (constant.PREFIX, constant.PREFIX, ))
+            for row in results:
+                self.add_drop_trigger_entry(
+                    row['db'], row['TRIGGER_NAME'])
 
     def search_for_files(self):
         """
@@ -258,7 +274,7 @@ class CleanupPayload(Payload):
         if self.kill_only:
             return
 
-        # Cleanup triggers first, otherwise DML against orignal table may fail
+        # Cleanup triggers first, otherwise DML against original table may fail
         # with a "table not exist" error. Because the table which is referenced
         # in the trigger was dropped first.
         self.search_for_triggers()
