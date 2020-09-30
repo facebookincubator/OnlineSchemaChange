@@ -810,6 +810,7 @@ class CopyPayload(Payload):
             self._new_table.indexes
         old_pk_len = len(self._pk_for_filter)
         for idx in idx_on_new_table:
+            # list[:idx] where idx > len(list) yields full list
             idx_prefix = idx.column_list[:old_pk_len]
             idx_name_list = [col.name for col in idx_prefix]
             if self._pk_for_filter == idx_name_list:
@@ -894,8 +895,7 @@ class CopyPayload(Payload):
                              .format(idx.name))
                     self._pk_for_filter = [
                         col.name for col in idx.column_list]
-                    self._pk_for_filter_def = [
-                        col for col in idx.column_list]
+                    self._pk_for_filter_def = idx.column_list.copy()
                     self._idx_name_for_filter = idx.name
                     break
             else:
@@ -903,8 +903,7 @@ class CopyPayload(Payload):
                 if self.allow_new_pk:
                     self._pk_for_filter = [
                         col.name for col in self._old_table.column_list]
-                    self._pk_for_filter_def = [
-                        col for col in self._old_table.column_list]
+                    self._pk_for_filter_def = self._old_table.column_list.copy()
                     self.is_full_table_dump = True
                 else:
                     raise OSCError('NEW_PK')
@@ -914,21 +913,21 @@ class CopyPayload(Payload):
             # if any of the columns of the primary key is prefixed, we want to
             # use full_table_dump, instead of chunking, so that it doesn't fill
             # up the disk
+            # e.g. name below is a prefixed col in the PK (assume varchar(99))
+            # since we dont use full col in PK - `PRIMARY KEY(id, name(10))`
             for col in self._old_table.primary_key.column_list:
                 if col.length:
                     log.info('Found prefixed column/s as part of the PK. '
                              'Will do full table dump (no chunking).')
                     self._pk_for_filter = [
-                        col.name for col in self._old_table.column_list]
-                    self._pk_for_filter_def = [
-                        col for col in self._old_table.column_list]
+                        c.name for c in self._old_table.column_list]
+                    self._pk_for_filter_def = self._old_table.column_list.copy()
                     self.is_full_table_dump = True
                     break
-
-            self._pk_for_filter = [
-                col.name for col in self._old_table.primary_key.column_list]
-            self._pk_for_filter_def = [
-                col for col in self._old_table.primary_key.column_list]
+            else:
+                self._pk_for_filter = [
+                    col.name for col in self._old_table.primary_key.column_list]
+                self._pk_for_filter_def = self._old_table.primary_key.column_list.copy()
 
     @wrap_hook
     def pre_osc_check(self):
@@ -972,8 +971,7 @@ class CopyPayload(Payload):
                 self.is_full_table_dump = True
                 self._pk_for_filter = [
                     col.name for col in self._old_table.column_list]
-                self._pk_for_filter_def = [
-                    col for col in self._old_table.column_list]
+                self._pk_for_filter_def = self._old_table.column_list.copy()
             else:
                 if self.skip_pk_coverage_check:
                     log.warning(

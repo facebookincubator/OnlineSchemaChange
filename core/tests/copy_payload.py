@@ -834,6 +834,44 @@ class CopyPayloadPKFilterTestCase(unittest.TestCase):
             "id3 int "
             ") "
         )
+        self.table_obj_newcol = parse_create(
+            " CREATE TABLE a ("
+            "id1 int, "
+            "id2 int, "
+            "id3 int, "
+            "dummy int,"
+            "PRIMARY KEY(id1) "
+            ") "
+        )
+        self.table_obj_newcol_with_idx = parse_create(
+            " CREATE TABLE a ("
+            "id1 int, "
+            "id2 int, "
+            "id3 int, "
+            "dummy int, "
+            "PRIMARY KEY(id1), "
+            "KEY (dummy) "
+            ") "
+        )
+
+        self.table_obj_pk1_prefixed = parse_create(
+            " CREATE TABLE a ("
+            "id1 int, "
+            "name varchar(200) NOT NULL,"
+            "dummy1 int, "
+            "PRIMARY KEY (id, name(42)) "
+            ") "
+        )
+        self.table_obj_pk2_prefixed = parse_create(
+            " CREATE TABLE a ("
+            "id1 int, "
+            "name varchar(200) NOT NULL,"
+            "dummy1 int, "
+            "dummy2 int, "
+            "PRIMARY KEY (id, name(42)) "
+            ") "
+        )
+
         self.payload._current_db = 'test'
 
     def test_decide_pk_for_filter_1pk_to_2pk(self):
@@ -858,3 +896,34 @@ class CopyPayloadPKFilterTestCase(unittest.TestCase):
         self.payload.decide_pk_for_filter()
         self.assertEquals(self.payload._pk_for_filter, ['id1', 'id2', 'id3'])
         self.assertTrue(self.payload.is_full_table_dump)
+
+    def test_decide_pk_for_filter_newcol_not_indexed(self):
+        # Old has PK and no prefix cols, should chunk
+        self.payload._old_table = self.table_obj_1pk
+        self.payload._new_table = self.table_obj_newcol
+        self.payload.decide_pk_for_filter()
+
+        self.assertEquals(self.payload._pk_for_filter, ['id1'])
+        self.assertFalse(self.payload.is_full_table_dump)
+        self.assertEqual(self.payload.find_coverage_index(), 'PRIMARY')
+        self.assertTrue(self.payload.validate_post_alter_pk())
+
+        # (That new table has idx on added col is a NOP)
+        self.payload._new_table = self.table_obj_newcol_with_idx
+        self.payload.decide_pk_for_filter()
+
+        self.assertEquals(self.payload._pk_for_filter, ['id1'])
+        self.assertFalse(self.payload.is_full_table_dump)
+        self.assertEqual(self.payload.find_coverage_index(), 'PRIMARY')
+        self.assertTrue(self.payload.validate_post_alter_pk())
+
+    def test_decide_pk_for_filter_prefixed(self):
+        # PK on old table uses prefixed columns, should NOT chunk.
+        self.payload._old_table = self.table_obj_pk1_prefixed
+        self.payload._new_table = self.table_obj_pk2_prefixed
+        self.payload.decide_pk_for_filter()
+
+        self.assertEquals(self.payload._pk_for_filter, ['id1', 'name', 'dummy1'])
+        self.assertTrue(self.payload.is_full_table_dump)
+        self.assertIsNone(self.payload.find_coverage_index())
+        self.assertFalse(self.payload.validate_post_alter_pk())
