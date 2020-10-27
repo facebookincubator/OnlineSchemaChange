@@ -30,17 +30,26 @@ class SchemaDiff(object):
     """
     Representing the difference between two Table object
     """
+
     def __init__(self, left, right, ignore_partition=False):
         self.left = left
         self.right = right
-        self.ignore_partition = ignore_partition
+        self.attrs_to_check = [
+            'charset', 'collate', 'comment',
+            'engine', 'key_block_size', 'name', 'row_format',
+        ]
+        if not ignore_partition:
+            self.attrs_to_check.append('partition')
+
 
     def _calculate_diff(self):
         diffs = {
             'removed': [],
             'added': [],
             # Customized messages
-            'msgs': []
+            'msgs': [],
+            # Any attributes that were modified
+            'attrs_modified': [],
         }
         # We are copying here since we want to change the col list.
         # Shallow copy should be enough here
@@ -83,18 +92,13 @@ class SchemaDiff(object):
             if self.right.primary_key.column_list:
                 diffs['added'].append(self.right.primary_key)
 
-        attrs_to_check = [
-            'name', 'engine', 'charset', 'collate', 'row_format',
-            'key_block_size', 'comment']
-        if not self.ignore_partition:
-            attrs_to_check.append('partition')
-
-        for attr in attrs_to_check:
+        for attr in self.attrs_to_check:
             tbl_option_old = getattr(self.left, attr)
             tbl_option_new = getattr(self.right, attr)
             if not is_equal(tbl_option_old, tbl_option_new):
                 diffs['removed'].append(TableOptionDiff(attr, tbl_option_old))
                 diffs['added'].append(TableOptionDiff(attr, tbl_option_new))
+                diffs['attrs_modified'].append(attr)
 
         return diffs
 
@@ -110,6 +114,8 @@ class SchemaDiff(object):
                 diff_strs.append('+ ' + diff.to_sql())
             for diff in diffs["msgs"]:
                 diff_strs.append(diff)
+            for attr in diffs["attrs_modified"]:
+                diff_strs.append(f'attrs_modified: {attr}')
             diff_str = "\n".join(diff_strs)
             return diff_str
 
@@ -224,13 +230,8 @@ class SchemaDiff(object):
         Generate the table attribute section for ALTER TABLE statement
         """
         segments = []
-        attrs_to_check = [
-            'charset', 'collate', 'row_format', 'key_block_size', 'comment'
-        ]
-        if not self.ignore_partition:
-            attrs_to_check.append('partition')
 
-        for attr in attrs_to_check:
+        for attr in self.attrs_to_check:
             tbl_option_old = getattr(self.left, attr)
             tbl_option_new = getattr(self.right, attr)
             if not is_equal(tbl_option_old, tbl_option_new):

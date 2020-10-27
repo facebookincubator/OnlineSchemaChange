@@ -246,3 +246,30 @@ class SQLParserTest(unittest.TestCase):
         self.assertEqual(len(type_conv_columns), 2)
         self.assertEqual(type_conv_columns[0].name, 'column2')
         self.assertEqual(type_conv_columns[1].name, 'column3')
+
+    def test_meta_diff_with_commas(self):
+        sql1 = (
+            "Create table foo ("
+            "column1 int NOT NULL AUTO_INCREMENT, "
+            "column2 varchar(10) default '', "
+            "column3 int default 0 "
+            ") charset=utf8 engine=INNODB"
+        )
+
+        # Schema identical but comment added in table attrs
+        # The commas in the table attrs should be a NOP for parsing
+        sql2 = (
+            "Create table foo ("
+            "column1 int NOT NULL AUTO_INCREMENT, "
+            "column2 varchar(10) default '', "
+            "column3 int default 0 "
+            ") engine=INNODB , charset=utf8, comment='whatever'"
+        )
+
+        obj1 = parse_create(sql1)
+        obj2 = parse_create(sql2)
+        self.assertNotEqual(obj1, obj2)
+
+        diff_obj = SchemaDiff(obj1, obj2)
+        diffs = diff_obj.diffs()
+        self.assertEqual(diffs["attrs_modified"], ['comment'])

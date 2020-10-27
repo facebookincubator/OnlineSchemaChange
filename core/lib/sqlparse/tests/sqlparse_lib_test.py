@@ -927,3 +927,35 @@ class ModelTableTestCase(unittest.TestCase):
         )
         sql_obj = parse_create(sql)
         self.assertFalse(sql_obj.is_myrocks_ttl_table)
+
+    def test_comma_separated_attrs(self):
+        # Schema and attrs are the same except that in sql2, the
+        # attributes are comma separated
+        sql1 = (
+            "Create table foo ("
+            "column1 int NOT NULL AUTO_INCREMENT, "
+            "column2 varchar(10) default '', "
+            "column3 int default 0 "
+            ") charset=utf8 engine=INNODB comment='hello, world'"
+        )
+
+        sql2 = (
+            "Create table foo ("
+            "column1 int NOT NULL AUTO_INCREMENT, "
+            "column2 varchar(10) default '', "
+            "column3 int default 0 "
+            ") charset=utf8 , engine=INNODB, comment='hello, world'"
+        )
+
+        # Parsed objects must be identical
+        obj1 = parse_create(sql1)
+        obj2 = parse_create(sql2)
+        self.assertEqual(obj1, obj2)
+
+        # Comment attrib should be the same
+        attr1 = obj1.comment or None
+        attr2 = obj2.comment or None
+        self.assertIsNotNone(attr1)
+        self.assertIsNotNone(attr2)
+        self.assertEqual(attr1, "'hello, world'")
+        self.assertEqual(attr1, attr2)

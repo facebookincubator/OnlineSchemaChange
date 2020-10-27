@@ -383,7 +383,7 @@ class CreateParser(object):
         Optional(Literal('=')).suppress() +
         Word(alphanums + '_')('compression').setParseAction(upcaseTokens)
     )
-    # Parse and make sure auto_increment is an interger
+    # Parse and make sure auto_increment is an integer
     # parseAction function is defined as fn( s, loc, toks ), where:
     # s is the original parse string
     # loc is the location in the string where matching started
@@ -400,12 +400,12 @@ class CreateParser(object):
         CaselessLiteral("COMMENT").suppress() +
         Optional(Literal('=')).suppress() + QUOTED_STRING_WITH_QUOTE('comment')
     )
+
     TABLE_OPTION = ZeroOrMore(
-        ENGINE | DEFAULT_CHARSET |
-        TABLE_COLLATE |
-        ROW_FORMAT | TABLE_KEY_BLOCK_SIZE |
-        COMPRESSION | TABLE_AUTO_INCRE |
-        TABLE_COMMENT
+        (ENGINE | DEFAULT_CHARSET | TABLE_COLLATE | ROW_FORMAT
+        | TABLE_KEY_BLOCK_SIZE | COMPRESSION | TABLE_AUTO_INCRE | TABLE_COMMENT)
+        # Table attributes could be comma separated too.
+        + Optional(COMMA).suppress()
     )
 
     # Partition section
