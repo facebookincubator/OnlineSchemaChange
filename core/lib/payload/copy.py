@@ -155,6 +155,8 @@ class CopyPayload(Payload):
         self.max_replay_batch_size = kwargs.get(
             'max_replay_batch_size', constant.MAX_REPLAY_BATCH_SIZE)
         self.is_full_table_dump = False
+        self.replay_max_changes = kwargs.get(
+            'replay_max_changes', constant.MAX_REPLAY_CHANGES)
 
     @property
     def current_db(self):
@@ -1891,6 +1893,11 @@ class CopyPayload(Payload):
             max_id_now = delta_id_limit
         else:
             max_id_now = self.get_max_delta_id()
+        log.debug("max_id_now is %r / %r", max_id_now, self.replay_max_changes)
+        if max_id_now > self.replay_max_changes:
+            raise OSCError(
+                "REPLAY_TOO_MANY_DELTAS",
+                {'deltas': max_id_now, 'max_deltas': self.replay_max_changes})
 
         if self.detailed_mismatch_info or self.dump_after_checksum:
             # We need this information for better understanding of the checksum

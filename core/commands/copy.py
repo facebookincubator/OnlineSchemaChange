@@ -106,6 +106,13 @@ class Copy(CommandBase):
                             help="Maximum number of times we should try to "
                             "replay changes before we decide it's impossible "
                             "to catch up.")
+        parser.add_argument("--replay-max-changes", type=int,
+                            default=constant.MAX_REPLAY_CHANGES,
+                            help="Maximum number of row updates we should try to "
+                            "replay before we decide it's impossible.  Setting "
+                            "this too high can cause our osc_chg table to hit "
+                            "max int value and even if we use bigint osc will "
+                            " be unlikey to ever catchup in such cases.")
         parser.add_argument("--reserved-space-percent",
                             default=constant.DEFAULT_RESERVED_SPACE_PERCENT,
                             type=int,

@@ -285,6 +285,11 @@ class OSCError(Exception):
                 "with charset '{charset}'. Use --charset "
                 "to set the proper charset."),
         },
+        'REPLAY_TOO_MANY_DELTAS': {
+            'code': 151,
+            'desc': ('Recorded too many changes to ever catchup '
+                     '({deltas} > max replay changes {max_deltas})'),
+        },
         'ASSERTION_ERROR': {
             'code': 249,
             'desc': (
