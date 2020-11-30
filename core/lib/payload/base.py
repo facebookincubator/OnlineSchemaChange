@@ -212,8 +212,7 @@ class Payload(object):
             dbs = {r['Database'] for r in databases}
             for db in self.db_list:
                 if db not in dbs:
-                    log.debug("DB: {} doesn't exist in MySQL"
-                              .format(db))
+                    log.warning("DB: {} doesn't exist in MySQL".format(db))
                     non_exist_dbs.append(db)
             return non_exist_dbs
         except Exception:

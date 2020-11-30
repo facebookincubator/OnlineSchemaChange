@@ -35,6 +35,9 @@ def gen_test_cases(base_dir, get_conn, test_to_run=None, database='test',
 
     def gen_test(test_case_dir, config, gen_conn, database):
         def test_function(self):
+            last_seen_err_key = None
+            expect_error = config.get(
+                'expect_result', {}).get('err_key', None)
             hook_map = collections.defaultdict(lambda: hook.NoopHook())
             for c in config['hooks']:
                 file_path = os.path.join(test_case_dir, config['hooks'][c])
@@ -63,13 +66,16 @@ def gen_test_cases(base_dir, get_conn, test_to_run=None, database='test',
                 )
                 payload.run()
             except error.OSCError as e:
-                expect_error = config.get(
-                    'expect_result', {}).get('err_key', None)
                 self.assertEqual(e.err_key, expect_error)
+                last_seen_err_key = e.err_key
                 if expect_error == 'GENERIC_MYSQL_ERROR':
                     mysql_err_code = config.get(
                         'expect_result', {}).get('mysql_err_code', None)
                     self.assertEqual(e.mysql_err_code, mysql_err_code)
+
+            # If we are expecting error make sure there's exception raised
+            if expect_error:
+                self.assertEqual(last_seen_err_key, expect_error)
 
         return test_function
 
