@@ -8,7 +8,9 @@ LICENSE file in the root directory of this source tree.
 """
 
 import unittest
-from ...sqlparse import parse_create, SchemaDiff, get_type_conv_columns
+from ...sqlparse import (
+    parse_create, SchemaDiff, get_type_conv_columns, need_default_ts_bootstrap
+)
 
 
 class SQLParserTest(unittest.TestCase):
@@ -273,3 +275,95 @@ class SQLParserTest(unittest.TestCase):
         diff_obj = SchemaDiff(obj1, obj2)
         diffs = diff_obj.diffs()
         self.assertEqual(diffs["attrs_modified"], ['comment'])
+
+
+class HelpersTest(unittest.TestCase):
+    def test_need_default_ts_bootstrap(self):
+        sql1 = (
+            "Create table foo ("
+            "column1 int NOT NULL AUTO_INCREMENT, "
+            "column2 varchar(10) default '', "
+            "column3 int default 0 "
+            ") charset=utf8 engine=INNODB"
+        )
+
+        sql2 = (
+            "Create table foo ("
+            "column1 int NOT NULL AUTO_INCREMENT, "
+            "column2 varchar(10) default '', "
+            "column3 int default 0, "
+            "column4 timestamp default CURRENT_TIMESTAMP "
+            ") charset=utf8 engine=INNODB"
+        )
+
+        obj1 = parse_create(sql1)
+        obj2 = parse_create(sql2)
+        self.assertTrue(need_default_ts_bootstrap(obj1, obj2))
+
+    def test_need_default_ts_bootstrap_implicit_ts_default(self):
+        sql1 = (
+            "Create table foo ("
+            "column1 int NOT NULL AUTO_INCREMENT, "
+            "column2 varchar(10) default '', "
+            "column3 int default 0 "
+            ") charset=utf8 engine=INNODB"
+        )
+
+        sql2 = (
+            "Create table foo ("
+            "column1 int NOT NULL AUTO_INCREMENT, "
+            "column2 varchar(10) default '', "
+            "column3 int default 0, "
+            "column4 timestamp "
+            ") charset=utf8 engine=INNODB"
+        )
+
+        obj1 = parse_create(sql1)
+        obj2 = parse_create(sql2)
+        self.assertTrue(need_default_ts_bootstrap(obj1, obj2))
+
+    def test_need_default_ts_bootstrap_changing_defaults(self):
+        sql1 = (
+            "Create table foo ("
+            "column1 int NOT NULL AUTO_INCREMENT, "
+            "column2 varchar(10) default '', "
+            "column3 int default 0, "
+            "column4 timestamp default 0 "
+            ") charset=utf8 engine=INNODB"
+        )
+
+        sql2 = (
+            "Create table foo ("
+            "column1 int NOT NULL AUTO_INCREMENT, "
+            "column2 varchar(10) default '', "
+            "column3 int default 0, "
+            "column4 timestamp default CURRENT_TIMESTAMP "
+            ") charset=utf8 engine=INNODB"
+        )
+
+        obj1 = parse_create(sql1)
+        obj2 = parse_create(sql2)
+        self.assertTrue(need_default_ts_bootstrap(obj1, obj2))
+
+    def test_need_default_ts_bootstrap_changing_other_column(self):
+        sql1 = (
+            "Create table foo ("
+            "column1 int NOT NULL AUTO_INCREMENT, "
+            "column2 varchar(10) default '', "
+            "column3 int default 0, "
+            "column4 timestamp default CURRENT_TIMESTAMP "
+            ") charset=utf8 engine=INNODB"
+        )
+
+        sql2 = (
+            "Create table foo ("
+            "column1 bigint NOT NULL AUTO_INCREMENT, "
+            "column2 varchar(10) default 'abc', "
+            "column3 int default 999, "
+            "column4 timestamp default CURRENT_TIMESTAMP "
+            ") charset=utf8 engine=INNODB"
+        )
+
+        obj1 = parse_create(sql1)
+        obj2 = parse_create(sql2)
+        self.assertFalse(need_default_ts_bootstrap(obj1, obj2))

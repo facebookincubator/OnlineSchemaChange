@@ -290,6 +290,13 @@ class OSCError(Exception):
             'desc': ('Recorded too many changes to ever catchup '
                      '({deltas} > max replay changes {max_deltas})'),
         },
+        'UNSAFE_TS_BOOTSTRAP': {
+            'code': 152,
+            'desc': (
+                "Adding columns or changing columns to use CURRENT_TIMESTAMP as "
+                "default value is unsafe with OSC. Please consider a different "
+                "deployment method for this"),
+        },
         'ASSERTION_ERROR': {
             'code': 249,
             'desc': (

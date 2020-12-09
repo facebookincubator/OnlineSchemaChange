@@ -41,7 +41,6 @@ class SchemaDiff(object):
         if not ignore_partition:
             self.attrs_to_check.append('partition')
 
-
     def _calculate_diff(self):
         diffs = {
             'removed': [],
@@ -282,3 +281,47 @@ def get_type_conv_columns(old_obj, new_obj):
             if new_col.length != old_col.length:
                 type_conv_cols.append(old_col)
     return type_conv_cols
+
+
+def need_default_ts_bootstrap(old_obj, new_obj):
+    """
+    Check when going from old schema to new, whether bootstraping column using
+    CURRENT_TIMESTAMP is involved. This is normally dangerous thing to do out of
+    replication and will be disallowed by default from OSC perspective
+    """
+    current_cols = {c.name: c for c in old_obj.column_list}
+    new_cols = {c.name: c for c in new_obj.column_list}
+
+    # find columns that will involve type conversions
+    for name, new_col in new_cols.items():
+        old_col = current_cols.get(name)
+
+        # This check only applies to column types that support default ts value
+        if new_col.column_type not in ['TIMESTAMP', 'DATE', 'DATETIME']:
+            continue
+        if new_col.column_type == 'TIMESTAMP':
+            new_col.explicit_ts_default()
+
+        if str(new_col.default).upper() != "CURRENT_TIMESTAMP" \
+                and str(new_col.on_update_current_timestamp).upper() \
+                != "CURRENT_TIMESTAMP":
+            continue
+
+        # Adding timestamp column with defaults is considered out of replication
+        # bootstraping
+        if not old_col:
+            return True
+
+        # At this point we know this column in new schema need default value setting
+        # to curernt ts. We will need to further confirm if old schema does the same
+        # or not. If not, this will be consider as dangerous for replication
+        if str(new_col.default).upper() == "CURRENT_TIMESTAMP" \
+                and str(old_col.default).upper() != "CURRENT_TIMESTAMP":
+            return True
+
+        if str(new_col.on_update_current_timestamp).upper() == "CURRENT_TIMESTAMP" \
+                and str(old_col.on_update_current_timestamp).upper() \
+                != "CURRENT_TIMESTAMP":
+            return True
+
+    return False

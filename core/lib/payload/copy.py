@@ -19,7 +19,9 @@ from threading import Timer
 from .. import constant, sql, util
 from ..error import OSCError
 from ..hook import wrap_hook
-from ..sqlparse import parse_create, ParseError, is_equal, SchemaDiff
+from ..sqlparse import (
+    parse_create, ParseError, is_equal, SchemaDiff, need_default_ts_bootstrap
+)
 from .base import Payload
 from .cleanup import CleanupPayload
 
@@ -154,6 +156,8 @@ class CopyPayload(Payload):
             'max_wait_for_slow_query', constant.MAX_WAIT_FOR_SLOW_QUERY)
         self.max_replay_batch_size = kwargs.get(
             'max_replay_batch_size', constant.MAX_REPLAY_BATCH_SIZE)
+        self.allow_unsafe_ts_bootstrap = kwargs.get(
+            'allow_unsafe_ts_bootstrap', False)
         self.is_full_table_dump = False
         self.replay_max_changes = kwargs.get(
             'replay_max_changes', constant.MAX_REPLAY_CHANGES)
@@ -931,6 +935,22 @@ class CopyPayload(Payload):
                     col.name for col in self._old_table.primary_key.column_list]
                 self._pk_for_filter_def = self._old_table.primary_key.column_list.copy()
 
+    def ts_bootstrap_check(self):
+        """
+        Check when going from old schema to new, whether bootstraping column using
+        CURRENT_TIMESTAMP is involved. This is a dangerous thing to do out of
+        replication and is disallowed by default
+        """
+        if not need_default_ts_bootstrap(self._old_table, self._new_table):
+            return
+        if self.allow_unsafe_ts_bootstrap:
+            log.warning(
+                "Bootstraping timestamp column using current time is required. "
+                "Bypassing the safety check as requested"
+            )
+            return
+        raise OSCError('UNSAFE_TS_BOOTSTRAP')
+
     @wrap_hook
     def pre_osc_check(self):
         """
@@ -1003,6 +1023,7 @@ class CopyPayload(Payload):
         self.get_table_chunk_size()
         self.make_chunk_size_odd()
         self.check_disk_size()
+        self.ts_bootstrap_check()
 
     def add_drop_table_entry(self, table_name):
         """
