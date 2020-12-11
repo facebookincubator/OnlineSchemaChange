@@ -1096,6 +1096,13 @@ class CopyPayload(Payload):
                 log.warning(
                     "Overriding collation to be {} for table for schema comparison"
                     .format(self._new_table.collate))
+                text_types = {'CHAR', 'VARCHAR', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT'}
+                for column in self._new_table.column_list:
+                    if column.column_type in text_types and column.collate is None:
+                        log.warning(
+                            "Overriding collation to be {} for {} for schema comparison"
+                            .format(self._new_table.collate, column.name))
+                        column.collate = default_collate
 
         if self._new_table.charset is None and self._new_table.collate is not None:
             charset = collation_charsets.get(self._new_table.collate)
