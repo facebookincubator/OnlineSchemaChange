@@ -302,13 +302,21 @@ def need_default_ts_bootstrap(old_obj, new_obj):
         if new_col.column_type == 'TIMESTAMP':
             new_col.explicit_ts_default()
 
-        if str(new_col.default).upper() != "CURRENT_TIMESTAMP" \
-                and str(new_col.on_update_current_timestamp).upper() \
-                != "CURRENT_TIMESTAMP":
-            continue
+        # Nothing to worry if a vulnerable column type doesn't use current time
+        # as default
+        if str(new_col.column_type) == "TIMESTAMP":
+            # Cases for TIMESTAMP type
+            if str(new_col.default).upper() != "CURRENT_TIMESTAMP" and \
+                    str(new_col.on_update_current_timestamp).upper() != \
+                    "CURRENT_TIMESTAMP":
+                continue
+        else:
+            # Cases for DATE and DATETIME type
+            if str(new_col.default).upper() != "CURRENT_TIMESTAMP":
+                continue
 
-        # Adding timestamp column with defaults is considered out of replication
-        # bootstraping
+        # Adding timestamp column with defaults is considered unsafe
+        # out of replication bootstraping
         if not old_col:
             return True
 

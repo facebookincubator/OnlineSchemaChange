@@ -300,6 +300,28 @@ class HelpersTest(unittest.TestCase):
         obj2 = parse_create(sql2)
         self.assertTrue(need_default_ts_bootstrap(obj1, obj2))
 
+    def test_need_default_ts_bootstrap_add_irrelevant_col(self):
+        sql1 = (
+            "Create table foo ("
+            "column1 int NOT NULL AUTO_INCREMENT, "
+            "column2 varchar(10) default '', "
+            "column3 int default 0 "
+            ") charset=utf8 engine=INNODB"
+        )
+
+        sql2 = (
+            "Create table foo ("
+            "column1 int NOT NULL AUTO_INCREMENT, "
+            "column2 varchar(10) default '', "
+            "column3 int default 0, "
+            "column4 date "
+            ") charset=utf8 engine=INNODB"
+        )
+
+        obj1 = parse_create(sql1)
+        obj2 = parse_create(sql2)
+        self.assertFalse(need_default_ts_bootstrap(obj1, obj2))
+
     def test_need_default_ts_bootstrap_implicit_ts_default(self):
         sql1 = (
             "Create table foo ("
@@ -367,3 +389,49 @@ class HelpersTest(unittest.TestCase):
         obj1 = parse_create(sql1)
         obj2 = parse_create(sql2)
         self.assertFalse(need_default_ts_bootstrap(obj1, obj2))
+
+    def test_need_default_ts_bootstrap_date_type(self):
+        sql1 = (
+            "Create table foo ("
+            "column1 int NOT NULL AUTO_INCREMENT, "
+            "column2 varchar(10) default '', "
+            "column3 int default 0, "
+            "column4 date default '2000-01-01' "
+            ") charset=utf8 engine=INNODB"
+        )
+
+        sql2 = (
+            "Create table foo ("
+            "column1 bigint NOT NULL AUTO_INCREMENT, "
+            "column2 varchar(10) default 'abc', "
+            "column3 int default 999, "
+            "column4 date default '2000-01-01'"
+            ") charset=utf8 engine=INNODB"
+        )
+
+        obj1 = parse_create(sql1)
+        obj2 = parse_create(sql2)
+        self.assertFalse(need_default_ts_bootstrap(obj1, obj2))
+
+    def test_need_default_ts_bootstrap_on_update_current(self):
+        sql1 = (
+            "Create table foo ("
+            "column1 int NOT NULL AUTO_INCREMENT, "
+            "column2 varchar(10) default '', "
+            "column3 int default 0, "
+            "column4 timestamp default '2000-01-01' "
+            ") charset=utf8 engine=INNODB"
+        )
+
+        sql2 = (
+            "Create table foo ("
+            "column1 bigint NOT NULL AUTO_INCREMENT, "
+            "column2 varchar(10) default 'abc', "
+            "column3 int default 999, "
+            "column4 timestamp default '2000-01-01' on update CURRENT_TIMESTAMP"
+            ") charset=utf8 engine=INNODB"
+        )
+
+        obj1 = parse_create(sql1)
+        obj2 = parse_create(sql2)
+        self.assertTrue(need_default_ts_bootstrap(obj1, obj2))
