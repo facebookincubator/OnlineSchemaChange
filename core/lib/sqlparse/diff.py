@@ -167,17 +167,17 @@ class SchemaDiff(object):
                 continue
             # Get column definition
             col = new_columns[col_name]
-            old_pos = old_column_names.index(col_name) - 1
+            old_pos = old_column_names.index(col_name)
 
             # If the first column is diferent, we need to adjust the sequence
             if idx == 0:
-                if old_pos == -1:
+                if old_pos == 0:
                     continue
                 segments.append("MODIFY {} FIRST".format(col.to_sql()))
                 handled_cols.append(col_name)
                 continue
 
-            # If this column has the same ancestoer then it means there's no sequence
+            # If this column has the same ancestor then it means there's no sequence
             # adjustment needed
             if new_column_names[idx - 1] == old_column_names[old_pos - 1]:
                 continue
