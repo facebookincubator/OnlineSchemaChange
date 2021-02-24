@@ -742,6 +742,28 @@ class CopyPayloadTestCase(unittest.TestCase):
         # charset should be populated if collate is provided
         self.assertEqual(payload._new_table.charset, 'latin1')
 
+    def test_auto_removal_of_using_hash(self):
+        payload = self.payload_setup()
+        sql1 = """
+        CREATE TABLE abc (
+        ID int primary key,
+        A varchar(10) not null default '',
+        B varchar(20) not null default '',
+        KEY `ab` (`A`, `B`) USING HASH
+        )
+        """
+        sql2 = """
+        CREATE TABLE abc (
+        ID int primary key,
+        A varchar(10) not null default '',
+        B varchar(20) not null default '',
+        KEY `ab` (`A`, `B`)
+        )
+        """
+        payload._new_table = parse_create(sql1)
+        payload.remove_using_hash_for_80()
+        self.assertEqual(payload._new_table, parse_create(sql2))
+
     """
     Following test disabled until the high_pri_ddl is fixed
     def test_is_high_pri_ddl_supported_yes_8_0(self):

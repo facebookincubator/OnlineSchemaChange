@@ -1112,6 +1112,15 @@ class CopyPayload(Payload):
                     "Overriding charset to be {} for table for schema comparison"
                     .format(self._new_table.charset))
 
+    def remove_using_hash_for_80(self):
+        """
+        Remove `USING HASH` for indexes that explicitly have it, because that's
+        the 8.0 behavior
+        """
+        for index in self._new_table.indexes:
+            if index.using == 'HASH':
+                index.using = None
+
     @wrap_hook
     def create_copy_table(self):
         """
@@ -1161,11 +1170,15 @@ class CopyPayload(Payload):
             # Ignore partition difference, since there will be no implicit
             # conversion here
             obj_after.partition = self._new_table.partition
-            # Pre-populate to avoid collation difference, because 8.0 will
-            # always show collate using the server default when a charset is
-            # defined for text column
             if self.mysql_version.is_mysql8:
+                # Pre-populate to avoid collation difference, because 8.0 will
+                # always show collate using the server default when a charset is
+                # defined for text column
                 self.populate_charset_collation_for_80()
+
+                # Remove 'USING HASH' in keys on 8.0, when present in 5.6, as 8.0
+                # removes it by default
+                self.remove_using_hash_for_80()
 
             if obj_after != self._new_table:
                 raise OSCError(
