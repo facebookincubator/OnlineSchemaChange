@@ -65,8 +65,15 @@ class CleanupPayload(Payload):
         self.gen_drop_sqls()
         self.get_mysql_settings()
         self.init_mysql_version()
-        self.enable_priority_ddl()
         self.set_no_binlog()
+
+        # Stop sql thread to avoid MDL lock contention and blocking reads before
+        # running DDLs. Will use high_pri_ddl instead if it's supported
+        if self.is_high_pri_ddl_supported:
+            if self.is_repl_running():
+                self.is_slave_stopped_by_me = True
+            self.enable_priority_ddl()
+
         self.execute_sql('USE `{}`'.format(escape(db)))
         current_db = db
         for stmt, stmt_db in self.sqls_to_execute:
@@ -95,6 +102,14 @@ class CleanupPayload(Payload):
                 # cleanup all the queries no matter they are executed or not
                 # to prevent them from being executed again in the next run
                 self.sqls_to_execute = []
+                # If sql_thread was killed as a result of high_pri_ddl we need to
+                # revive it
+                if self.is_high_pri_ddl_supported \
+                        and self.is_slave_stopped_by_me \
+                        and not self.is_repl_running():
+                    log.info("Resuming sql_thread as it was killed by high_pri_ddl")
+                    self.start_slave_sql()
+                    self.is_slave_stopped_by_me = True
             if cleanupError:
                 log.error("Failed to execute sql for cleanup")
                 raise OSCError(

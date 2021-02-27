@@ -57,6 +57,7 @@ class Payload(object):
         self.skip_named_lock = kwargs.get(
             'skip_named_lock', False)
         self.mysql_vars = {}
+        self.is_slave_stopped_by_me = False
 
     @property
     def conn(self):
@@ -384,6 +385,35 @@ class Payload(object):
         @type  filename:  string
         """
         return util.rm(filename, sudo=self.sudo)
+
+    def is_repl_running(self):
+        """
+        Check current replication status. We need to know that exact state
+        before we trying to stop the sql_thread. If the sql_thread is not
+        stopped by us, then we'll skip starting it afterwards
+        """
+        result = self.query(sql.show_slave_status)
+        if result:
+            return all((result[0]['Slave_IO_Running'] == "Yes",
+                       result[0]['Slave_SQL_Running'] == "Yes"))
+        else:
+            return False
+
+    def stop_slave_sql(self):
+        """
+        Stop sql_thread for such operations as create trigger and swap table
+        """
+        if self.is_repl_running():
+            self.execute_sql(sql.stop_slave_sql)
+            self.is_slave_stopped_by_me = True
+
+    def start_slave_sql(self):
+        """
+        Start the sql_thread if we are the one stopped it
+        """
+        if self.is_slave_stopped_by_me:
+            self.execute_sql(sql.start_slave_sql)
+            self.is_slave_stopped_by_me = False
 
     def get_osc_lock(self):
         """

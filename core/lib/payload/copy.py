@@ -61,7 +61,6 @@ class CopyPayload(Payload):
         self._replayed_chg_ids = util.RangeChain()
         self.select_chunk_size = 0
         self.bypass_replay_timeout = False
-        self.is_slave_stopped_by_me = False
         self.is_ttl_disabled_by_me = False
         self.stop_before_swap = False
         self.is_skip_fcache_supported = False
@@ -1295,35 +1294,6 @@ class CopyPayload(Payload):
                         'Info', b'').encode('utf-8').decode('utf-8', 'replace')
                 }
             )
-
-    def is_repl_running(self):
-        """
-        Check current replication status. We need to know that exact state
-        before we trying to stop the sql_thread. If the sql_thread is not
-        stopped by us, then we'll skip starting it afterwards
-        """
-        result = self.query(sql.show_slave_status)
-        if result:
-            return all((result[0]['Slave_IO_Running'],
-                       result[0]['Slave_SQL_Running']))
-        else:
-            return False
-
-    def stop_slave_sql(self):
-        """
-        Stop sql_thread for such operations as create trigger and swap table
-        """
-        if self.is_repl_running():
-            self.execute_sql(sql.stop_slave_sql)
-            self.is_slave_stopped_by_me = True
-
-    def start_slave_sql(self):
-        """
-        Start the sql_thread if we are the one stopped it
-        """
-        if self.is_slave_stopped_by_me:
-            self.execute_sql(sql.start_slave_sql)
-            self.is_slave_stopped_by_me = False
 
     def kill_selects(self, table_names, conn=None):
         """
