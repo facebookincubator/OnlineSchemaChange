@@ -894,6 +894,16 @@ class CopyPayloadPKFilterTestCase(unittest.TestCase):
             ") "
         )
 
+        self.table_obj_pk3_subset = parse_create(
+            " CREATE TABLE a ("
+            "id1 int, "
+            "name varchar(200) NOT NULL,"
+            "dummy1 int, "
+            "dummy2 int, "
+            "PRIMARY KEY (id1) "
+            ") "
+        )
+
         self.payload._current_db = 'test'
 
     def test_decide_pk_for_filter_1pk_to_2pk(self):
@@ -949,3 +959,13 @@ class CopyPayloadPKFilterTestCase(unittest.TestCase):
         self.assertTrue(self.payload.is_full_table_dump)
         self.assertIsNone(self.payload.find_coverage_index())
         self.assertFalse(self.payload.validate_post_alter_pk())
+
+    def test_decide_pk_for_filter_subset(self):
+        self.payload._old_table = self.table_obj_2pk
+        self.payload._new_table = self.table_obj_1pk
+        self.payload.decide_pk_for_filter()
+
+        # Going from 2 PK columns into 1 is considered as efficient
+        self.assertEquals(self.payload._pk_for_filter, ['id1', 'id2'])
+        self.assertFalse(self.payload.is_full_table_dump)
+        self.assertTrue(self.payload.validate_post_alter_pk())

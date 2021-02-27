@@ -787,7 +787,10 @@ class CopyPayload(Payload):
         based on old primary key combination.
         Note that if old PK is (a, b), new PK is (b, a, c) is acceptable,
         because for each combination of (a, b), it still can utilize the new
-        PK for row searching
+        PK for row searching.
+        Same for old PK being (a, b, c), new PK is (a, b) because new PK is more
+        strict, so it will always return at most one row when using old PK columns
+        as WHERE condition.
         However if the old PK is (a, b, c), new PK is (b, c, d). Then there's
         a chance the changes may not be able to be replay efficiently. Because
         using only column (b, c) for row searching may result in a huge number
@@ -800,9 +803,14 @@ class CopyPayload(Payload):
             log.debug("Checking prefix for {}".format(idx.name))
             idx_prefix = idx.column_list[:old_pk_len]
             idx_name_set = {col.name for col in idx_prefix}
+            # Identical set and covered set are considered as covering
             if set(self._pk_for_filter) == idx_name_set:
                 log.info("PK prefix on new table can cover PK from old table")
                 return True
+            if idx.is_unique and set(self._pk_for_filter) > idx_name_set:
+                log.info("old PK can uniquely identify rows from new schema")
+                return True
+
         return False
 
     def find_coverage_index(self):
@@ -982,7 +990,12 @@ class CopyPayload(Payload):
         # current old pk combinations
         if not self.validate_post_alter_pk():
             self.table_size = self.get_table_size(self.table_name)
-            if self.table_size < self.pk_coverage_size_threshold:
+            if self.skip_pk_coverage_check:
+                log.warning(
+                    "Indexes on new table cannot cover current PK of "
+                    "the old schema, which will make binary logs replay "
+                    "in an inefficient way.")
+            elif self.table_size < self.pk_coverage_size_threshold:
                 log.warning(
                     "No index on new table can cover old pk. Since this is "
                     "a small table: {}, we fallback to a full table dump"
@@ -994,28 +1007,22 @@ class CopyPayload(Payload):
                 self._pk_for_filter = [
                     col.name for col in self._old_table.column_list]
                 self._pk_for_filter_def = self._old_table.column_list.copy()
+            elif self.is_full_table_dump:
+                log.warning(
+                    "Skipping coverage index test, since we are doing "
+                    "full table dump")
             else:
-                if self.skip_pk_coverage_check:
-                    log.warning(
-                        "Indexes on new table cannot cover current PK of "
-                        "the old schema, which will make binary logs replay "
-                        "in an inefficient way.")
-                elif self.is_full_table_dump:
-                    log.warning(
-                        "Skipping coverage index test, since we are doing "
-                        "full table dump")
-                else:
-                    old_pk_names = ", ".join(
-                        "`{}`".format(col.name)
-                        for col in self._old_table.primary_key.column_list)
-                    raise OSCError('NO_INDEX_COVERAGE',
-                                   {'pk_names': old_pk_names})
+                old_pk_names = ", ".join(
+                    "`{}`".format(col.name)
+                    for col in self._old_table.primary_key.column_list)
+                raise OSCError('NO_INDEX_COVERAGE',
+                               {'pk_names': old_pk_names})
 
         if self.check_no_fcache_support():
             self.is_skip_fcache_supported = True
 
-        log.debug("PK filter for replaying changes later: {}"
-                  .format(self._pk_for_filter))
+        log.info("PK filter for replaying changes later: {}"
+                 .format(self._pk_for_filter))
 
         self.foreign_key_check()
         self.trigger_check()
