@@ -42,6 +42,11 @@ fetch_partition = (
     "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s"
 )
 
+fetch_partition_value = (
+    "SELECT PARTITION_DESCRIPTION FROM information_schema.PARTITIONS "
+    "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND PARTITION_NAME = %s"
+)
+
 foreign_key_cnt = (
     "SELECT rc.CONSTRAINT_NAME AS constraint_name,"
     " kcu.COLUMN_NAME col_name,kcu.REFERENCED_COLUMN_NAME ref_col_name,"

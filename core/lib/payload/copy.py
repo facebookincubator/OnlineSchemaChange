@@ -15,6 +15,7 @@ import re
 import time
 from copy import deepcopy
 from threading import Timer
+from typing import List, Optional, Set
 
 from .. import constant, sql, util
 from ..error import OSCError
@@ -2505,6 +2506,110 @@ class CopyPayload(Payload):
             (time.time() - start_time)
 
     @wrap_hook
+    def apply_partition_differences(
+            self, parts_to_drop: Optional[Set[str]],
+            parts_to_add: Optional[Set[str]]) -> None:
+        # we can just drop partitions by name (ie, p[0-9]+), but to add
+        # partitions we need the range value for each - get this from orig
+        # table
+        if parts_to_add:
+            add_parts = []
+            for part_name in parts_to_add:
+                part_value = self.partition_value_for_name(self.table_name, part_name)
+                add_parts.append(
+                    "PARTITION {} VALUES LESS THAN ({})".format(part_name, part_value))
+            add_parts_str = ', '.join(add_parts)
+            add_sql = (
+                "ALTER TABLE `{}` ADD PARTITION ({})".format(
+                    self.new_table_name, add_parts_str)
+            )
+            log.info(add_sql)
+            self.execute_sql(add_sql)
+
+        if parts_to_drop:
+            drop_parts_str = ', '.join(parts_to_drop)
+            drop_sql = (
+                "ALTER TABLE `{}` DROP PARTITION {}".format(
+                    self.new_table_name, drop_parts_str)
+            )
+            log.info(drop_sql)
+            self.execute_sql(drop_sql)
+
+    @wrap_hook
+    def partition_value_for_name(self, table_name: str, part_name: str) -> str:
+        result = self.query(
+            sql.fetch_partition_value, (
+                self._current_db, table_name, part_name,))
+        for r in result:
+            return r['PARTITION_DESCRIPTION']
+        raise RuntimeError(f"No partition value found for {table_name} {part_name}")
+
+    @wrap_hook
+    def list_partition_names(self, table_name: str) -> List[str]:
+        tbl_parts = []
+        result = self.query(
+            sql.fetch_partition, (self._current_db, table_name))
+        for r in result:
+            tbl_parts.append(r['PARTITION_NAME'])
+        if not tbl_parts:
+            raise RuntimeError(f"No partition values found for {table_name}")
+        return tbl_parts
+
+    @wrap_hook
+    def sync_table_partitions(self) -> None:
+        """
+        If table partitions have changed on the original table, apply the same
+        changes before swapping table, or we will likely break replication
+        if using row-based.
+        """
+        log.info("== Stage 5.1: Check table partitions are up-to-date ==")
+
+        # we're using partitions in the ddl file, skip syncing anything
+        if not self.rm_partition:
+            return
+        # not a partitioned table, nothing to do
+        if not self.partitions:
+            return
+
+        # only apply this logic to RANGE partitioning, as other types
+        # are usually static
+        partition_method = self.get_partition_method(
+            self._current_db, self.new_table_name)
+        if partition_method != 'RANGE':
+            return
+
+        try:
+            new_tbl_parts = self.list_partition_names(self.new_table_name)
+            orig_tbl_parts = self.list_partition_names(self.table_name)
+
+            parts_to_drop = set(new_tbl_parts) - set(orig_tbl_parts)
+            parts_to_add = set(orig_tbl_parts) - set(new_tbl_parts)
+
+            # information schema literally has the string None for
+            # non-partitioned tables.  Previous checks *should* prevent us
+            # from hitting this.
+            if 'None' in parts_to_add or 'None' in parts_to_drop:
+                log.warning(
+                    "MySQL claims either %s or %s are not partitioned",
+                    self.new_table_name, self.table_name)
+                return
+
+            if parts_to_drop:
+                log.info(
+                    "Partitions missing from source table "
+                    "to drop from new table %s: %s",
+                    self.new_table_name, ', '.join(parts_to_drop))
+            if parts_to_add:
+                log.info(
+                    "Partitions in source table to add to new table %s: %s",
+                    self.new_table_name, ', '.join(parts_to_add))
+            self.apply_partition_differences(parts_to_drop, parts_to_add)
+        except Exception:
+            log.exception(
+                "Unable to sync new table %s with orig table %s partitions",
+                self.new_table_name, self.table_name)
+
+    @wrap_hook
     def swap_tables(self):
         """
         Flip the table name while holding the write lock. All operations
@@ -2624,6 +2729,7 @@ class CopyPayload(Payload):
             self.checksum()
             log.info("== Stage 5: Catch up to reduce time for holding lock ==")
             self.replay_till_good2go(checksum=self.skip_delta_checksum)
+            self.sync_table_partitions()
             self.swap_tables()
             self.reset_no_pk_creation()
             self.cleanup()
