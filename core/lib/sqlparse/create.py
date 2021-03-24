@@ -121,7 +121,7 @@ class CreateParser(object):
     INT_TYPE = (
         CaselessLiteral("TINYINT") | CaselessLiteral("SMALLINT") |
         CaselessLiteral("MEDIUMINT") | CaselessLiteral("INT") |
-        CaselessLiteral("INTERGER") | CaselessLiteral("BIGINT") |
+        CaselessLiteral("INTEGER") | CaselessLiteral("BIGINT") |
         CaselessLiteral("BINARY") | CaselessLiteral("BIT")
     )
     INT_DEF = (
