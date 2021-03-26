@@ -240,6 +240,16 @@ class Column(object):
                 'name', 'column_type', 'charset', 'collate',
                 'length', 'comment', 'nullable', 'unsigned', 'is_default_bit',
                 'auto_increment'):
+
+            # Ignore display width of *int types, because of the new default in 8.0.20.
+            # This is a bit of a heavy hammer, but it's the simpler alternative to be
+            # able to support mixed version comparisons
+            # Ref: https://dev.mysql.com/doc/relnotes/mysql/8.0/en/news-8-0-19.html
+            # (search for: "Display width specification for integer data types")
+            int_types = {'int', 'bigint', 'tinyint', 'smallint', 'mediumint'}
+            if self.column_type.lower() in int_types and attr == 'length':
+                continue
+
             if not is_equal(getattr(self, attr), getattr(other, attr)):
                 return False
         # nullable column has implicit default as null

@@ -959,3 +959,24 @@ class ModelTableTestCase(unittest.TestCase):
         self.assertIsNotNone(attr2)
         self.assertEqual(attr1, "'hello, world'")
         self.assertEqual(attr1, attr2)
+
+    def test_ignore_ints_display_width(self):
+        sql1 = (
+            "create table a ("
+            "column1 int(11), "
+            "column2 bigint(20), "
+            "column4 tinyint(2), "
+            "column3 smallint(5), "
+            "column5 mediumint(15)"
+            ")"
+        )
+        sql2 = (
+            "create table a ("
+            "column1 int, "
+            "column2 bigint, "
+            "column4 tinyint, "
+            "column3 smallint, "
+            "column5 mediumint"
+            ")"
+        )
+        self.assertEqual(parse_create(sql1), parse_create(sql2))
