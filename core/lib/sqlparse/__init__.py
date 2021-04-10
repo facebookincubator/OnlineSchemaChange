@@ -13,8 +13,8 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 from .create import parse_create, ParseError
-from .models import is_equal, Column
 from .diff import SchemaDiff, get_type_conv_columns, need_default_ts_bootstrap
+from .models import is_equal, Column
 
 __all__ = [
     "parse_create",

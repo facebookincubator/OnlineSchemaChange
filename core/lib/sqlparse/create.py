@@ -12,7 +12,8 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-from . import models
+import logging
+
 from pyparsing import (
     Word,
     Literal,
@@ -29,7 +30,8 @@ from pyparsing import (
     StringEnd,
     upcaseTokens,
 )
-import logging
+
+from . import models
 
 log = logging.getLogger(__name__)
 

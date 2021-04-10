@@ -7,16 +7,18 @@ This source code is licensed under the BSD-style license found in the
 LICENSE file in the root directory of this source tree.
 """
 
-import MySQLdb
-import unittest
 import time
-from ..lib.payload.copy import CopyPayload
-from ..lib.payload.cleanup import CleanupPayload
-from ..lib.sqlparse import parse_create
+import unittest
+from unittest.mock import Mock
+
+import MySQLdb
+
+from ..lib import constant
 from ..lib.error import OSCError
 from ..lib.mysql_version import MySQLVersion
-from ..lib import constant
-from unittest.mock import Mock
+from ..lib.payload.cleanup import CleanupPayload
+from ..lib.payload.copy import CopyPayload
+from ..lib.sqlparse import parse_create
 
 
 class CopyPayloadTestCase(unittest.TestCase):

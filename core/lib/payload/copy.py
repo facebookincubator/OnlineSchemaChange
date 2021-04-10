@@ -9,13 +9,14 @@ LICENSE file in the root directory of this source tree.
 
 import glob
 import logging
-import MySQLdb
 import os
 import re
 import time
 from copy import deepcopy
 from threading import Timer
 from typing import List, Optional, Set
+
+import MySQLdb
 
 from .. import constant, sql, util
 from ..error import OSCError

@@ -7,11 +7,11 @@ This source code is licensed under the BSD-style license found in the
 LICENSE file in the root directory of this source tree.
 """
 
-import sys
 import logging
+import sys
 
-from setuptools import setup, find_packages
 import pkg_resources
+from setuptools import setup, find_packages
 
 install_requires = [
     "pyparsing",

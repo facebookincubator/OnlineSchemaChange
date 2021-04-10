@@ -8,11 +8,13 @@ LICENSE file in the root directory of this source tree.
 """
 
 import unittest
-from ..lib.payload.direct import DirectPayload
-from ..lib.error import OSCError
-from ..lib import db as db_lib
 from unittest.mock import MagicMock
+
 import MySQLdb
+
+from ..lib import db as db_lib
+from ..lib.error import OSCError
+from ..lib.payload.direct import DirectPayload
 
 
 class BasePayloadTestCase(unittest.TestCase):

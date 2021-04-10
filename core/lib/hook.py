@@ -11,9 +11,9 @@ import codecs
 import functools
 import logging
 import time
+from threading import Thread
 
 from .error import OSCError
-from threading import Thread
 
 log = logging.getLogger(__name__)
 

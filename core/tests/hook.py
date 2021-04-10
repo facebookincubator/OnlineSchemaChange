@@ -8,9 +8,10 @@ LICENSE file in the root directory of this source tree.
 """
 
 import unittest
-from ..lib.hook import SQLHook
-from ..lib.error import OSCError
 from unittest.mock import Mock, patch
+
+from ..lib.error import OSCError
+from ..lib.hook import SQLHook
 
 
 class SQLHookTest(unittest.TestCase):

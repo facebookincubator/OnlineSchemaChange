@@ -7,15 +7,15 @@ This source code is licensed under the BSD-style license found in the
 LICENSE file in the root directory of this source tree.
 """
 
+import codecs
 import logging
 import os
-import codecs
 
-from .base import CommandBase
 from ..lib import util
 from ..lib import constant
 from ..lib.error import OSCError
 from ..lib.payload.copy import CopyPayload
+from .base import CommandBase
 
 log = logging.getLogger(__name__)
 

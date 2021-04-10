@@ -13,12 +13,13 @@ import re
 import time
 
 import MySQLdb
-from .base import Payload
+
 from .. import constant
-from .. import util
 from .. import sql
-from ..sql import escape
+from .. import util
 from ..error import OSCError
+from ..sql import escape
+from .base import Payload
 
 log = logging.getLogger(__name__)
 

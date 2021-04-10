@@ -11,10 +11,11 @@ LICENSE file in the root directory of this source tree.
 import codecs
 import collections
 import logging
+
 import MySQLdb
 
-from .. import db as db_lib
 from .. import constant
+from .. import db as db_lib
 from .. import hook
 from .. import sql
 from .. import util

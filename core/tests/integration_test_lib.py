@@ -15,8 +15,8 @@ import sys
 import unittest
 
 from ..lib import hook
-from ..lib.payload.copy import CopyPayload
 from ..lib import error
+from ..lib.payload.copy import CopyPayload
 
 log = logging.getLogger(__name__)
 

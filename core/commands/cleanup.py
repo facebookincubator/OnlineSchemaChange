@@ -9,9 +9,9 @@ LICENSE file in the root directory of this source tree.
 
 import logging
 
-from .base import CommandBase
 from ..lib.error import OSCError
 from ..lib.payload.cleanup import CleanupPayload
+from .base import CommandBase
 
 log = logging.getLogger(__name__)
 
