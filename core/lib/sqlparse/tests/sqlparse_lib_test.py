@@ -12,240 +12,163 @@ from ...sqlparse import parse_create, ParseError
 
 
 class SQLParserTest(unittest.TestCase):
-
     def test_simple_create_table(self):
-        sql = (
-            "Create table foo\n"
-            "( column1 int )"
-        )
+        sql = "Create table foo\n" "( column1 int )"
         tbl = parse_create(sql)
-        self.assertEqual(tbl.name, 'foo')
+        self.assertEqual(tbl.name, "foo")
         self.assertEqual(len(tbl.column_list), 1)
         self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
     def test_table_name_quoted_with_backtick(self):
-        sql = (
-            "Create table `foo`\n"
-            "( column1 int )"
-        )
+        sql = "Create table `foo`\n" "( column1 int )"
         tbl = parse_create(sql)
-        self.assertEqual(tbl.name, 'foo')
+        self.assertEqual(tbl.name, "foo")
         self.assertEqual(len(tbl.column_list), 1)
         self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
     def test_column_name_quoted_with_backtick(self):
-        sql = (
-            "Create table foo\n"
-            "( `column1` int )"
-        )
+        sql = "Create table foo\n" "( `column1` int )"
         tbl = parse_create(sql)
-        self.assertEqual(tbl.name, 'foo')
+        self.assertEqual(tbl.name, "foo")
         self.assertEqual(len(tbl.column_list), 1)
         self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
     def test_table_name_with_backtick(self):
-        sql = (
-            "Create table `foo``bar`\n"
-            "( `column1` int )"
-        )
+        sql = "Create table `foo``bar`\n" "( `column1` int )"
         tbl = parse_create(sql)
-        self.assertEqual(tbl.name, 'foo`bar')
+        self.assertEqual(tbl.name, "foo`bar")
         self.assertEqual(len(tbl.column_list), 1)
         self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
     def test_simple_with_all_supported_int_type(self):
-        supported_type = [
-            'int', 'tinyint', 'bigint', 'mediumint', 'smallint'
-        ]
+        supported_type = ["int", "tinyint", "bigint", "mediumint", "smallint"]
         for col_type in supported_type:
-            for unsigned in ['unsigned', '']:
-                sql = (
-                    "Create table foo\n"
-                    "( column1 {} {})".format(col_type, unsigned)
-                )
+            for unsigned in ["unsigned", ""]:
+                sql = "Create table foo\n" "( column1 {} {})".format(col_type, unsigned)
                 tbl = parse_create(sql)
                 self.assertTrue(tbl.primary_key.is_unique)
                 self.assertEqual(len(tbl.column_list), 1)
-                self.assertEqual(tbl.column_list[0].name, 'column1')
-                self.assertEqual(
-                    tbl.column_list[0].column_type, col_type.upper())
-                self.assertEqual(tbl.name, 'foo')
+                self.assertEqual(tbl.column_list[0].name, "column1")
+                self.assertEqual(tbl.column_list[0].column_type, col_type.upper())
+                self.assertEqual(tbl.name, "foo")
                 self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
     def test_table_comment(self):
-        sql = (
-            "Create table foo\n"
-            "( column1 int )"
-            "comment='table comment'"
-        )
+        sql = "Create table foo\n" "( column1 int )" "comment='table comment'"
         tbl = parse_create(sql)
-        self.assertEqual(tbl.name, 'foo')
+        self.assertEqual(tbl.name, "foo")
         self.assertEqual(tbl.comment, "'table comment'")
         self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
     def test_table_charset(self):
         sqls = [
-            (
-                "Create table foo\n"
-                "( column1 int )"
-                "character set=utf8"
-            ), (
-                "Create table foo\n"
-                "( column1 int )"
-                "default character set=utf8"
-            )]
+            ("Create table foo\n" "( column1 int )" "character set=utf8"),
+            ("Create table foo\n" "( column1 int )" "default character set=utf8"),
+        ]
         for sql in sqls:
             tbl = parse_create(sql)
-            self.assertEqual(tbl.name, 'foo')
-            self.assertEqual(tbl.charset, 'utf8')
+            self.assertEqual(tbl.name, "foo")
+            self.assertEqual(tbl.charset, "utf8")
             self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
     def test_bare_column_collate(self):
-        sql = (
-            "Create table foo\n"
-            "( column1 varchar(10) collate latin1_bin )"
-        )
+        sql = "Create table foo\n" "( column1 varchar(10) collate latin1_bin )"
         tbl = parse_create(sql)
-        self.assertEqual(tbl.name, 'foo')
-        self.assertEqual(tbl.column_list[0].collate, 'latin1_bin')
+        self.assertEqual(tbl.name, "foo")
+        self.assertEqual(tbl.column_list[0].collate, "latin1_bin")
         self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
     def test_bare_column_charset(self):
-        sql = (
-            "Create table foo\n"
-            "( column1 varchar(10) character set latin1 )"
-        )
+        sql = "Create table foo\n" "( column1 varchar(10) character set latin1 )"
         tbl = parse_create(sql)
-        self.assertEqual(tbl.name, 'foo')
-        self.assertEqual(tbl.column_list[0].charset, 'latin1')
+        self.assertEqual(tbl.name, "foo")
+        self.assertEqual(tbl.column_list[0].charset, "latin1")
         self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
     def test_table_collate(self):
         sqls = [
-            (
-                "Create table foo\n"
-                "( column1 int )"
-                "collate='utf8_bin'"
-            ), (
-                "Create table foo\n"
-                "( column1 int )"
-                "default collate='utf8_bin'"
-            )]
+            ("Create table foo\n" "( column1 int )" "collate='utf8_bin'"),
+            ("Create table foo\n" "( column1 int )" "default collate='utf8_bin'"),
+        ]
         for sql in sqls:
             tbl = parse_create(sql)
-            self.assertEqual(tbl.name, 'foo')
-            self.assertEqual(tbl.collate, 'utf8_bin')
+            self.assertEqual(tbl.name, "foo")
+            self.assertEqual(tbl.collate, "utf8_bin")
             self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
     def test_table_key_block_size(self):
-        sql = (
-            "Create table foo\n"
-            "( column1 int )"
-            "key_block_size=16"
-        )
+        sql = "Create table foo\n" "( column1 int )" "key_block_size=16"
         tbl = parse_create(sql)
-        self.assertEqual(tbl.name, 'foo')
+        self.assertEqual(tbl.name, "foo")
         self.assertEqual(tbl.key_block_size, 16)
         self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
     def test_engine(self):
-        sql = (
-            "Create table foo\n"
-            "( column1 int )"
-            "engine=Innodb"
-        )
+        sql = "Create table foo\n" "( column1 int )" "engine=Innodb"
         tbl = parse_create(sql)
-        self.assertEqual(tbl.name, 'foo')
-        self.assertEqual(tbl.engine, 'INNODB')
+        self.assertEqual(tbl.name, "foo")
+        self.assertEqual(tbl.engine, "INNODB")
         self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
     def test_table_incre(self):
-        sql = (
-            "Create table foo\n"
-            "( column1 int )"
-            "auto_increment=123"
-        )
+        sql = "Create table foo\n" "( column1 int )" "auto_increment=123"
         tbl = parse_create(sql)
-        self.assertEqual(tbl.name, 'foo')
+        self.assertEqual(tbl.name, "foo")
         self.assertEqual(tbl.auto_increment, 123)
         self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
     def test_row_format(self):
-        sqls = [
-            (
-                "Create table foo\n"
-                "( column1 int )"
-                "row_format=compressed"
-            )]
+        sqls = [("Create table foo\n" "( column1 int )" "row_format=compressed")]
         for sql in sqls:
             tbl = parse_create(sql)
-            self.assertEqual(tbl.name, 'foo')
-            self.assertEqual(tbl.row_format, 'COMPRESSED')
+            self.assertEqual(tbl.name, "foo")
+            self.assertEqual(tbl.row_format, "COMPRESSED")
             self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
     def test_compression(self):
-        sqls = [
-            (
-                "Create table foo\n"
-                "( column1 int )"
-                "compression=zlib_stream"
-            )]
+        sqls = [("Create table foo\n" "( column1 int )" "compression=zlib_stream")]
         for sql in sqls:
             tbl = parse_create(sql)
-            self.assertEqual(tbl.name, 'foo')
-            self.assertEqual(tbl.compression, 'ZLIB_STREAM')
+            self.assertEqual(tbl.name, "foo")
+            self.assertEqual(tbl.compression, "ZLIB_STREAM")
 
     def test_simple_with_all_supported_int_type_and_length(self):
-        supported_type = [
-            'int', 'tinyint', 'bigint', 'mediumint', 'smallint'
-        ]
+        supported_type = ["int", "tinyint", "bigint", "mediumint", "smallint"]
         for col_type in supported_type:
-            for unsigned in ['unsigned', '']:
-                sql = (
-                    "Create table foo\n"
-                    "( column1 {}(10) {})".format(col_type, unsigned)
+            for unsigned in ["unsigned", ""]:
+                sql = "Create table foo\n" "( column1 {}(10) {})".format(
+                    col_type, unsigned
                 )
                 tbl = parse_create(sql)
                 self.assertTrue(tbl.primary_key.is_unique)
                 self.assertEqual(len(tbl.column_list), 1)
-                self.assertEqual(tbl.column_list[0].name, 'column1')
+                self.assertEqual(tbl.column_list[0].name, "column1")
                 self.assertEqual(tbl.column_list[0].length, str(10))
-                self.assertEqual(
-                    tbl.column_list[0].column_type, col_type.upper())
-                self.assertEqual(tbl.name, 'foo')
+                self.assertEqual(tbl.column_list[0].column_type, col_type.upper())
+                self.assertEqual(tbl.name, "foo")
                 self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
     def test_simple_create_table_with_inline_pri(self):
         sqls = []
-        sqls.append(
-            "Create table foo\n"
-            "( column1 int primary )"
-        )
-        sqls.append(
-            "Create table foo\n"
-            "( column1 int primary key)"
-        )
+        sqls.append("Create table foo\n" "( column1 int primary )")
+        sqls.append("Create table foo\n" "( column1 int primary key)")
         for sql in sqls:
             tbl = parse_create(sql)
             self.assertTrue(tbl.primary_key.is_unique)
             self.assertEqual(len(tbl.primary_key.column_list), 1)
-            self.assertEqual(tbl.primary_key.column_list[0].name, 'column1')
-            self.assertEqual(tbl.name, 'foo')
+            self.assertEqual(tbl.primary_key.column_list[0].name, "column1")
+            self.assertEqual(tbl.name, "foo")
             self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
     def test_trailing_pri(self):
         sqls = []
-        sqls.append(
-            "Create table foo\n"
-            "( column1 int , "
-            "primary key (column1))"
-        )
+        sqls.append("Create table foo\n" "( column1 int , " "primary key (column1))")
         for sql in sqls:
             tbl = parse_create(sql)
             self.assertTrue(tbl.primary_key.is_unique)
             self.assertEqual(len(tbl.primary_key.column_list), 1)
-            self.assertEqual(tbl.primary_key.column_list[0].name, 'column1')
-            self.assertEqual(tbl.name, 'foo')
+            self.assertEqual(tbl.primary_key.column_list[0].name, "column1")
+            self.assertEqual(tbl.name, "foo")
             self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
     def test_docstore_index(self):
@@ -259,9 +182,8 @@ class SQLParserTest(unittest.TestCase):
             tbl = parse_create(sql)
             self.assertTrue(len(tbl.indexes), 1)
             self.assertTrue(len(tbl.indexes[0].column_list), 1)
-            self.assertEqual(tbl.indexes[0].column_list[0].document_path,
-                             '`a`.`b`.`c`')
-            self.assertEqual(tbl.indexes[0].column_list[0].key_type, 'INT')
+            self.assertEqual(tbl.indexes[0].column_list[0].document_path, "`a`.`b`.`c`")
+            self.assertEqual(tbl.indexes[0].column_list[0].key_type, "INT")
             self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
     def test_docstore_index_str(self):
@@ -275,9 +197,8 @@ class SQLParserTest(unittest.TestCase):
             tbl = parse_create(sql)
             self.assertTrue(len(tbl.indexes), 1)
             self.assertTrue(len(tbl.indexes[0].column_list), 1)
-            self.assertEqual(tbl.indexes[0].column_list[0].document_path,
-                             '`a`.`b`.`c`')
-            self.assertEqual(tbl.indexes[0].column_list[0].key_type, 'STRING')
+            self.assertEqual(tbl.indexes[0].column_list[0].document_path, "`a`.`b`.`c`")
+            self.assertEqual(tbl.indexes[0].column_list[0].key_type, "STRING")
             self.assertEqual(tbl.indexes[0].column_list[0].length, str(10))
 
     def test_multiple_tailing_index(self):
@@ -296,10 +217,10 @@ class SQLParserTest(unittest.TestCase):
             self.assertEqual(len(tbl.indexes[0].column_list), 2)
             self.assertEqual(len(tbl.indexes[1].column_list), 1)
             self.assertFalse(tbl.indexes[0].is_unique)
-            self.assertEqual(tbl.indexes[0].column_list[0].name, 'column1')
-            self.assertEqual(tbl.indexes[0].column_list[1].name, 'column2')
+            self.assertEqual(tbl.indexes[0].column_list[0].name, "column1")
+            self.assertEqual(tbl.indexes[0].column_list[1].name, "column2")
             self.assertEqual(tbl.indexes[0].comment, "'a comment'")
-            self.assertEqual(tbl.indexes[1].column_list[0].name, 'column1')
+            self.assertEqual(tbl.indexes[1].column_list[0].name, "column1")
             self.assertTrue(tbl.indexes[1].is_unique)
             self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
@@ -317,16 +238,13 @@ class SQLParserTest(unittest.TestCase):
             self.assertEqual(len(tbl.indexes), 1)
             self.assertEqual(len(tbl.indexes[0].column_list), 1)
             self.assertFalse(tbl.indexes[0].is_unique)
-            self.assertEqual(tbl.indexes[0].name, 'index_name')
-            self.assertEqual(tbl.indexes[0].key_type, 'FULLTEXT')
+            self.assertEqual(tbl.indexes[0].name, "index_name")
+            self.assertEqual(tbl.indexes[0].key_type, "FULLTEXT")
             self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
     def test_default_value_int(self):
         sqls = []
-        sqls.append(
-            "Create table foo\n"
-            "( column1 int default 0) "
-        )
+        sqls.append("Create table foo\n" "( column1 int default 0) ")
         for sql in sqls:
             tbl = parse_create(sql)
             self.assertEqual(tbl.column_list[0].default, "0")
@@ -350,10 +268,7 @@ class SQLParserTest(unittest.TestCase):
 
     def test_default_value_string(self):
         sqls = []
-        sqls.append(
-            "Create table foo\n"
-            "( column1 int default '0') "
-        )
+        sqls.append("Create table foo\n" "( column1 int default '0') ")
         for sql in sqls:
             tbl = parse_create(sql)
             self.assertEqual(tbl.column_list[0].default, "'0'")
@@ -361,10 +276,7 @@ class SQLParserTest(unittest.TestCase):
 
     def test_default_value_empty_string(self):
         sqls = []
-        sqls.append(
-            "Create table foo\n"
-            "( column1 char(1) default '') "
-        )
+        sqls.append("Create table foo\n" "( column1 char(1) default '') ")
         for sql in sqls:
             tbl = parse_create(sql)
             self.assertEqual(tbl.column_list[0].default, "''")
@@ -372,10 +284,7 @@ class SQLParserTest(unittest.TestCase):
 
     def test_nullable(self):
         sqls = []
-        sqls.append(
-            "Create table foo\n"
-            "( column1 int null) "
-        )
+        sqls.append("Create table foo\n" "( column1 int null) ")
         for sql in sqls:
             tbl = parse_create(sql)
             self.assertTrue(tbl.column_list[0].nullable)
@@ -383,24 +292,15 @@ class SQLParserTest(unittest.TestCase):
 
     def test_explicit_nullable(self):
         # explicitly specify nullable and implicitly should be identical
-        left = (
-            "Create table foo\n"
-            "( column1 int null) "
-        )
-        right = (
-            "Create table foo\n"
-            "( column1 int) "
-        )
+        left = "Create table foo\n" "( column1 int null) "
+        right = "Create table foo\n" "( column1 int) "
         left_obj = parse_create(left)
         right_obj = parse_create(right)
         self.assertEqual(left_obj, right_obj)
 
     def test_not_nullable(self):
         sqls = []
-        sqls.append(
-            "Create table foo\n"
-            "( column1 int not null) "
-        )
+        sqls.append("Create table foo\n" "( column1 int not null) ")
         for sql in sqls:
             tbl = parse_create(sql)
             self.assertFalse(tbl.column_list[0].nullable)
@@ -409,12 +309,11 @@ class SQLParserTest(unittest.TestCase):
     def test_col_type_timestamp(self):
         sqls = []
         sqls.append(
-            "Create table foo\n"
-            "( column1 timestamp default current_timestamp) "
+            "Create table foo\n" "( column1 timestamp default current_timestamp) "
         )
         for sql in sqls:
             tbl = parse_create(sql)
-            self.assertEqual(tbl.column_list[0].default, 'CURRENT_TIMESTAMP')
+            self.assertEqual(tbl.column_list[0].default, "CURRENT_TIMESTAMP")
 
     def test_col_type_timestamp_on_update(self):
         sqls = []
@@ -425,15 +324,13 @@ class SQLParserTest(unittest.TestCase):
         )
         for sql in sqls:
             tbl = parse_create(sql)
-            self.assertEqual(tbl.column_list[0].default, 'CURRENT_TIMESTAMP')
-            self.assertEqual(tbl.column_list[0].on_update_current_timestamp,
-                             'CURRENT_TIMESTAMP')
+            self.assertEqual(tbl.column_list[0].default, "CURRENT_TIMESTAMP")
+            self.assertEqual(
+                tbl.column_list[0].on_update_current_timestamp, "CURRENT_TIMESTAMP"
+            )
 
     def test_explicit_timestamp_default_for_bare_timestamp(self):
-        left = (
-            "Create table foo\n"
-            "( column1 timestamp(10) ) "
-        )
+        left = "Create table foo\n" "( column1 timestamp(10) ) "
         right = (
             "Create table foo\n"
             "( column1 timestamp(10) NOT NULL default current_timestamp "
@@ -442,10 +339,7 @@ class SQLParserTest(unittest.TestCase):
         self.assertEqual(parse_create(left), parse_create(right))
 
     def test_explicit_timestamp_default_for_not_null(self):
-        left = (
-            "Create table foo\n"
-            "( column1 timestamp(10) NOT NULL ) "
-        )
+        left = "Create table foo\n" "( column1 timestamp(10) NOT NULL ) "
         right = (
             "Create table foo\n"
             "( column1 timestamp(10) NOT NULL default current_timestamp "
@@ -454,10 +348,7 @@ class SQLParserTest(unittest.TestCase):
         self.assertEqual(parse_create(left), parse_create(right))
 
     def test_no_accidentally_explicit_timestamp_default_for(self):
-        left = (
-            "Create table foo\n"
-            "( column1 timestamp(10) NULL ) "
-        )
+        left = "Create table foo\n" "( column1 timestamp(10) NULL ) "
         right = (
             "Create table foo\n"
             "( column1 timestamp(10) NOT NULL default current_timestamp "
@@ -467,32 +358,23 @@ class SQLParserTest(unittest.TestCase):
 
     def test_col_collate(self):
         sqls = []
-        sqls.append(
-            "Create table foo\n"
-            "( column1 varchar(10) collate utf8_bin) "
-        )
+        sqls.append("Create table foo\n" "( column1 varchar(10) collate utf8_bin) ")
         for sql in sqls:
             tbl = parse_create(sql)
-            self.assertEqual(tbl.column_list[0].collate, 'utf8_bin')
+            self.assertEqual(tbl.column_list[0].collate, "utf8_bin")
             self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
     def test_col_charset(self):
         sqls = []
-        sqls.append(
-            "Create table foo\n"
-            "( column1 varchar(10) character set utf8) "
-        )
+        sqls.append("Create table foo\n" "( column1 varchar(10) character set utf8) ")
         for sql in sqls:
             tbl = parse_create(sql)
-            self.assertEqual(tbl.column_list[0].charset, 'utf8')
+            self.assertEqual(tbl.column_list[0].charset, "utf8")
             self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
     def test_col_comment(self):
         sqls = []
-        sqls.append(
-            "Create table foo\n"
-            "( column1 int comment 'column comment') "
-        )
+        sqls.append("Create table foo\n" "( column1 int comment 'column comment') ")
         for sql in sqls:
             tbl = parse_create(sql)
             self.assertEqual(tbl.column_list[0].comment, "'column comment'")
@@ -511,10 +393,7 @@ class SQLParserTest(unittest.TestCase):
 
     def test_default_value_bit(self):
         sqls = []
-        sqls.append(
-            "Create table foo\n"
-            "( column1 bit default b'0') "
-        )
+        sqls.append("Create table foo\n" "( column1 bit default b'0') ")
         for sql in sqls:
             tbl = parse_create(sql)
             self.assertEqual(tbl.column_list[0].default, "'0'")
@@ -547,9 +426,7 @@ class SQLParserTest(unittest.TestCase):
     def test_multiple_primary(self):
         sqls = []
         sqls.append(
-            "Create table foo\n"
-            "( column1 int primary key, "
-            "primary key (column1))"
+            "Create table foo\n" "( column1 int primary key, " "primary key (column1))"
         )
         for sql in sqls:
             with self.assertRaises(ParseError):
@@ -735,11 +612,7 @@ class SQLParserTest(unittest.TestCase):
         self.assertFalse(left != right)
 
     def test_implicit_default_for_nullable(self):
-        left = (
-            "Create table `foobar`\n"
-            "( `column1` int ,"
-            "PRIMARY key (`column1`))"
-        )
+        left = "Create table `foobar`\n" "( `column1` int ," "PRIMARY key (`column1`))"
         right = (
             "Create table `foobar`\n"
             "( `column1` int default null,"
@@ -884,13 +757,13 @@ class ModelTableTestCase(unittest.TestCase):
         droppable_indexes = sql_obj.droppable_indexes(keep_unique_key=False)
         self.assertEqual(len(droppable_indexes), 2)
         for idx in droppable_indexes:
-            self.assertTrue(idx.name in ['idx_name', 'idx_name2'])
+            self.assertTrue(idx.name in ["idx_name", "idx_name2"])
 
         # only `idx_name` is droppable
         droppable_indexes = sql_obj.droppable_indexes(keep_unique_key=True)
         self.assertEqual(len(droppable_indexes), 1)
         for idx in droppable_indexes:
-            self.assertEqual(idx.name, 'idx_name')
+            self.assertEqual(idx.name, "idx_name")
 
     def test_is_myrocks_ttl_table(self):
         sql = (

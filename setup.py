@@ -20,17 +20,17 @@ install_requires = [
 
 
 setup(
-    name='osc',
-    version='0.0.1',
+    name="osc",
+    version="0.0.1",
     packages=find_packages(),
     author="Luke Lu",
     author_email="junyilu@fb.com",
-    url='https://github.com/facebookincubator/OnlineSchemaChange',
-    description='Online Schema Change for MySQL',
-    long_description=open('README.rst').read(),
+    url="https://github.com/facebookincubator/OnlineSchemaChange",
+    description="Online Schema Change for MySQL",
+    long_description=open("README.rst").read(),
     install_requires=install_requires,
-    scripts=['osc_cli'],
+    scripts=["osc_cli"],
     include_package_data=True,
     zip_safe=False,
-    python_requires='>=3.5',
+    python_requires=">=3.5",
 )

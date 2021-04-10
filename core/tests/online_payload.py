@@ -17,13 +17,14 @@ import MySQLdb
 
 class BasePayloadTestCase(unittest.TestCase):
     def setUp(self):
-        self._payload.ddl_file_list = ['ddl_file1.sql', 'ddl_file2.sql']
+        self._payload.ddl_file_list = ["ddl_file1.sql", "ddl_file2.sql"]
 
 
 class DirectPayloadDeadMySQL(BasePayloadTestCase):
     def setUp(self):
         db_lib.MySQLSocketConnection = MagicMock(
-            side_effect=MySQLdb.OperationalError(2013, 'mock unconnectable'))
+            side_effect=MySQLdb.OperationalError(2013, "mock unconnectable")
+        )
         self._payload = DirectPayload()
         self._payload.read_ddl_files = MagicMock()
         super(DirectPayloadDeadMySQL, self).setUp()
@@ -33,13 +34,14 @@ class DirectPayloadDeadMySQL(BasePayloadTestCase):
             self._payload.init_conn()
             self._payload.run()
             oscerr = e.exception
-            self.assertEqual(oscerr.err_key, 'GENERIC_MYSQL_ERRO')
+            self.assertEqual(oscerr.err_key, "GENERIC_MYSQL_ERRO")
 
 
 class DirectPayloadSQLFailed(BasePayloadTestCase):
     def setUp(self):
         db_lib.MySQLSocketConnection.query = MagicMock(
-            side_effect=MySQLdb.OperationalError(2013, 'transaction failed'))
+            side_effect=MySQLdb.OperationalError(2013, "transaction failed")
+        )
         self._payload = DirectPayload()
         self._payload.read_ddl_files = MagicMock()
         super(DirectPayloadSQLFailed, self).setUp()
@@ -49,4 +51,4 @@ class DirectPayloadSQLFailed(BasePayloadTestCase):
             self._payload.init_conn()
             self._payload.run()
         oscerr = e.exception
-        self.assertEqual(oscerr.err_key, 'GENERIC_MYSQL_ERROR')
+        self.assertEqual(oscerr.err_key, "GENERIC_MYSQL_ERROR")

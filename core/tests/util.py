@@ -14,12 +14,27 @@ from ..lib.util import RangeChain, dirname_for_db
 class RangeChainTest(unittest.TestCase):
     def test_range_chain_basic(self):
         chain = RangeChain()
-        chain.extend([1, 2, 3, 4, 5, ])
+        chain.extend(
+            [
+                1,
+                2,
+                3,
+                4,
+                5,
+            ]
+        )
         self.assertEqual(chain.missing_points(), [])
 
     def test_range_chain_with_gap(self):
         chain = RangeChain()
-        chain.extend([1, 2, 3, 5, ])
+        chain.extend(
+            [
+                1,
+                2,
+                3,
+                5,
+            ]
+        )
         self.assertEqual(chain.missing_points(), [4])
 
     def test_range_chain_with_large_gap(self):
@@ -33,34 +48,102 @@ class RangeChainTest(unittest.TestCase):
 
     def test_append_with_gap(self):
         chain = RangeChain()
-        chain.extend([1, 2, 3, 4, ])
-        chain.extend([9, 10, 11, 12, ])
+        chain.extend(
+            [
+                1,
+                2,
+                3,
+                4,
+            ]
+        )
+        chain.extend(
+            [
+                9,
+                10,
+                11,
+                12,
+            ]
+        )
         self.assertEqual(chain.missing_points(), [5, 6, 7, 8])
 
     def test_extend_with_gap(self):
         chain = RangeChain()
-        chain.extend([1, 2, 3, 4, ])
-        chain.extend([9, 10, 12, ])
+        chain.extend(
+            [
+                1,
+                2,
+                3,
+                4,
+            ]
+        )
+        chain.extend(
+            [
+                9,
+                10,
+                12,
+            ]
+        )
         self.assertEqual(chain.missing_points(), [5, 6, 7, 8, 11])
 
     def test_extend_with_empty_list(self):
         chain = RangeChain()
-        chain.extend([1, 2, 3, 4, ])
-        chain.extend([9, 10, 12, ])
+        chain.extend(
+            [
+                1,
+                2,
+                3,
+                4,
+            ]
+        )
+        chain.extend(
+            [
+                9,
+                10,
+                12,
+            ]
+        )
         chain.extend([])
         self.assertEqual(chain.missing_points(), [5, 6, 7, 8, 11])
 
     def test_remove_point_from_gap(self):
         chain = RangeChain()
-        chain.extend([1, 2, 3, 4, ])
-        chain.extend([9, 10, 11, 12, ])
+        chain.extend(
+            [
+                1,
+                2,
+                3,
+                4,
+            ]
+        )
+        chain.extend(
+            [
+                9,
+                10,
+                11,
+                12,
+            ]
+        )
         chain.fill(6)
         self.assertEqual(chain.missing_points(), [5, 7, 8])
 
     def test_fill_existing_point(self):
         chain = RangeChain()
-        chain.extend([1, 2, 3, 4, ])
-        chain.extend([9, 10, 11, 12, ])
+        chain.extend(
+            [
+                1,
+                2,
+                3,
+                4,
+            ]
+        )
+        chain.extend(
+            [
+                9,
+                10,
+                11,
+                12,
+            ]
+        )
         with self.assertRaises(Exception):
             chain.fill(3)
 

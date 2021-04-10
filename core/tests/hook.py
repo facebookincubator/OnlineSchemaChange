@@ -18,7 +18,7 @@ class SQLHookTest(unittest.TestCase):
         sql_obj = SQLHook()
         sql_obj._is_select = True
         sql_obj._dbh = Mock()
-        sql_obj._sqls = ['select 1']
+        sql_obj._sqls = ["select 1"]
         expected_lines = []
         for row in expected:
             expected_lines.append("\t".join([str(col) for col in row]))
@@ -27,73 +27,40 @@ class SQLHookTest(unittest.TestCase):
         return sql_obj
 
     def test_consitent_data_not_raise_exception(self):
-        with patch.object(SQLHook, 'read_sqls'):
-            sql_obj = self.gen_sql_hook_obj(
-                expected=(
-                    (1, 1, 1),
-                ),
-                got=(
-                    (1, 1, 1),
-                )
-            )
+        with patch.object(SQLHook, "read_sqls"):
+            sql_obj = self.gen_sql_hook_obj(expected=((1, 1, 1),), got=((1, 1, 1),))
             sql_obj.execute_sqls()
 
     def test_expect_data_mismatch(self):
-        with patch.object(SQLHook, 'read_sqls'):
-            sql_obj = self.gen_sql_hook_obj(
-                expected=(
-                    (1, 1, 1),
-                ),
-                got=(
-                    (1, 1, 2),
-                )
-            )
+        with patch.object(SQLHook, "read_sqls"):
+            sql_obj = self.gen_sql_hook_obj(expected=((1, 1, 1),), got=((1, 1, 2),))
             with self.assertRaises(OSCError) as context:
                 sql_obj.execute_sqls()
-            self.assertEqual(context.exception.err_key, 'ASSERTION_ERROR')
+            self.assertEqual(context.exception.err_key, "ASSERTION_ERROR")
 
     def test_expect_more_rows(self):
-        with patch.object(SQLHook, 'read_sqls'):
+        with patch.object(SQLHook, "read_sqls"):
             sql_obj = self.gen_sql_hook_obj(
-                expected=(
-                    (1, 1, 1),
-                    (2, 2, 2)
-                ),
-                got=(
-                    (1, 1, 1),
-                )
+                expected=((1, 1, 1), (2, 2, 2)), got=((1, 1, 1),)
             )
             with self.assertRaises(OSCError) as context:
                 sql_obj.execute_sqls()
-            self.assertEqual(context.exception.err_key, 'ASSERTION_ERROR')
+            self.assertEqual(context.exception.err_key, "ASSERTION_ERROR")
 
     def test_expect_less_rows(self):
-        with patch.object(SQLHook, 'read_sqls'):
+        with patch.object(SQLHook, "read_sqls"):
             sql_obj = self.gen_sql_hook_obj(
-                expected=(
-                    (1, 1, 1),
-                ),
-                got=(
-                    (1, 1, 1),
-                    (2, 2, 2)
-                )
+                expected=((1, 1, 1),), got=((1, 1, 1), (2, 2, 2))
             )
             with self.assertRaises(OSCError) as context:
                 sql_obj.execute_sqls()
-            self.assertEqual(context.exception.err_key, 'ASSERTION_ERROR')
+            self.assertEqual(context.exception.err_key, "ASSERTION_ERROR")
 
     def test_expect_different_order(self):
-        with patch.object(SQLHook, 'read_sqls'):
+        with patch.object(SQLHook, "read_sqls"):
             sql_obj = self.gen_sql_hook_obj(
-                expected=(
-                    (2, 2, 2),
-                    (1, 1, 1)
-                ),
-                got=(
-                    (1, 1, 1),
-                    (2, 2, 2)
-                )
+                expected=((2, 2, 2), (1, 1, 1)), got=((1, 1, 1), (2, 2, 2))
             )
             with self.assertRaises(OSCError) as context:
                 sql_obj.execute_sqls()
-            self.assertEqual(context.exception.err_key, 'ASSERTION_ERROR')
+            self.assertEqual(context.exception.err_key, "ASSERTION_ERROR")

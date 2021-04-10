@@ -25,6 +25,7 @@ class DirectPayload(Payload):
     when you think locking a table for certain amount of time won't be a
     big deal for your application
     """
+
     def run_ddl(self, db, sql):
         log.debug("Creating table using: \n {}".format(sql))
         try:
@@ -35,10 +36,16 @@ class DirectPayload(Payload):
             log.error(
                 "SQL execution error: [{}] {}\n"
                 "When executing: {}\n"
-                "With args: {}"
-                .format(errnum, errmsg, self._sql_now, self._sql_args_now))
-            raise OSCError('GENERIC_MYSQL_ERROR',
-                           {'stage': "running DDL on db '{}'".format(db),
-                            'errnum': errnum,
-                            'errmsg': errmsg},
-                           mysql_err_code=errnum)
+                "With args: {}".format(
+                    errnum, errmsg, self._sql_now, self._sql_args_now
+                )
+            )
+            raise OSCError(
+                "GENERIC_MYSQL_ERROR",
+                {
+                    "stage": "running DDL on db '{}'".format(db),
+                    "errnum": errnum,
+                    "errmsg": errmsg,
+                },
+                mysql_err_code=errnum,
+            )

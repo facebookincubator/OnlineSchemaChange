@@ -21,7 +21,11 @@ from .. import constant, sql, util
 from ..error import OSCError
 from ..hook import wrap_hook
 from ..sqlparse import (
-    parse_create, ParseError, is_equal, SchemaDiff, need_default_ts_bootstrap
+    parse_create,
+    ParseError,
+    is_equal,
+    SchemaDiff,
+    need_default_ts_bootstrap,
 )
 from .base import Payload
 from .cleanup import CleanupPayload
@@ -45,8 +49,9 @@ class CopyPayload(Payload):
         - pk/non_pk representing whether these columns are a part of primary
             key
     """
-    IDCOLNAME = '_osc_ID_'
-    DMLCOLNAME = '_osc_dml_type_'
+
+    IDCOLNAME = "_osc_ID_"
+    DMLCOLNAME = "_osc_dml_type_"
 
     DML_TYPE_INSERT = 1
     DML_TYPE_DELETE = 2
@@ -56,7 +61,7 @@ class CopyPayload(Payload):
         super(CopyPayload, self).__init__(*args, **kwargs)
         self._current_db = None
         self._pk_for_filter = []
-        self._idx_name_for_filter = 'PRIMARY'
+        self._idx_name_for_filter = "PRIMARY"
         self._new_table = None
         self._old_table = None
         self._replayed_chg_ids = util.RangeChain()
@@ -77,90 +82,90 @@ class CopyPayload(Payload):
         self._last_kill_timer = None
         self.table_swapped = False
 
-        self.repl_status = kwargs.get('repl_status', '')
-        self.outfile_dir = kwargs.get('outfile_dir', '')
+        self.repl_status = kwargs.get("repl_status", "")
+        self.outfile_dir = kwargs.get("outfile_dir", "")
         # By specify this option we are allowed to open a long transaction
         # during full table dump and full table checksum
-        self.allow_new_pk = kwargs.get('allow_new_pk', False)
-        self.allow_drop_column = kwargs.get('allow_drop_column', False)
-        self.detailed_mismatch_info = kwargs.get(
-            'detailed_mismatch_info', False)
-        self.dump_after_checksum = kwargs.get(
-            'dump_after_checksum', False)
-        self.eliminate_dups = kwargs.get('eliminate_dups', False)
-        self.rm_partition = kwargs.get('rm_partition', False)
-        self.force_cleanup = kwargs.get('force_cleanup', False)
-        self.skip_cleanup_after_kill = kwargs.get(
-            'skip_cleanup_after_kill', False)
-        self.pre_load_statement = kwargs.get('pre_load_statement', '')
-        self.post_load_statement = kwargs.get('post_load_statement', '')
+        self.allow_new_pk = kwargs.get("allow_new_pk", False)
+        self.allow_drop_column = kwargs.get("allow_drop_column", False)
+        self.detailed_mismatch_info = kwargs.get("detailed_mismatch_info", False)
+        self.dump_after_checksum = kwargs.get("dump_after_checksum", False)
+        self.eliminate_dups = kwargs.get("eliminate_dups", False)
+        self.rm_partition = kwargs.get("rm_partition", False)
+        self.force_cleanup = kwargs.get("force_cleanup", False)
+        self.skip_cleanup_after_kill = kwargs.get("skip_cleanup_after_kill", False)
+        self.pre_load_statement = kwargs.get("pre_load_statement", "")
+        self.post_load_statement = kwargs.get("post_load_statement", "")
         self.replay_max_attempt = kwargs.get(
-            'replay_max_attempt', constant.DEFAULT_REPLAY_ATTEMPT)
+            "replay_max_attempt", constant.DEFAULT_REPLAY_ATTEMPT
+        )
         self.replay_timeout = kwargs.get(
-            'replay_timeout', constant.REPLAY_DEFAULT_TIMEOUT)
+            "replay_timeout", constant.REPLAY_DEFAULT_TIMEOUT
+        )
         self.replay_batch_size = kwargs.get(
-            'replay_batch_size', constant.DEFAULT_BATCH_SIZE)
+            "replay_batch_size", constant.DEFAULT_BATCH_SIZE
+        )
         self.replay_group_size = kwargs.get(
-            'replay_group_size', constant.DEFAULT_REPLAY_GROUP_SIZE)
-        self.skip_pk_coverage_check = kwargs.get(
-            'skip_pk_coverage_check', False)
+            "replay_group_size", constant.DEFAULT_REPLAY_GROUP_SIZE
+        )
+        self.skip_pk_coverage_check = kwargs.get("skip_pk_coverage_check", False)
         self.pk_coverage_size_threshold = kwargs.get(
-            'pk_coverage_size_threshold', constant.PK_COVERAGE_SIZE_THRESHOLD)
-        self.skip_long_trx_check = kwargs.get(
-            'skip_long_trx_check', False)
-        self.ddl_file_list = kwargs.get('ddl_file_list', '')
+            "pk_coverage_size_threshold", constant.PK_COVERAGE_SIZE_THRESHOLD
+        )
+        self.skip_long_trx_check = kwargs.get("skip_long_trx_check", False)
+        self.ddl_file_list = kwargs.get("ddl_file_list", "")
         self.free_space_reserved_percent = kwargs.get(
-            'free_space_reserved_percent',
-            constant.DEFAULT_RESERVED_SPACE_PERCENT)
-        self.chunk_size = kwargs.get(
-            'chunk_size', constant.CHUNK_BYTES)
-        self.long_trx_time = kwargs.get(
-            'long_trx_time', constant.LONG_TRX_TIME)
+            "free_space_reserved_percent", constant.DEFAULT_RESERVED_SPACE_PERCENT
+        )
+        self.chunk_size = kwargs.get("chunk_size", constant.CHUNK_BYTES)
+        self.long_trx_time = kwargs.get("long_trx_time", constant.LONG_TRX_TIME)
         self.max_running_before_ddl = kwargs.get(
-            'max_running_before_ddl', constant.MAX_RUNNING_BEFORE_DDL)
+            "max_running_before_ddl", constant.MAX_RUNNING_BEFORE_DDL
+        )
         self.ddl_guard_attempts = kwargs.get(
-            'ddl_guard_attempts', constant.DDL_GUARD_ATTEMPTS)
+            "ddl_guard_attempts", constant.DDL_GUARD_ATTEMPTS
+        )
         self.lock_max_attempts = kwargs.get(
-            'lock_max_attempts', constant.LOCK_MAX_ATTEMPTS)
+            "lock_max_attempts", constant.LOCK_MAX_ATTEMPTS
+        )
         self.lock_max_wait_before_kill_seconds = kwargs.get(
-            'lock_max_wait_before_kill_seconds',
-            constant.LOCK_MAX_WAIT_BEFORE_KILL_SECONDS)
+            "lock_max_wait_before_kill_seconds",
+            constant.LOCK_MAX_WAIT_BEFORE_KILL_SECONDS,
+        )
         self.session_timeout = kwargs.get(
-            'mysql_session_timeout', constant.SESSION_TIMEOUT)
-        self.idx_recreation = kwargs.get(
-            'idx_recreation', False)
+            "mysql_session_timeout", constant.SESSION_TIMEOUT
+        )
+        self.idx_recreation = kwargs.get("idx_recreation", False)
         self.rocksdb_bulk_load_allow_sk = kwargs.get(
-            'rocksdb_bulk_load_allow_sk', False)
+            "rocksdb_bulk_load_allow_sk", False
+        )
         self.unblock_table_creation_without_pk = kwargs.get(
-            'unblock_table_creation_without_pk', False)
-        self.rebuild = kwargs.get('rebuild', False)
-        self.keep_tmp_table = kwargs.get(
-            'keep_tmp_table_after_exception', False)
-        self.skip_checksum = kwargs.get('skip_checksum', False)
+            "unblock_table_creation_without_pk", False
+        )
+        self.rebuild = kwargs.get("rebuild", False)
+        self.keep_tmp_table = kwargs.get("keep_tmp_table_after_exception", False)
+        self.skip_checksum = kwargs.get("skip_checksum", False)
         self.skip_checksum_for_modified = kwargs.get(
-            'skip_checksum_for_modified', False)
-        self.skip_delta_checksum = kwargs.get(
-            'skip_delta_checksum', False)
-        self.skip_named_lock = kwargs.get(
-            'skip_named_lock', False)
-        self.skip_affected_rows_check = kwargs.get(
-            'skip_affected_rows_check', False)
-        self.skip_disk_space_check = kwargs.get(
-            'skip_disk_space_check', False)
-        self.where = kwargs.get('where', None)
-        self.session_overrides_str = kwargs.get(
-            'session_overrides', '')
-        self.fail_for_implicit_conv = kwargs.get(
-            'fail_for_implicit_conv', False)
+            "skip_checksum_for_modified", False
+        )
+        self.skip_delta_checksum = kwargs.get("skip_delta_checksum", False)
+        self.skip_named_lock = kwargs.get("skip_named_lock", False)
+        self.skip_affected_rows_check = kwargs.get("skip_affected_rows_check", False)
+        self.skip_disk_space_check = kwargs.get("skip_disk_space_check", False)
+        self.where = kwargs.get("where", None)
+        self.session_overrides_str = kwargs.get("session_overrides", "")
+        self.fail_for_implicit_conv = kwargs.get("fail_for_implicit_conv", False)
         self.max_wait_for_slow_query = kwargs.get(
-            'max_wait_for_slow_query', constant.MAX_WAIT_FOR_SLOW_QUERY)
+            "max_wait_for_slow_query", constant.MAX_WAIT_FOR_SLOW_QUERY
+        )
         self.max_replay_batch_size = kwargs.get(
-            'max_replay_batch_size', constant.MAX_REPLAY_BATCH_SIZE)
-        self.allow_unsafe_ts_bootstrap = kwargs.get(
-            'allow_unsafe_ts_bootstrap', False)
+            "max_replay_batch_size", constant.MAX_REPLAY_BATCH_SIZE
+        )
+        self.allow_unsafe_ts_bootstrap = kwargs.get("allow_unsafe_ts_bootstrap", False)
         self.is_full_table_dump = False
         self.replay_max_changes = kwargs.get(
-            'replay_max_changes', constant.MAX_REPLAY_CHANGES)
+            "replay_max_changes", constant.MAX_REPLAY_CHANGES
+        )
 
     @property
     def current_db(self):
@@ -178,10 +183,7 @@ class CopyPayload(Payload):
         comparing the length to zero. Also will be used in construct the
         condition part of the replay query
         """
-        return [
-            col.name
-            for col in self._old_table.primary_key.column_list
-        ]
+        return [col.name for col in self._old_table.primary_key.column_list]
 
     @property
     def dropped_column_name_list(self):
@@ -215,7 +217,8 @@ class CopyPayload(Payload):
         the old schema. It will be used in query construction for replay
         """
         return [
-            col.name for col in self._old_table.column_list
+            col.name
+            for col in self._old_table.column_list
             if col.name not in self._pk_for_filter
             and col.name not in self.dropped_column_name_list
         ]
@@ -226,15 +229,13 @@ class CopyPayload(Payload):
         A list of non-pk column name suitable for comparing checksum
         """
         column_list = []
-        old_pk_name_list = [
-            c.name for c in self._old_table.primary_key.column_list]
+        old_pk_name_list = [c.name for c in self._old_table.primary_key.column_list]
         for col in self._old_table.column_list:
             if col.name in old_pk_name_list:
                 continue
             if col.name in self.dropped_column_name_list:
                 continue
-            new_columns = {
-                col.name: col for col in self._new_table.column_list}
+            new_columns = {col.name: col for col in self._new_table.column_list}
             if col != new_columns[col.name]:
                 if self.skip_checksum_for_modified:
                     continue
@@ -249,8 +250,10 @@ class CopyPayload(Payload):
         """
         if len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 10:
             return constant.DELTA_TABLE_PREFIX + self._old_table.name
-        elif (len(self._old_table.name) >= constant.MAX_TABLE_LENGTH - 10
-                and len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 2):
+        elif (
+            len(self._old_table.name) >= constant.MAX_TABLE_LENGTH - 10
+            and len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 2
+        ):
             return constant.SHORT_DELTA_TABLE_PREFIX + self._old_table.name
         else:
             return constant.DELTA_TABLE_PREFIX + constant.GENERIC_TABLE_NAME
@@ -275,8 +278,10 @@ class CopyPayload(Payload):
         """
         if len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 10:
             return constant.NEW_TABLE_PREFIX + self.table_name
-        elif (len(self._old_table.name) >= constant.MAX_TABLE_LENGTH - 10
-                and len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 2):
+        elif (
+            len(self._old_table.name) >= constant.MAX_TABLE_LENGTH - 10
+            and len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 2
+        ):
             return constant.SHORT_NEW_TABLE_PREFIX + self.table_name
         else:
             return constant.NEW_TABLE_PREFIX + constant.GENERIC_TABLE_NAME
@@ -288,8 +293,10 @@ class CopyPayload(Payload):
         """
         if len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 10:
             return constant.RENAMED_TABLE_PREFIX + self._old_table.name
-        elif (len(self._old_table.name) >= constant.MAX_TABLE_LENGTH - 10
-                and len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 2):
+        elif (
+            len(self._old_table.name) >= constant.MAX_TABLE_LENGTH - 10
+            and len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 2
+        ):
             return constant.SHORT_RENAMED_TABLE_PREFIX + self._old_table.name
         else:
             return constant.RENAMED_TABLE_PREFIX + constant.GENERIC_TABLE_NAME
@@ -302,8 +309,10 @@ class CopyPayload(Payload):
         """
         if len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 10:
             return constant.INSERT_TRIGGER_PREFIX + self._old_table.name
-        elif (len(self._old_table.name) >= constant.MAX_TABLE_LENGTH - 10
-                and len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 2):
+        elif (
+            len(self._old_table.name) >= constant.MAX_TABLE_LENGTH - 10
+            and len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 2
+        ):
             return constant.SHORT_INSERT_TRIGGER_PREFIX + self._old_table.name
         else:
             return constant.INSERT_TRIGGER_PREFIX + constant.GENERIC_TABLE_NAME
@@ -316,8 +325,10 @@ class CopyPayload(Payload):
         """
         if len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 10:
             return constant.UPDATE_TRIGGER_PREFIX + self._old_table.name
-        elif (len(self._old_table.name) >= constant.MAX_TABLE_LENGTH - 10
-                and len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 2):
+        elif (
+            len(self._old_table.name) >= constant.MAX_TABLE_LENGTH - 10
+            and len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 2
+        ):
             return constant.SHORT_UPDATE_TRIGGER_PREFIX + self._old_table.name
         else:
             return constant.UPDATE_TRIGGER_PREFIX + constant.GENERIC_TABLE_NAME
@@ -330,8 +341,10 @@ class CopyPayload(Payload):
         """
         if len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 10:
             return constant.DELETE_TRIGGER_PREFIX + self._old_table.name
-        elif (len(self._old_table.name) >= constant.MAX_TABLE_LENGTH - 10
-                and len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 2):
+        elif (
+            len(self._old_table.name) >= constant.MAX_TABLE_LENGTH - 10
+            and len(self._old_table.name) < constant.MAX_TABLE_LENGTH - 2
+        ):
             return constant.SHORT_DELETE_TRIGGER_PREFIX + self._old_table.name
         else:
             return constant.DELETE_TRIGGER_PREFIX + constant.GENERIC_TABLE_NAME
@@ -343,8 +356,7 @@ class CopyPayload(Payload):
         of outfile chunks. A single outfile chunk will look like
         '@datadir/__osc_tbl_@TABLE_NAME.1'
         """
-        return os.path.join(self.outfile_dir,
-                            constant.OUTFILE_TABLE + self.table_name)
+        return os.path.join(self.outfile_dir, constant.OUTFILE_TABLE + self.table_name)
 
     @property
     def tmp_table_exclude_id(self):
@@ -352,7 +364,7 @@ class CopyPayload(Payload):
         Name of the temporary table which contains the value of IDCOLNAME in
         self.delta_table_name which we've already replayed
         """
-        return '__osc_temp_ids_to_exclude'
+        return "__osc_temp_ids_to_exclude"
 
     @property
     def tmp_table_include_id(self):
@@ -361,7 +373,7 @@ class CopyPayload(Payload):
         self.delta_table_name which we will be replaying for a single
         self.replay_changes() call
         """
-        return '__osc_temp_ids_to_include'
+        return "__osc_temp_ids_to_include"
 
     @property
     def outfile_exclude_id(self):
@@ -371,8 +383,9 @@ class CopyPayload(Payload):
         from, because that will hold gap lock inside transaction. The whole
         select into outfile/load data infile logic is a work around for this.
         """
-        return os.path.join(self.outfile_dir,
-                            constant.OUTFILE_EXCLUDE_ID + self.table_name)
+        return os.path.join(
+            self.outfile_dir, constant.OUTFILE_EXCLUDE_ID + self.table_name
+        )
 
     @property
     def outfile_include_id(self):
@@ -381,8 +394,9 @@ class CopyPayload(Payload):
         self.tmp_table_include_id soon. See docs in self.outfile_exclude_id
         for more
         """
-        return os.path.join(self.outfile_dir,
-                            constant.OUTFILE_INCLUDE_ID + self.table_name)
+        return os.path.join(
+            self.outfile_dir, constant.OUTFILE_INCLUDE_ID + self.table_name
+        )
 
     @property
     def droppable_indexes(self):
@@ -397,8 +411,7 @@ class CopyPayload(Payload):
             return []
         # We need to keep unique index, if we need to use it to eliminate
         # duplicates during data loading
-        return self._new_table.droppable_indexes(
-            keep_unique_key=self.eliminate_dups)
+        return self._new_table.droppable_indexes(keep_unique_key=self.eliminate_dups)
 
     def set_tx_isolation(self):
         """
@@ -408,18 +421,21 @@ class CopyPayload(Payload):
         # MYSQL_5_TO_8_MIGRATION
         if self.mysql_version.is_mysql8:
             self.execute_sql(
-                sql.set_session_variable('transaction_isolation'), ('REPEATABLE-READ',))
+                sql.set_session_variable("transaction_isolation"), ("REPEATABLE-READ",)
+            )
         else:
             self.execute_sql(
-                sql.set_session_variable('tx_isolation'), ('REPEATABLE-READ',))
+                sql.set_session_variable("tx_isolation"), ("REPEATABLE-READ",)
+            )
 
     def set_sql_mode(self):
         """
         Setting the sql_mode to STRICT for the connection we will using for OSC
         """
         self.execute_sql(
-            sql.set_session_variable('sql_mode'),
-            ('STRICT_ALL_TABLES,NO_AUTO_VALUE_ON_ZERO',))
+            sql.set_session_variable("sql_mode"),
+            ("STRICT_ALL_TABLES,NO_AUTO_VALUE_ON_ZERO",),
+        )
 
     def parse_session_overrides_str(self, overrides_str):
         """
@@ -431,14 +447,16 @@ class CopyPayload(Payload):
         @return : A list of [var, value]
         """
         overrides = []
-        if overrides_str is None or overrides_str == '':
+        if overrides_str is None or overrides_str == "":
             return []
-        for section in overrides_str.split(';'):
-            splitted_array = section.split('=')
-            if len(splitted_array) != 2 or splitted_array[0] == '' or \
-                    splitted_array[1] == '':
-                raise OSCError('INCORRECT_SESSION_OVERRIDE',
-                               {'section': section})
+        for section in overrides_str.split(";"):
+            splitted_array = section.split("=")
+            if (
+                len(splitted_array) != 2
+                or splitted_array[0] == ""
+                or splitted_array[1] == ""
+            ):
+                raise OSCError("INCORRECT_SESSION_OVERRIDE", {"section": section})
             overrides.append(splitted_array)
         return overrides
 
@@ -447,19 +465,22 @@ class CopyPayload(Payload):
         Override session variable if there's any
         """
         self.session_overrides = self.parse_session_overrides_str(
-            self.session_overrides_str)
+            self.session_overrides_str
+        )
         for var_name, var_value in self.session_overrides:
-            log.info("Override session variable {} with value: {}"
-                     .format(var_name, var_value))
-            self.execute_sql(
-                sql.set_session_variable(var_name), (var_value,))
+            log.info(
+                "Override session variable {} with value: {}".format(
+                    var_name, var_value
+                )
+            )
+            self.execute_sql(sql.set_session_variable(var_name), (var_value,))
 
     def is_var_enabled(self, var_name):
         if var_name not in self.mysql_vars:
             return False
-        if self.mysql_vars[var_name] == 'OFF':
+        if self.mysql_vars[var_name] == "OFF":
             return False
-        if self.mysql_vars[var_name] == '0':
+        if self.mysql_vars[var_name] == "0":
             return False
         return True
 
@@ -470,9 +491,9 @@ class CopyPayload(Payload):
         Otherwise slave will hit _chg table not exists error
         """
         # We only need to check this if RBR is enabled
-        if self.mysql_vars['binlog_format'] == 'ROW':
+        if self.mysql_vars["binlog_format"] == "ROW":
             if self.mysql_version.is_fb:
-                if not self.is_var_enabled('sql_log_bin_triggers'):
+                if not self.is_var_enabled("sql_log_bin_triggers"):
                     return True
                 else:
                     return False
@@ -485,7 +506,7 @@ class CopyPayload(Payload):
     def is_myrocks_table(self):
         if not self._new_table.engine:
             return False
-        return self._new_table.engine.upper() == 'ROCKSDB'
+        return self._new_table.engine.upper() == "ROCKSDB"
 
     @property
     def is_myrocks_ttl_table(self):
@@ -497,15 +518,14 @@ class CopyPayload(Payload):
         hold a name lock for
         """
         if not self.is_trigger_rbr_safe:
-            raise OSCError('NOT_RBR_SAFE')
+            raise OSCError("NOT_RBR_SAFE")
 
     def skip_cache_fill_for_myrocks(self):
         """
         Skip block cache fill for dumps and scans to avoid cache polution
         """
-        if 'rocksdb_skip_fill_cache' in self.mysql_vars:
-            self.execute_sql(
-                sql.set_session_variable('rocksdb_skip_fill_cache'), (1,))
+        if "rocksdb_skip_fill_cache" in self.mysql_vars:
+            self.execute_sql(sql.set_session_variable("rocksdb_skip_fill_cache"), (1,))
 
     @wrap_hook
     def init_connection(self, db):
@@ -536,8 +556,13 @@ class CopyPayload(Payload):
         @param table_name:  Name of the table to check existence
         @type  table_name:  string
         """
-        table_exists = self.query(sql.table_existence,
-                                  (table_name, self._current_db,))
+        table_exists = self.query(
+            sql.table_existence,
+            (
+                table_name,
+                self._current_db,
+            ),
+        )
         return bool(table_exists)
 
     def fetch_table_schema(self, table_name):
@@ -548,12 +573,12 @@ class CopyPayload(Payload):
         ddl = self.query(sql.show_create_table(table_name))
         if ddl:
             try:
-                return parse_create(ddl[0]['Create Table'])
+                return parse_create(ddl[0]["Create Table"])
             except ParseError as e:
                 raise OSCError(
-                    'TABLE_PARSING_ERROR',
-                    {'db': self._current_db, 'table': self.table_name,
-                     'msg': str(e)})
+                    "TABLE_PARSING_ERROR",
+                    {"db": self._current_db, "table": self.table_name, "msg": str(e)},
+                )
 
     def fetch_partitions(self, table_name):
         """
@@ -562,14 +587,21 @@ class CopyPayload(Payload):
         partition will be dropped one by one before the table get dropped.
         This way we will bring less pressure to the MySQL server
         """
-        partition_result = self.query(sql.fetch_partition,
-                                      (self._current_db, table_name,))
+        partition_result = self.query(
+            sql.fetch_partition,
+            (
+                self._current_db,
+                table_name,
+            ),
+        )
         # If a table doesn't have partition schema the "PARTITION_NAME"
         # will be string "None" instead of something considered as false
         # in python
-        return [partition_entry['PARTITION_NAME']
-                for partition_entry in partition_result
-                if partition_entry['PARTITION_NAME'] != 'None']
+        return [
+            partition_entry["PARTITION_NAME"]
+            for partition_entry in partition_result
+            if partition_entry["PARTITION_NAME"] != "None"
+        ]
 
     @wrap_hook
     def init_table_obj(self):
@@ -581,15 +613,14 @@ class CopyPayload(Payload):
         """
         # Check the existence of original table
         if not self.table_exists(self.table_name):
-            raise OSCError('TABLE_NOT_EXIST',
-                           {'db': self._current_db, 'table': self.table_name})
+            raise OSCError(
+                "TABLE_NOT_EXIST", {"db": self._current_db, "table": self.table_name}
+            )
         self._old_table = self.fetch_table_schema(self.table_name)
-        self.partitions[self.table_name] = self.fetch_partitions(
-            self.table_name)
+        self.partitions[self.table_name] = self.fetch_partitions(self.table_name)
         # The table after swap will have the same partition layout as current
         # table
-        self.partitions[self.renamed_table_name] = \
-            self.partitions[self.table_name]
+        self.partitions[self.renamed_table_name] = self.partitions[self.table_name]
         # Preserve the auto_inc value from old table, so that we don't revert
         # back to a smaller value after OSC
         if self._old_table.auto_increment:
@@ -600,36 +631,40 @@ class CopyPayload(Payload):
         Loop through all the tables we will touch during OSC, and clean them
         up if force_cleanup is specified
         """
-        log.info("--force-cleanup specified, cleaning up things that may left "
-                 "behind by last run")
+        log.info(
+            "--force-cleanup specified, cleaning up things that may left "
+            "behind by last run"
+        )
         cleanup_payload = CleanupPayload(charset=self.charset, sudo=self.sudo)
         # cleanup outfiles for include_id and exclude_id
-        for filepath in (
-                self.outfile_exclude_id, self.outfile_include_id):
+        for filepath in (self.outfile_exclude_id, self.outfile_include_id):
             cleanup_payload.add_file_entry(filepath)
         # cleanup outfiles for detailed checksum
-        for suffix in ['old', 'new']:
-            cleanup_payload.add_file_entry(
-                "{}.{}".format(self.outfile, suffix))
+        for suffix in ["old", "new"]:
+            cleanup_payload.add_file_entry("{}.{}".format(self.outfile, suffix))
         # cleanup outfiles for table dump
         file_prefixes = [
             self.outfile,
             "{}.old".format(self.outfile),
-            "{}.new".format(self.outfile)]
+            "{}.new".format(self.outfile),
+        ]
         for file_prefix in file_prefixes:
             log.debug("globbing {}".format(file_prefix))
             for outfile in glob.glob("{}.[0-9]*".format(file_prefix)):
                 cleanup_payload.add_file_entry(outfile)
         for trigger in (
-                self.delete_trigger_name, self.update_trigger_name,
-                self.insert_trigger_name):
+            self.delete_trigger_name,
+            self.update_trigger_name,
+            self.insert_trigger_name,
+        ):
             cleanup_payload.add_drop_trigger_entry(self._current_db, trigger)
         for tbl in (
-                self.new_table_name, self.delta_table_name,
-                self.renamed_table_name):
+            self.new_table_name,
+            self.delta_table_name,
+            self.renamed_table_name,
+        ):
             partitions = self.fetch_partitions(tbl)
-            cleanup_payload.add_drop_table_entry(
-                self._current_db, tbl, partitions)
+            cleanup_payload.add_drop_table_entry(self._current_db, tbl, partitions)
         cleanup_payload.mysql_user = self.mysql_user
         cleanup_payload.mysql_pass = self.mysql_pass
         cleanup_payload.socket = self.socket
@@ -646,23 +681,20 @@ class CopyPayload(Payload):
             return
         # if --tmpdir is not specified on command line for outfiles
         # use @@secure_file_priv
-        for var_name in ('@@secure_file_priv', '@@datadir'):
-            result = self.query(
-                sql.select_as(var_name, 'folder'))
+        for var_name in ("@@secure_file_priv", "@@datadir"):
+            result = self.query(sql.select_as(var_name, "folder"))
             if not result:
-                raise Exception('Failed to get {} system variable'
-                                .format(var_name))
-            if result[0]['folder']:
-                if var_name == '@@secure_file_priv':
-                    self.outfile_dir = result[0]['folder']
+                raise Exception("Failed to get {} system variable".format(var_name))
+            if result[0]["folder"]:
+                if var_name == "@@secure_file_priv":
+                    self.outfile_dir = result[0]["folder"]
                 else:
                     self.outfile_dir = os.path.join(
-                        result[0]['folder'],
-                        self._current_db_dir)
-                log.info("Will use {} storing dump outfile"
-                         .format(self.outfile_dir))
+                        result[0]["folder"], self._current_db_dir
+                    )
+                log.info("Will use {} storing dump outfile".format(self.outfile_dir))
                 return
-        raise Exception('Cannot determine output dir for dump')
+        raise Exception("Cannot determine output dir for dump")
 
     def trigger_check(self):
         """
@@ -671,17 +703,21 @@ class CopyPayload(Payload):
         """
         triggers = self.query(
             sql.trigger_existence,
-            (self.table_name, self._current_db),)
+            (self.table_name, self._current_db),
+        )
         if triggers:
             trigger_desc = []
             for trigger in triggers:
                 trigger_desc.append(
-                    "Trigger name: {}, Action: {} {}"
-                    .format(trigger['TRIGGER_NAME'],
-                            trigger['ACTION_TIMING'],
-                            trigger['EVENT_MANIPULATION']))
-            raise OSCError("TRIGGER_ALREADY_EXIST",
-                           {'triggers': "\n".join(trigger_desc)})
+                    "Trigger name: {}, Action: {} {}".format(
+                        trigger["TRIGGER_NAME"],
+                        trigger["ACTION_TIMING"],
+                        trigger["EVENT_MANIPULATION"],
+                    )
+                )
+            raise OSCError(
+                "TRIGGER_ALREADY_EXIST", {"triggers": "\n".join(trigger_desc)}
+            )
 
     def foreign_key_check(self):
         """
@@ -690,25 +726,30 @@ class CopyPayload(Payload):
         """
         # MyRocks doesn't support foreign key
         if self.is_myrocks_table:
-            log.info("SKip foreign key check because MyRocks doesn't support "
-                     "this yet")
+            log.info(
+                "SKip foreign key check because MyRocks doesn't support " "this yet"
+            )
             return True
         foreign_keys = self.query(
             sql.foreign_key_cnt,
-            (self.table_name, self._current_db,
-             self.table_name, self._current_db,))
+            (
+                self.table_name,
+                self._current_db,
+                self.table_name,
+                self._current_db,
+            ),
+        )
         if foreign_keys:
-            fk = "CONSTRAINT `{}` FOREIGN KEY (`{}`) REFERENCES `{}` (`{}`)".\
-                format(
-                    foreign_keys[0]['constraint_name'],
-                    foreign_keys[0]['col_name'],
-                    foreign_keys[0]['ref_tab'],
-                    foreign_keys[0]['ref_col_name'],
-                )
-            raise OSCError("FOREIGN_KEY_FOUND",
-                           {'db': self._current_db,
-                            'table': self.table_name,
-                            'fk': fk})
+            fk = "CONSTRAINT `{}` FOREIGN KEY (`{}`) REFERENCES `{}` (`{}`)".format(
+                foreign_keys[0]["constraint_name"],
+                foreign_keys[0]["col_name"],
+                foreign_keys[0]["ref_tab"],
+                foreign_keys[0]["ref_col_name"],
+            )
+            raise OSCError(
+                "FOREIGN_KEY_FOUND",
+                {"db": self._current_db, "table": self.table_name, "fk": fk},
+            )
 
     def get_table_size_from_IS(self, table_name):
         """
@@ -718,10 +759,9 @@ class CopyPayload(Payload):
         @param table_name:  Name of the table to fetch size
         @type  table_name:  string
         """
-        result = self.query(sql.show_table_stats(self._current_db),
-                            (self.table_name,))
+        result = self.query(sql.show_table_stats(self._current_db), (self.table_name,))
         if result:
-            return result[0]['Data_length'] + result[0]['Index_length']
+            return result[0]["Data_length"] + result[0]["Index_length"]
         return 0
 
     def get_table_size_for_myrocks(self, table_name):
@@ -734,11 +774,16 @@ class CopyPayload(Payload):
         @param table_name:  Name of the table to fetch size
         @type  table_name:  string
         """
-        result = self.query(sql.get_myrocks_table_size(),
-                            (self._current_db, self.table_name,))
+        result = self.query(
+            sql.get_myrocks_table_size(),
+            (
+                self._current_db,
+                self.table_name,
+            ),
+        )
 
         if result:
-            return result[0]['raw_size'] or 0
+            return result[0]["raw_size"] or 0
         return 0
 
     def get_table_size(self, table_name):
@@ -769,13 +814,19 @@ class CopyPayload(Payload):
             required_size = self.table_size * 2
         else:
             required_size = self.table_size * 1.1
-        log.info("Disk space required: {}, available: {}"
-                 .format(util.readable_size(required_size),
-                         util.readable_size(disk_space)))
+        log.info(
+            "Disk space required: {}, available: {}".format(
+                util.readable_size(required_size), util.readable_size(disk_space)
+            )
+        )
         if required_size > disk_space:
-            raise OSCError('NOT_ENOUGH_SPACE',
-                           {'need': util.readable_size(required_size),
-                            'avail': util.readable_size(disk_space)})
+            raise OSCError(
+                "NOT_ENOUGH_SPACE",
+                {
+                    "need": util.readable_size(required_size),
+                    "avail": util.readable_size(disk_space),
+                },
+            )
 
     def validate_post_alter_pk(self):
         """
@@ -796,8 +847,7 @@ class CopyPayload(Payload):
         using only column (b, c) for row searching may result in a huge number
         of matched rows
         """
-        idx_on_new_table = [self._new_table.primary_key] + \
-            self._new_table.indexes
+        idx_on_new_table = [self._new_table.primary_key] + self._new_table.indexes
         old_pk_len = len(self._pk_for_filter)
         for idx in idx_on_new_table:
             log.debug("Checking prefix for {}".format(idx.name))
@@ -820,8 +870,7 @@ class CopyPayload(Payload):
         as force index in checksum query
         See validate_post_alter_pk for more detail about pri-key coverage
         """
-        idx_on_new_table = [self._new_table.primary_key] + \
-            self._new_table.indexes
+        idx_on_new_table = [self._new_table.primary_key] + self._new_table.indexes
         old_pk_len = len(self._pk_for_filter)
         for idx in idx_on_new_table:
             # list[:idx] where idx > len(list) yields full list
@@ -842,10 +891,10 @@ class CopyPayload(Payload):
         self.range_end_vars_array = []
 
         for idx in range(len(self._pk_for_filter)):
-            self.range_start_vars_array.append('@range_start_{}'.format(idx))
-            self.range_end_vars_array.append('@range_end_{}'.format(idx))
-        self.range_start_vars = ','.join(self.range_start_vars_array)
-        self.range_end_vars = ','.join(self.range_end_vars_array)
+            self.range_start_vars_array.append("@range_start_{}".format(idx))
+            self.range_end_vars_array.append("@range_end_{}".format(idx))
+        self.range_start_vars = ",".join(self.range_start_vars_array)
+        self.range_end_vars = ",".join(self.range_end_vars_array)
 
     def make_chunk_size_odd(self):
         """
@@ -862,10 +911,15 @@ class CopyPayload(Payload):
         Calculate the number of rows for each table dump query table based on
         average row length and the chunks size we've specified
         """
-        result = self.query(sql.table_avg_row_len,
-                            (self._current_db, self.table_name,))
+        result = self.query(
+            sql.table_avg_row_len,
+            (
+                self._current_db,
+                self.table_name,
+            ),
+        )
         if result:
-            tbl_avg_length = result[0]['AVG_ROW_LENGTH']
+            tbl_avg_length = result[0]["AVG_ROW_LENGTH"]
             # avoid huge chunk row count
             if tbl_avg_length < 20:
                 tbl_avg_length = 20
@@ -875,12 +929,12 @@ class CopyPayload(Payload):
             # outfile to avoid zero division
             if not self.select_chunk_size:
                 self.select_chunk_size = 1
-            log.info("Outfile will contain {} rows each"
-                     .format(self.select_chunk_size))
-            self.eta_chunks = max(int(
-                result[0]['TABLE_ROWS'] / self.select_chunk_size), 1)
+            log.info("Outfile will contain {} rows each".format(self.select_chunk_size))
+            self.eta_chunks = max(
+                int(result[0]["TABLE_ROWS"] / self.select_chunk_size), 1
+            )
         else:
-            raise OSCError('FAIL_TO_GUESS_CHUNK_SIZE')
+            raise OSCError("FAIL_TO_GUESS_CHUNK_SIZE")
 
     def has_desired_schema(self):
         """
@@ -891,24 +945,26 @@ class CopyPayload(Payload):
                 log.info("Table already has the desired schema. ")
                 return True
             else:
-                log.info("Table already has the desired schema. However "
-                         "--rebuild is specified, doing a rebuild instead")
+                log.info(
+                    "Table already has the desired schema. However "
+                    "--rebuild is specified, doing a rebuild instead"
+                )
                 return False
         return False
 
     def decide_pk_for_filter(self):
         # If we are adding a PK, then we should use all the columns in
         # old table to identify an unique row
-        if not all((
-                self._old_table.primary_key,
-                self._old_table.primary_key.column_list)):
+        if not all(
+            (self._old_table.primary_key, self._old_table.primary_key.column_list)
+        ):
             # Let's try to get an UK if possible
             for idx in self._old_table.indexes:
                 if idx.is_unique:
-                    log.info("Old table doesn't have a PK but has an UK: {}"
-                             .format(idx.name))
-                    self._pk_for_filter = [
-                        col.name for col in idx.column_list]
+                    log.info(
+                        "Old table doesn't have a PK but has an UK: {}".format(idx.name)
+                    )
+                    self._pk_for_filter = [col.name for col in idx.column_list]
                     self._pk_for_filter_def = idx.column_list.copy()
                     self._idx_name_for_filter = idx.name
                     break
@@ -916,11 +972,12 @@ class CopyPayload(Payload):
                 # There's no UK either
                 if self.allow_new_pk:
                     self._pk_for_filter = [
-                        col.name for col in self._old_table.column_list]
+                        col.name for col in self._old_table.column_list
+                    ]
                     self._pk_for_filter_def = self._old_table.column_list.copy()
                     self.is_full_table_dump = True
                 else:
-                    raise OSCError('NEW_PK')
+                    raise OSCError("NEW_PK")
         # If we have PK in existing schema, then we use current PK as an unique
         # row finder
         else:
@@ -931,16 +988,18 @@ class CopyPayload(Payload):
             # since we dont use full col in PK - `PRIMARY KEY(id, name(10))`
             for col in self._old_table.primary_key.column_list:
                 if col.length:
-                    log.info('Found prefixed column/s as part of the PK. '
-                             'Will do full table dump (no chunking).')
-                    self._pk_for_filter = [
-                        c.name for c in self._old_table.column_list]
+                    log.info(
+                        "Found prefixed column/s as part of the PK. "
+                        "Will do full table dump (no chunking)."
+                    )
+                    self._pk_for_filter = [c.name for c in self._old_table.column_list]
                     self._pk_for_filter_def = self._old_table.column_list.copy()
                     self.is_full_table_dump = True
                     break
             else:
                 self._pk_for_filter = [
-                    col.name for col in self._old_table.primary_key.column_list]
+                    col.name for col in self._old_table.primary_key.column_list
+                ]
                 self._pk_for_filter_def = self._old_table.primary_key.column_list.copy()
 
     def ts_bootstrap_check(self):
@@ -957,7 +1016,7 @@ class CopyPayload(Payload):
                 "Bypassing the safety check as requested"
             )
             return
-        raise OSCError('UNSAFE_TS_BOOTSTRAP')
+        raise OSCError("UNSAFE_TS_BOOTSTRAP")
 
     @wrap_hook
     def pre_osc_check(self):
@@ -971,18 +1030,21 @@ class CopyPayload(Payload):
         tables_to_check = (
             self.new_table_name,
             self.delta_table_name,
-            self.renamed_table_name)
+            self.renamed_table_name,
+        )
         for table_name in tables_to_check:
             if self.table_exists(table_name):
-                raise OSCError('TABLE_ALREADY_EXIST',
-                               {'db': self._current_db, 'table': table_name})
+                raise OSCError(
+                    "TABLE_ALREADY_EXIST", {"db": self._current_db, "table": table_name}
+                )
 
         # Make sure new table schema has primary key
-        if not all((self._new_table.primary_key,
-                    self._new_table.primary_key.column_list)):
+        if not all(
+            (self._new_table.primary_key, self._new_table.primary_key.column_list)
+        ):
             raise OSCError(
-                'NO_PK_EXIST',
-                {'db': self._current_db, 'table': self.table_name})
+                "NO_PK_EXIST", {"db": self._current_db, "table": self.table_name}
+            )
 
         self.decide_pk_for_filter()
 
@@ -994,35 +1056,39 @@ class CopyPayload(Payload):
                 log.warning(
                     "Indexes on new table cannot cover current PK of "
                     "the old schema, which will make binary logs replay "
-                    "in an inefficient way.")
+                    "in an inefficient way."
+                )
             elif self.table_size < self.pk_coverage_size_threshold:
                 log.warning(
                     "No index on new table can cover old pk. Since this is "
-                    "a small table: {}, we fallback to a full table dump"
-                    .format(self.table_size))
+                    "a small table: {}, we fallback to a full table dump".format(
+                        self.table_size
+                    )
+                )
                 # All columns will be chosen if we are dumping table without
                 # chunking, this means all columns will be used as a part of
                 # the WHERE condition when replaying
                 self.is_full_table_dump = True
-                self._pk_for_filter = [
-                    col.name for col in self._old_table.column_list]
+                self._pk_for_filter = [col.name for col in self._old_table.column_list]
                 self._pk_for_filter_def = self._old_table.column_list.copy()
             elif self.is_full_table_dump:
                 log.warning(
                     "Skipping coverage index test, since we are doing "
-                    "full table dump")
+                    "full table dump"
+                )
             else:
                 old_pk_names = ", ".join(
                     "`{}`".format(col.name)
-                    for col in self._old_table.primary_key.column_list)
-                raise OSCError('NO_INDEX_COVERAGE',
-                               {'pk_names': old_pk_names})
+                    for col in self._old_table.primary_key.column_list
+                )
+                raise OSCError("NO_INDEX_COVERAGE", {"pk_names": old_pk_names})
 
         if self.check_no_fcache_support():
             self.is_skip_fcache_supported = True
 
-        log.info("PK filter for replaying changes later: {}"
-                 .format(self._pk_for_filter))
+        log.info(
+            "PK filter for replaying changes later: {}".format(self._pk_for_filter)
+        )
 
         self.foreign_key_check()
         self.trigger_check()
@@ -1040,7 +1106,8 @@ class CopyPayload(Payload):
         schema before DDL
         """
         self._cleanup_payload.add_drop_table_entry(
-            self._current_db, table_name, self.partitions.get(table_name, []))
+            self._current_db, table_name, self.partitions.get(table_name, [])
+        )
 
     def get_collations(self):
         """
@@ -1049,7 +1116,7 @@ class CopyPayload(Payload):
         collations = self.query(sql.all_collation)
         collation_charsets = {}
         for r in collations:
-            collation_charsets[r['COLLATION_NAME']] = r['CHARACTER_SET_NAME']
+            collation_charsets[r["COLLATION_NAME"]] = r["CHARACTER_SET_NAME"]
         return collation_charsets
 
     def get_default_collations(self):
@@ -1060,13 +1127,14 @@ class CopyPayload(Payload):
         collations = self.query(sql.default_collation)
         charset_collations = {}
         for r in collations:
-            charset_collations[r['CHARACTER_SET_NAME']] = r['COLLATION_NAME']
+            charset_collations[r["CHARACTER_SET_NAME"]] = r["COLLATION_NAME"]
 
         # Populate utf8mb4 override
         utf8_override = self.query(
-            sql.get_global_variable('default_collation_for_utf8mb4'))
-        if utf8_override and 'utf8mb4' in charset_collations:
-            charset_collations['utf8mb4'] = utf8_override[0]['Value']
+            sql.get_global_variable("default_collation_for_utf8mb4")
+        )
+        if utf8_override and "utf8mb4" in charset_collations:
+            charset_collations["utf8mb4"] = utf8_override[0]["Value"]
         return charset_collations
 
     def populate_charset_collation_for_80(self):
@@ -1083,8 +1151,8 @@ class CopyPayload(Payload):
                     column.collate = default_collate
                     log.warning(
                         "Overriding collation to be {} for column {} "
-                        "for schema comparison"
-                        .format(column.collate, column.name))
+                        "for schema comparison".format(column.collate, column.name)
+                    )
             # Similar case where collation is specified without charset
             if column.charset is None and column.collate is not None:
                 charset = collation_charsets.get(column.collate)
@@ -1092,23 +1160,27 @@ class CopyPayload(Payload):
                     column.charset = charset
                     log.warning(
                         "Overriding charset to be {} for column {} "
-                        "for schema comparison"
-                        .format(column.charset, column.name))
+                        "for schema comparison".format(column.charset, column.name)
+                    )
 
         # Take care of table property
-        if self._new_table.charset == 'utf8mb4' and self._new_table.collate is None:
+        if self._new_table.charset == "utf8mb4" and self._new_table.collate is None:
             default_collate = default_collations.get(self._new_table.charset)
             if default_collate:
                 self._new_table.collate = default_collate
                 log.warning(
-                    "Overriding collation to be {} for table for schema comparison"
-                    .format(self._new_table.collate))
-                text_types = {'CHAR', 'VARCHAR', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT'}
+                    "Overriding collation to be {} for table for schema comparison".format(
+                        self._new_table.collate
+                    )
+                )
+                text_types = {"CHAR", "VARCHAR", "TEXT", "MEDIUMTEXT", "LONGTEXT"}
                 for column in self._new_table.column_list:
                     if column.column_type in text_types and column.collate is None:
                         log.warning(
-                            "Overriding collation to be {} for {} for schema comparison"
-                            .format(self._new_table.collate, column.name))
+                            "Overriding collation to be {} for {} for schema comparison".format(
+                                self._new_table.collate, column.name
+                            )
+                        )
                         column.collate = default_collate
 
         if self._new_table.charset is None and self._new_table.collate is not None:
@@ -1116,8 +1188,10 @@ class CopyPayload(Payload):
             if charset:
                 self._new_table.charset = charset
                 log.warning(
-                    "Overriding charset to be {} for table for schema comparison"
-                    .format(self._new_table.charset))
+                    "Overriding charset to be {} for table for schema comparison".format(
+                        self._new_table.charset
+                    )
+                )
 
     def remove_using_hash_for_80(self):
         """
@@ -1125,7 +1199,7 @@ class CopyPayload(Payload):
         the 8.0 behavior
         """
         for index in self._new_table.indexes:
-            if index.using == 'HASH':
+            if index.using == "HASH":
                 index.using = None
 
     @wrap_hook
@@ -1147,26 +1221,27 @@ class CopyPayload(Payload):
                 self.new_table_name,
                 self.table_name,
                 self._current_db,
-            ))
+            ),
+        )
         self.partitions[self.new_table_name] = self.fetch_partitions(
-            self.new_table_name)
+            self.new_table_name
+        )
         self.add_drop_table_entry(self.new_table_name)
         if table_diff:
             if self.allow_drop_column:
                 for diff_column in table_diff:
-                    log.warning("Column `{}` is missing in the new schema, "
-                                "but --alow-drop-column is specified. Will "
-                                "drop this column."
-                                .format(diff_column['COLUMN_NAME']))
+                    log.warning(
+                        "Column `{}` is missing in the new schema, "
+                        "but --alow-drop-column is specified. Will "
+                        "drop this column.".format(diff_column["COLUMN_NAME"])
+                    )
             else:
-                missing_columns = ', '.join(
-                    col['COLUMN_NAME'] for col in table_diff)
-                raise OSCError('MISSING_COLUMN',
-                               {'column': missing_columns})
+                missing_columns = ", ".join(col["COLUMN_NAME"] for col in table_diff)
+                raise OSCError("MISSING_COLUMN", {"column": missing_columns})
             # We don't allow dropping columns from current primary key
             for col in self._pk_for_filter:
                 if col in self.dropped_column_name_list:
-                    raise OSCError('PRI_COL_DROPPED', {'pri_col': col})
+                    raise OSCError("PRI_COL_DROPPED", {"pri_col": col})
 
         # Check whether the schema is consistent after execution to avoid
         # any implicit conversion
@@ -1189,8 +1264,9 @@ class CopyPayload(Payload):
 
             if obj_after != self._new_table:
                 raise OSCError(
-                    'IMPLICIT_CONVERSION_DETECTED',
-                    {'diff': str(SchemaDiff(self._new_table, obj_after))})
+                    "IMPLICIT_CONVERSION_DETECTED",
+                    {"diff": str(SchemaDiff(self._new_table, obj_after))},
+                )
 
     @wrap_hook
     def create_delta_table(self):
@@ -1200,9 +1276,14 @@ class CopyPayload(Payload):
         """
         self.execute_sql(
             sql.create_delta_table(
-                self.delta_table_name, self.IDCOLNAME, self.DMLCOLNAME,
-                self._old_table.engine, self.old_column_list,
-                self._old_table.name))
+                self.delta_table_name,
+                self.IDCOLNAME,
+                self.DMLCOLNAME,
+                self._old_table.engine,
+                self.old_column_list,
+                self._old_table.name,
+            )
+        )
         self.add_drop_table_entry(self.delta_table_name)
         # We will break table into chunks when calculate checksums using
         # old primary key. We need this index to skip verify the same row
@@ -1211,7 +1292,9 @@ class CopyPayload(Payload):
             self.execute_sql(
                 sql.create_idx_on_delta_table(
                     self.delta_table_name,
-                    [col.to_sql() for col in self._pk_for_filter_def]))
+                    [col.to_sql() for col in self._pk_for_filter_def],
+                )
+            )
 
     def create_insert_trigger(self):
         self.execute_sql(
@@ -1219,32 +1302,48 @@ class CopyPayload(Payload):
                 self.insert_trigger_name,
                 self.table_name,
                 self.delta_table_name,
-                self.DMLCOLNAME, self.old_column_list,
-                self.DML_TYPE_INSERT))
+                self.DMLCOLNAME,
+                self.old_column_list,
+                self.DML_TYPE_INSERT,
+            )
+        )
         self._cleanup_payload.add_drop_trigger_entry(
-            self._current_db, self.insert_trigger_name)
+            self._current_db, self.insert_trigger_name
+        )
 
     @wrap_hook
     def create_delete_trigger(self):
         self.execute_sql(
             sql.create_delete_trigger(
-                self.delete_trigger_name, self.table_name,
+                self.delete_trigger_name,
+                self.table_name,
                 self.delta_table_name,
-                self.DMLCOLNAME, self.old_column_list,
-                self.DML_TYPE_DELETE))
+                self.DMLCOLNAME,
+                self.old_column_list,
+                self.DML_TYPE_DELETE,
+            )
+        )
         self._cleanup_payload.add_drop_trigger_entry(
-            self._current_db, self.delete_trigger_name)
+            self._current_db, self.delete_trigger_name
+        )
 
     def create_update_trigger(self):
         self.execute_sql(
             sql.create_update_trigger(
-                self.update_trigger_name, self.table_name,
+                self.update_trigger_name,
+                self.table_name,
                 self.delta_table_name,
-                self.DMLCOLNAME, self.old_column_list,
-                self.DML_TYPE_UPDATE, self.DML_TYPE_DELETE,
-                self.DML_TYPE_INSERT, self._pk_for_filter))
+                self.DMLCOLNAME,
+                self.old_column_list,
+                self.DML_TYPE_UPDATE,
+                self.DML_TYPE_DELETE,
+                self.DML_TYPE_INSERT,
+                self._pk_for_filter,
+            )
+        )
         self._cleanup_payload.add_drop_trigger_entry(
-            self._current_db, self.update_trigger_name)
+            self._current_db, self.update_trigger_name
+        )
 
     def get_long_trx(self):
         """
@@ -1257,43 +1356,47 @@ class CopyPayload(Payload):
             return False
         processes = self.query(sql.show_processlist)
         for proc in processes:
-            if not proc['Info']:
-                sql_statement = ''
+            if not proc["Info"]:
+                sql_statement = ""
             else:
-                if isinstance(proc['Info'], bytes):
-                    sql_statement = proc['Info'].decode('utf-8', 'replace')
+                if isinstance(proc["Info"], bytes):
+                    sql_statement = proc["Info"].decode("utf-8", "replace")
                 else:
-                    sql_statement = proc['Info']
+                    sql_statement = proc["Info"]
 
-            proc['Info'] = sql_statement
+            proc["Info"] = sql_statement
             # Time can be None if the connection is in "Connect" state
-            if ((proc.get('Time') or 0) > self.long_trx_time
-                    and proc.get('db', '') == self._current_db
-                    and self.table_name in '--' + sql_statement
-                    and not proc.get('Command', '') == 'Sleep'):
+            if (
+                (proc.get("Time") or 0) > self.long_trx_time
+                and proc.get("db", "") == self._current_db
+                and self.table_name in "--" + sql_statement
+                and not proc.get("Command", "") == "Sleep"
+            ):
                 return proc
 
     def wait_until_slow_query_finish(self):
         for _ in range(self.max_wait_for_slow_query):
             slow_query = self.get_long_trx()
             if slow_query:
-                log.info("Slow query pid={} is still running"
-                         .format(slow_query.get('Id', 0)))
+                log.info(
+                    "Slow query pid={} is still running".format(slow_query.get("Id", 0))
+                )
                 time.sleep(5)
             else:
                 return True
         else:
             raise OSCError(
-                'LONG_RUNNING_TRX',
+                "LONG_RUNNING_TRX",
                 {
-                    'pid': slow_query.get('Id', 0),
-                    'user': slow_query.get('User', ''),
-                    'host': slow_query.get('Host', ''),
-                    'time': slow_query.get('Time', ''),
-                    'command': slow_query.get('Command', ''),
-                    'info': slow_query.get(
-                        'Info', b'').encode('utf-8').decode('utf-8', 'replace')
-                }
+                    "pid": slow_query.get("Id", 0),
+                    "user": slow_query.get("User", ""),
+                    "host": slow_query.get("Host", ""),
+                    "time": slow_query.get("Time", ""),
+                    "command": slow_query.get("Command", ""),
+                    "info": slow_query.get("Info", b"")
+                    .encode("utf-8")
+                    .decode("utf-8", "replace"),
+                },
             )
 
     def kill_selects(self, table_names, conn=None):
@@ -1314,33 +1417,35 @@ class CopyPayload(Payload):
         # 2. Actually parse the SQL of the running queries, but this can be
         #    quite expensive
         keyword_pattern = (
-            r'(\s|^)'  # whitespace or start
-            r'({})'    # keyword(s)
-            r'(\s|$)'  # whitespace or end
+            r"(\s|^)"  # whitespace or start
+            r"({})"  # keyword(s)
+            r"(\s|$)"  # whitespace or end
         )
         table_pattern = (
-            r'(\s|`)'    # whitespace or backtick
-            r'({})'      # table(s)
-            r'(\s|`|$)'  # whitespace, backtick or end
+            r"(\s|`)"  # whitespace or backtick
+            r"({})"  # table(s)
+            r"(\s|`|$)"  # whitespace, backtick or end
         )
-        alter_or_select_pattern = \
-            re.compile(keyword_pattern.format('select|alter'))
-        information_schema_pattern = \
-            re.compile(keyword_pattern.format('information_schema'))
-        any_tables_pattern = \
-            re.compile(table_pattern.format('|'.join(table_names)))
+        alter_or_select_pattern = re.compile(keyword_pattern.format("select|alter"))
+        information_schema_pattern = re.compile(
+            keyword_pattern.format("information_schema")
+        )
+        any_tables_pattern = re.compile(table_pattern.format("|".join(table_names)))
 
         processlist = conn.get_running_queries()
         for proc in processlist:
-            sql_statement = proc.get('Info') or ''.encode('utf-8')
-            sql_statement = sql_statement.decode('utf-8', 'replace').lower()
+            sql_statement = proc.get("Info") or "".encode("utf-8")
+            sql_statement = sql_statement.decode("utf-8", "replace").lower()
 
-            if (proc['db'] == self._current_db and sql_statement
-                    and not information_schema_pattern.search(sql_statement)
-                    and any_tables_pattern.search(sql_statement)
-                    and alter_or_select_pattern.search(sql_statement)):
+            if (
+                proc["db"] == self._current_db
+                and sql_statement
+                and not information_schema_pattern.search(sql_statement)
+                and any_tables_pattern.search(sql_statement)
+                and alter_or_select_pattern.search(sql_statement)
+            ):
                 try:
-                    conn.kill_query_by_id(int(proc['Id']))
+                    conn.kill_query_by_id(int(proc["Id"]))
                 except MySQLdb.MySQLError as e:
                     errcode, errmsg = e.args
                     # 1094: Unknown thread id
@@ -1349,7 +1454,8 @@ class CopyPayload(Payload):
                     if errcode == 1094:
                         log.info(
                             "Trying to kill query id: {}, but it has "
-                            "already finished".format(proc['Id']))
+                            "already finished".format(proc["Id"])
+                        )
                     else:
                         raise
 
@@ -1372,26 +1478,28 @@ class CopyPayload(Payload):
         we timed out
         """
         for _ in range(self.ddl_guard_attempts):
-            result = self.query(sql.show_status, ('Threads_running',))
+            result = self.query(sql.show_status, ("Threads_running",))
             if result:
-                threads_running = int(result[0]['Value'])
+                threads_running = int(result[0]["Value"])
                 if threads_running > self.max_running_before_ddl:
                     log.warning(
                         "Threads running: {}, bigger than allowed: {}. "
-                        "Sleep 1 second before check again."
-                        .format(threads_running, self.max_running_before_ddl))
+                        "Sleep 1 second before check again.".format(
+                            threads_running, self.max_running_before_ddl
+                        )
+                    )
                     time.sleep(1)
                 else:
                     log.debug(
                         "Threads running: {}, less than: {}. We are good "
-                        "to go"
-                        .format(threads_running, self.max_running_before_ddl))
+                        "to go".format(threads_running, self.max_running_before_ddl)
+                    )
                     return
         log.error(
             "Hit max attempts: {}, but the threads running still don't drop"
-            "below: {}."
-            .format(self.ddl_guard_attempts, self.max_running_before_ddl))
-        raise OSCError('DDL_GUARD_FAILED')
+            "below: {}.".format(self.ddl_guard_attempts, self.max_running_before_ddl)
+        )
+        raise OSCError("DDL_GUARD_FAILED")
 
     @wrap_hook
     def lock_tables(self, tables):
@@ -1400,8 +1508,11 @@ class CopyPayload(Payload):
             # kill any selects on top of the tables being altered if we could
             # not lock the tables in time
             another_conn = self.get_conn(self._current_db)
-            kill_timer = Timer(self.lock_max_wait_before_kill_seconds,
-                               self.kill_selects, args=(tables, another_conn))
+            kill_timer = Timer(
+                self.lock_max_wait_before_kill_seconds,
+                self.kill_selects,
+                args=(tables, another_conn),
+            )
             # keeping a reference to kill timer helps on tests
             self._last_kill_timer = kill_timer
             kill_timer.start()
@@ -1410,15 +1521,15 @@ class CopyPayload(Payload):
                 self.execute_sql(sql.lock_tables(tables))
                 # It is best to cancel the timer as soon as possible
                 kill_timer.cancel()
-                log.info("Successfully lock table(s) for write: {}"
-                         .format(', '.join(tables)))
+                log.info(
+                    "Successfully lock table(s) for write: {}".format(", ".join(tables))
+                )
                 break
             except MySQLdb.MySQLError as e:
                 errcode, errmsg = e.args
                 # 1205 is timeout and 1213 is deadlock
                 if errcode in (1205, 1213):
-                    log.warning(
-                        "Retry locking because of error: {}".format(e))
+                    log.warning("Retry locking because of error: {}".format(e))
                 else:
                     raise
             finally:
@@ -1430,9 +1541,7 @@ class CopyPayload(Payload):
 
         else:
             # Cannot lock write after max lock attempts
-            raise OSCError(
-                'FAILED_TO_LOCK_TABLE',
-                {'tables': ', '.join(tables)})
+            raise OSCError("FAILED_TO_LOCK_TABLE", {"tables": ", ".join(tables)})
 
     def unlock_tables(self):
         self.execute_sql(sql.unlock_tables)
@@ -1443,8 +1552,7 @@ class CopyPayload(Payload):
         self.wait_until_slow_query_finish()
         self.stop_slave_sql()
         self.ddl_guard()
-        log.debug('Locking table: {} before creating trigger'
-                  .format(self.table_name))
+        log.debug("Locking table: {} before creating trigger".format(self.table_name))
         if not self.is_high_pri_ddl_supported:
             self.lock_tables(tables=[self.table_name])
 
@@ -1458,17 +1566,15 @@ class CopyPayload(Payload):
         self.start_slave_sql()
 
     def disable_ttl_for_myrocks(self):
-        if self.mysql_vars.get('rocksdb_enable_ttl', 'OFF') == 'ON':
-            self.execute_sql(
-                sql.set_global_variable('rocksdb_enable_ttl'), ('OFF',))
+        if self.mysql_vars.get("rocksdb_enable_ttl", "OFF") == "ON":
+            self.execute_sql(sql.set_global_variable("rocksdb_enable_ttl"), ("OFF",))
             self.is_ttl_disabled_by_me = True
         else:
             log.debug("TTL not enabled for MyRocks, skip")
 
     def enable_ttl_for_myrocks(self):
         if self.is_ttl_disabled_by_me:
-            self.execute_sql(
-                sql.set_global_variable('rocksdb_enable_ttl'), ('ON',))
+            self.execute_sql(sql.set_global_variable("rocksdb_enable_ttl"), ("ON",))
         else:
             log.debug("TTL not enabled for MyRocks before schema change, skip")
 
@@ -1477,19 +1583,28 @@ class CopyPayload(Payload):
         # We need to disable TTL feature in MyRocks. Otherwise rows will
         # possibly be purged during dump/load, and cause checksum mismatch
         if self.is_myrocks_table and self.is_myrocks_ttl_table:
-            log.debug(
-                "It's schema change for MyRocks table which is using TTL")
+            log.debug("It's schema change for MyRocks table which is using TTL")
             self.disable_ttl_for_myrocks()
         self.execute_sql(sql.start_transaction_with_snapshot)
         current_max = self.get_max_delta_id()
-        log.info("Changes with id <= {} committed before dump snapshot, "
-                 "and should be ignored.".format(current_max))
+        log.info(
+            "Changes with id <= {} committed before dump snapshot, "
+            "and should be ignored.".format(current_max)
+        )
         # Only replay changes in this range (last_replayed_id, max_id_now]
         new_changes = self.query(
             sql.get_replay_row_ids(
-                self.IDCOLNAME, self.DMLCOLNAME, self.delta_table_name, None,
-                self.mysql_version.is_mysql8),
-            (self.last_replayed_id, current_max, ))
+                self.IDCOLNAME,
+                self.DMLCOLNAME,
+                self.delta_table_name,
+                None,
+                self.mysql_version.is_mysql8,
+            ),
+            (
+                self.last_replayed_id,
+                current_max,
+            ),
+        )
         self._replayed_chg_ids.extend([r[self.IDCOLNAME] for r in new_changes])
         self.last_replayed_id = current_max
 
@@ -1497,31 +1612,31 @@ class CopyPayload(Payload):
         return self._conn.conn.affected_rows()
 
     def refresh_range_start(self):
-        self.execute_sql(
-            sql.select_into(self.range_end_vars, self.range_start_vars))
+        self.execute_sql(sql.select_into(self.range_end_vars, self.range_start_vars))
 
     def select_full_table_into_outfile(self):
         stage_start_time = time.time()
         try:
-            outfile = '{}.1'.format(self.outfile)
+            outfile = "{}.1".format(self.outfile)
             sql_string = sql.select_full_table_into_file(
                 self._pk_for_filter + self.old_non_pk_column_list,
                 self.table_name,
                 self.is_skip_fcache_supported,
-                self.where)
-            affected_rows = self.execute_sql(sql_string, (outfile, ))
+                self.where,
+            )
+            affected_rows = self.execute_sql(sql_string, (outfile,))
             self.outfile_suffix_end = 1
-            self.stats['outfile_lines'] = affected_rows
+            self.stats["outfile_lines"] = affected_rows
             self._cleanup_payload.add_file_entry(outfile)
             self.commit()
         except MySQLdb.OperationalError as e:
             errnum, errmsg = e.args
             # 1086: File exists
             if errnum == 1086:
-                raise OSCError('FILE_ALREADY_EXIST', {'file': outfile})
+                raise OSCError("FILE_ALREADY_EXIST", {"file": outfile})
             else:
                 raise
-        self.stats['time_in_dump'] = time.time() - stage_start_time
+        self.stats["time_in_dump"] = time.time() - stage_start_time
 
     @wrap_hook
     def select_chunk_into_outfile(self, outfile, use_where):
@@ -1536,23 +1651,24 @@ class CopyPayload(Payload):
                 use_where,
                 self.is_skip_fcache_supported,
                 self.where,
-                self._idx_name_for_filter
+                self._idx_name_for_filter,
             )
-            affected_rows = self.execute_sql(sql_string, (outfile, ))
+            affected_rows = self.execute_sql(sql_string, (outfile,))
         except MySQLdb.OperationalError as e:
             errnum, errmsg = e.args
             # 1086: File exists
             if errnum == 1086:
-                raise OSCError('FILE_ALREADY_EXIST', {'file': outfile})
+                raise OSCError("FILE_ALREADY_EXIST", {"file": outfile})
             else:
                 raise
         log.debug("{} affected".format(affected_rows))
-        self.stats['outfile_lines'] = affected_rows + \
-            self.stats.setdefault('outfile_lines', 0)
-        self.stats['outfile_cnt'] = 1 + \
-            self.stats.setdefault('outfile_cnt', 0)
+        self.stats["outfile_lines"] = affected_rows + self.stats.setdefault(
+            "outfile_lines", 0
+        )
+        self.stats["outfile_cnt"] = 1 + self.stats.setdefault("outfile_cnt", 0)
         self._cleanup_payload.add_file_entry(
-            '{}.{}'.format(self.outfile, self.outfile_suffix_end))
+            "{}.{}".format(self.outfile, self.outfile_suffix_end)
+        )
         return affected_rows
 
     @wrap_hook
@@ -1562,7 +1678,7 @@ class CopyPayload(Payload):
         # We can not break the table into chunks when there's no existing pk
         # We'll have to use one big file for copy data
         if self.is_full_table_dump:
-            log.info('Dumping full table in one go.')
+            log.info("Dumping full table in one go.")
             return self.select_full_table_into_outfile()
         outfile_suffix = 1
         # To let the loop run at least once
@@ -1572,7 +1688,7 @@ class CopyPayload(Payload):
         disk_partition_size = util.disk_partition_size(self.outfile_dir)
         while affected_rows:
             self.outfile_suffix_end = outfile_suffix
-            outfile = '{}.{}'.format(self.outfile, outfile_suffix)
+            outfile = "{}.{}".format(self.outfile, outfile_suffix)
             affected_rows = self.select_chunk_into_outfile(outfile, use_where)
             # Refresh where condition range for next select
             if affected_rows:
@@ -1584,18 +1700,24 @@ class CopyPayload(Payload):
             free_space_reserved = disk_partition_size * free_space_factor
             if free_disk_space < free_space_reserved:
                 raise OSCError(
-                    'NOT_ENOUGH_SPACE',
-                    {'need': util.readable_size(free_space_reserved),
-                     'avail': util.readable_size(free_disk_space)})
+                    "NOT_ENOUGH_SPACE",
+                    {
+                        "need": util.readable_size(free_space_reserved),
+                        "avail": util.readable_size(free_disk_space),
+                    },
+                )
             progress_pct = int((float(outfile_suffix) / self.eta_chunks) * 100)
             progress_chunk = int(progress_pct / 10)
             if progress_chunk > printed_chunk and self.eta_chunks > 10:
-                log.info("Dump progress: {}/{}(ETA) chunks"
-                         .format(outfile_suffix, self.eta_chunks))
+                log.info(
+                    "Dump progress: {}/{}(ETA) chunks".format(
+                        outfile_suffix, self.eta_chunks
+                    )
+                )
                 printed_chunk = progress_chunk
         self.commit()
         log.info("Dump finished")
-        self.stats['time_in_dump'] = time.time() - stage_start_time
+        self.stats["time_in_dump"] = time.time() - stage_start_time
 
     @wrap_hook
     def drop_non_unique_indexes(self):
@@ -1604,17 +1726,17 @@ class CopyPayload(Payload):
         process
         """
         for idx in self.droppable_indexes:
-            log.info("Dropping index '{}' on intermediate table"
-                     .format(idx.name))
+            log.info("Dropping index '{}' on intermediate table".format(idx.name))
             self.ddl_guard()
             self.execute_sql(sql.drop_index(idx.name, self.new_table_name))
 
     @wrap_hook
     def load_chunk(self, column_list, chunk_id):
         sql_string = sql.load_data_infile(
-            self.new_table_name, column_list, ignore=self.eliminate_dups)
+            self.new_table_name, column_list, ignore=self.eliminate_dups
+        )
         log.debug(sql_string)
-        filepath = '{}.{}'.format(self.outfile, chunk_id)
+        filepath = "{}.{}".format(self.outfile, chunk_id)
         self.execute_sql(sql_string, (filepath,))
         # Delete the outfile once we have the data in new table to free
         # up space as soon as possible
@@ -1630,14 +1752,15 @@ class CopyPayload(Payload):
         v = 1 if enable else 0
         try:
             self.execute_sql(
-                sql.set_session_variable('rocksdb_commit_in_the_middle'), (v,))
+                sql.set_session_variable("rocksdb_commit_in_the_middle"), (v,)
+            )
         except MySQLdb.OperationalError as e:
             errnum, errmsg = e.args
             # 1193: unknown variable
             if errnum == 1193:
                 log.warning(
-                    "Failed to set rocksdb_commit_in_the_middle: {}"
-                    .format(errmsg))
+                    "Failed to set rocksdb_commit_in_the_middle: {}".format(errmsg)
+                )
             else:
                 raise
 
@@ -1660,21 +1783,19 @@ class CopyPayload(Payload):
         try:
             if self.rocksdb_bulk_load_allow_sk and enable:
                 self.execute_sql(
-                    sql.set_session_variable('rocksdb_bulk_load_allow_sk'),
-                    (v,))
-            self.execute_sql(
-                sql.set_session_variable('rocksdb_bulk_load'), (v,))
+                    sql.set_session_variable("rocksdb_bulk_load_allow_sk"), (v,)
+                )
+            self.execute_sql(sql.set_session_variable("rocksdb_bulk_load"), (v,))
             if self.rocksdb_bulk_load_allow_sk and not enable:
                 self.execute_sql(
-                    sql.set_session_variable('rocksdb_bulk_load_allow_sk'),
-                    (v,))
+                    sql.set_session_variable("rocksdb_bulk_load_allow_sk"), (v,)
+                )
 
         except MySQLdb.OperationalError as e:
             errnum, errmsg = e.args
             # 1193: unknown variable
             if errnum == 1193:
-                log.warning(
-                    "Failed to set rocksdb_bulk_load: {}".format(errmsg))
+                log.warning("Failed to set rocksdb_bulk_load: {}".format(errmsg))
             else:
                 raise
 
@@ -1696,9 +1817,13 @@ class CopyPayload(Payload):
             # It's impossible to reach here, otherwise it means there's zero
             # column in old table which MySQL doesn't support. Something is
             # totally wrong if we get to this point
-            raise OSCError('OSC_INTERNAL_ERROR',
-                           {'msg': 'Unexpected scenario. Both _pk_for_filter '
-                            'and old_non_pk_column_list are empty'})
+            raise OSCError(
+                "OSC_INTERNAL_ERROR",
+                {
+                    "msg": "Unexpected scenario. Both _pk_for_filter "
+                    "and old_non_pk_column_list are empty"
+                },
+            )
         if self.is_myrocks_table:
             # Enable rocksdb bulk load before loading data
             self.change_rocksdb_bulk_load(enable=True)
@@ -1710,15 +1835,18 @@ class CopyPayload(Payload):
             # Print out information after every 10% chunks have been loaded
             # We won't show progress if the number of chunks is less than 50
             if suffix % max(5, int(self.outfile_suffix_end / 10)) == 0:
-                log.info("Load progress: {}/{} chunks"
-                         .format(suffix, self.outfile_suffix_end))
+                log.info(
+                    "Load progress: {}/{} chunks".format(
+                        suffix, self.outfile_suffix_end
+                    )
+                )
 
         if self.is_myrocks_table:
             # Disable rocksdb bulk load after loading data
             self.change_rocksdb_bulk_load(enable=False)
             # Disable rocksdb explicit commit after loading data
             self.change_explicit_commit(enable=False)
-        self.stats['time_in_load'] = time.time() - stage_start_time
+        self.stats["time_in_load"] = time.time() - stage_start_time
 
     def check_no_fcache_support(self):
         """
@@ -1740,7 +1868,7 @@ class CopyPayload(Payload):
         which is only supported by WebScaleSQL
         """
         if self.mysql_version.is_mysql8:
-            return self.is_var_enabled('max_execution_time')
+            return self.is_var_enabled("max_execution_time")
         else:
             # the max_statement_time is count in miliseconds
             try:
@@ -1762,7 +1890,7 @@ class CopyPayload(Payload):
                 into_table=self.tmp_table_exclude_id,
                 into_col_list=(self.IDCOLNAME, self.DMLCOLNAME),
                 from_table=self.tmp_table_include_id,
-                from_col_list=(self.IDCOLNAME, self.DMLCOLNAME)
+                from_col_list=(self.IDCOLNAME, self.DMLCOLNAME),
             )
         )
 
@@ -1770,13 +1898,12 @@ class CopyPayload(Payload):
         """
         Get current maximum delta table ID.
         """
-        result = self.query(
-            sql.get_max_id_from(self.IDCOLNAME, self.delta_table_name))
+        result = self.query(sql.get_max_id_from(self.IDCOLNAME, self.delta_table_name))
         # If no events has been replayed, max would return a string 'None'
         # instead of a pythonic None. So we should treat 'None' as 0 here
-        if result[0]['max_id'] == 'None':
+        if result[0]["max_id"] == "None":
             return 0
-        return result[0]['max_id']
+        return result[0]["max_id"]
 
     @wrap_hook
     def replay_delete_row(self, sql, *ids):
@@ -1789,10 +1916,13 @@ class CopyPayload(Payload):
         @type  ids:  list
         """
         affected_row = self.execute_sql(sql, ids)
-        if not self.eliminate_dups and not self.where and \
-                not self.skip_affected_rows_check:
+        if (
+            not self.eliminate_dups
+            and not self.where
+            and not self.skip_affected_rows_check
+        ):
             if not affected_row != 0:
-                raise OSCError('REPLAY_WRONG_AFFECTED', {'num': affected_row})
+                raise OSCError("REPLAY_WRONG_AFFECTED", {"num": affected_row})
 
     @wrap_hook
     def replay_insert_row(self, sql, *ids):
@@ -1805,10 +1935,13 @@ class CopyPayload(Payload):
         @type  ids:  list
         """
         affected_row = self.execute_sql(sql, ids)
-        if not self.eliminate_dups and not self.where and \
-                not self.skip_affected_rows_check:
+        if (
+            not self.eliminate_dups
+            and not self.where
+            and not self.skip_affected_rows_check
+        ):
             if not affected_row != 0:
-                raise OSCError('REPLAY_WRONG_AFFECTED', {'num': affected_row})
+                raise OSCError("REPLAY_WRONG_AFFECTED", {"num": affected_row})
 
     @wrap_hook
     def replay_update_row(self, sql, *ids):
@@ -1829,21 +1962,21 @@ class CopyPayload(Payload):
         # self.last_replayed_id
         delta = []
         log.info(
-            "Checking {} gap ids".format(
-                len(self._replayed_chg_ids.missing_points())))
+            "Checking {} gap ids".format(len(self._replayed_chg_ids.missing_points()))
+        )
         for chg_id in self._replayed_chg_ids.missing_points():
             row = self.query(
-                sql.get_chg_row(
-                    self.IDCOLNAME, self.DMLCOLNAME, self.delta_table_name),
-                (chg_id,))
+                sql.get_chg_row(self.IDCOLNAME, self.DMLCOLNAME, self.delta_table_name),
+                (chg_id,),
+            )
             if bool(row):
                 log.debug("Change {} appears now!".format(chg_id))
                 delta.append(row[0])
         for row in delta:
             self._replayed_chg_ids.fill(row[self.IDCOLNAME])
         log.info(
-            "{} changes before last checkpoint ready for replay"
-            .format(len(delta)))
+            "{} changes before last checkpoint ready for replay".format(len(delta))
+        )
         return delta
 
     def divide_changes_to_group(self, chg_rows):
@@ -1886,7 +2019,8 @@ class CopyPayload(Payload):
                 continue
 
     def replay_changes(
-            self, single_trx=False, holding_locks=False, delta_id_limit=None):
+        self, single_trx=False, holding_locks=False, delta_id_limit=None
+    ):
         """
         Loop through all the existing events in __osc_chg table and replay
         the change
@@ -1903,8 +2037,11 @@ class CopyPayload(Payload):
         # all the changes to be replayed in this round will be stored in
         # tmp_table_include_id. Though change events may keep being generated,
         # we'll only replay till the end of temporary table
-        if single_trx and not self.bypass_replay_timeout and \
-                self.check_max_statement_time_exists():
+        if (
+            single_trx
+            and not self.bypass_replay_timeout
+            and self.check_max_statement_time_exists()
+        ):
             replay_ms = self.replay_timeout * 1000
         else:
             replay_ms = None
@@ -1916,22 +2053,31 @@ class CopyPayload(Payload):
         if max_id_now > self.replay_max_changes:
             raise OSCError(
                 "REPLAY_TOO_MANY_DELTAS",
-                {'deltas': max_id_now, 'max_deltas': self.replay_max_changes})
+                {"deltas": max_id_now, "max_deltas": self.replay_max_changes},
+            )
 
         if self.detailed_mismatch_info or self.dump_after_checksum:
             # We need this information for better understanding of the checksum
             # mismatch issue
-            log.info("Replaying changes happened before change ID: {}"
-                     .format(max_id_now))
+            log.info(
+                "Replaying changes happened before change ID: {}".format(max_id_now)
+            )
         delta = self.get_gap_changes()
 
         # Only replay changes in this range (last_replayed_id, max_id_now]
         new_changes = self.query(
             sql.get_replay_row_ids(
-                self.IDCOLNAME, self.DMLCOLNAME, self.delta_table_name,
-                replay_ms, self.mysql_version.is_mysql8
+                self.IDCOLNAME,
+                self.DMLCOLNAME,
+                self.delta_table_name,
+                replay_ms,
+                self.mysql_version.is_mysql8,
             ),
-            (self.last_replayed_id, max_id_now, ))
+            (
+                self.last_replayed_id,
+                max_id_now,
+            ),
+        )
         self._replayed_chg_ids.extend([r[self.IDCOLNAME] for r in new_changes])
         delta.extend(new_changes)
 
@@ -1939,26 +2085,36 @@ class CopyPayload(Payload):
         # Generate all three possible replay SQL here, so that we don't waste
         # CPU time regenerating them for each replay event
         delete_sql = sql.replay_delete_row(
-            self.new_table_name, self.delta_table_name, self.IDCOLNAME,
-            self._pk_for_filter
+            self.new_table_name,
+            self.delta_table_name,
+            self.IDCOLNAME,
+            self._pk_for_filter,
         )
         update_sql = sql.replay_update_row(
-            self.old_non_pk_column_list, self.new_table_name,
-            self.delta_table_name, self.eliminate_dups,
-            self.IDCOLNAME, self._pk_for_filter
+            self.old_non_pk_column_list,
+            self.new_table_name,
+            self.delta_table_name,
+            self.eliminate_dups,
+            self.IDCOLNAME,
+            self._pk_for_filter,
         )
         insert_sql = sql.replay_insert_row(
-            self.old_column_list, self.new_table_name,
-            self.delta_table_name, self.IDCOLNAME,
-            self.eliminate_dups
+            self.old_column_list,
+            self.new_table_name,
+            self.delta_table_name,
+            self.IDCOLNAME,
+            self.eliminate_dups,
         )
         replayed = 0
         replayed_total = 0
         showed_pct = 0
         for chg_type, ids in self.divide_changes_to_group(delta):
             # We only care about replay time when we are holding a write lock
-            if holding_locks and not self.bypass_replay_timeout and \
-                    time.time() - time_start > self.replay_timeout:
+            if (
+                holding_locks
+                and not self.bypass_replay_timeout
+                and time.time() - time_start > self.replay_timeout
+            ):
                 raise OSCError("REPLAY_TIMEOUT")
             replayed_total += len(ids)
             # Commit transaction after every replay_batch_szie number of
@@ -1983,16 +2139,17 @@ class CopyPayload(Payload):
             else:
                 # We are not supposed to reach here, unless someone explicitly
                 # insert a row with unknown type into _chg table during OSC
-                raise OSCError("UNKOWN_REPLAY_TYPE",
-                               {'type_value': chg_type})
+                raise OSCError("UNKOWN_REPLAY_TYPE", {"type_value": chg_type})
             # Print progress information after every 10% changes have been
             # replayed. If there're no more than 100 changes to replay then
             # there'll be no such progress information
             progress_pct = int(replayed_total / len(delta) * 100)
             if progress_pct > showed_pct:
                 log.info(
-                    "Replay progress: {}/{} changes"
-                    .format(replayed_total + 1, len(delta)))
+                    "Replay progress: {}/{} changes".format(
+                        replayed_total + 1, len(delta)
+                    )
+                )
                 showed_pct += 10
         # Commit for last batch
         if not single_trx:
@@ -2000,15 +2157,20 @@ class CopyPayload(Payload):
         self.last_replayed_id = max_id_now
 
         time_spent = time.time() - stage_start_time
-        self.stats['time_in_replay'] = \
-            self.stats.setdefault('time_in_replay', 0) + time_spent
-        log.info("Replayed {} INSERT, {} DELETE, {} UPDATE in {:.2f} Seconds"
-                 .format(inserted, deleted, updated, time_spent))
+        self.stats["time_in_replay"] = (
+            self.stats.setdefault("time_in_replay", 0) + time_spent
+        )
+        log.info(
+            "Replayed {} INSERT, {} DELETE, {} UPDATE in {:.2f} Seconds".format(
+                inserted, deleted, updated, time_spent
+            )
+        )
 
     def set_innodb_tmpdir(self, innodb_tmpdir):
         try:
             self.execute_sql(
-                sql.set_session_variable('innodb_tmpdir'), (innodb_tmpdir,))
+                sql.set_session_variable("innodb_tmpdir"), (innodb_tmpdir,)
+            )
         except MySQLdb.OperationalError as e:
             errnum, errmsg = e.args
             # data_dir cannot always be set to innodb_tmpdir due to
@@ -2017,8 +2179,10 @@ class CopyPayload(Payload):
             # 1231: Failed to set because of priviledge error
             if errnum in (1231, 1193):
                 log.warning(
-                    "Failed to set innodb_tmpdir, falling back to tmpdir: {}"
-                    .format(errmsg))
+                    "Failed to set innodb_tmpdir, falling back to tmpdir: {}".format(
+                        errmsg
+                    )
+                )
             else:
                 raise
 
@@ -2036,10 +2200,11 @@ class CopyPayload(Payload):
         if self.droppable_indexes:
             self.ddl_guard()
             log.info(
-                "Recreating indexes: {}".format(', '.join(
-                    col.name for col in self.droppable_indexes)))
-            self.execute_sql(
-                sql.add_index(self.new_table_name, self.droppable_indexes))
+                "Recreating indexes: {}".format(
+                    ", ".join(col.name for col in self.droppable_indexes)
+                )
+            )
+            self.execute_sql(sql.add_index(self.new_table_name, self.droppable_indexes))
 
     @wrap_hook
     def analyze_table(self):
@@ -2067,35 +2232,40 @@ class CopyPayload(Payload):
 
         """
         if len(old_table_checksum) != len(new_table_checksum):
-            log.error("The total number of checksum chunks mismatch "
-                      "OLD={}, NEW={}"
-                      .format(len(old_table_checksum),
-                              len(new_table_checksum)))
-            raise OSCError('CHECKSUM_MISMATCH')
-        log.info("{} checksum chunks in total"
-                 .format(len(old_table_checksum)))
+            log.error(
+                "The total number of checksum chunks mismatch "
+                "OLD={}, NEW={}".format(
+                    len(old_table_checksum), len(new_table_checksum)
+                )
+            )
+            raise OSCError("CHECKSUM_MISMATCH")
+        log.info("{} checksum chunks in total".format(len(old_table_checksum)))
 
         for idx, checksum_entry in enumerate(old_table_checksum):
             for col in checksum_entry:
-                if not old_table_checksum[idx][col] == \
-                        new_table_checksum[idx][col]:
+                if not old_table_checksum[idx][col] == new_table_checksum[idx][col]:
                     log.error(
                         "checksum/count mismatch for chunk {} "
-                        "column `{}`: OLD={}, NEW={}"
-                        .format(
-                            idx, col,
+                        "column `{}`: OLD={}, NEW={}".format(
+                            idx,
+                            col,
                             old_table_checksum[idx][col],
-                            new_table_checksum[idx][col]))
+                            new_table_checksum[idx][col],
+                        )
+                    )
                     log.error(
                         "Number of rows for the chunk that cause the "
-                        "mismatch: OLD={}, NEW={}"
-                        .format(old_table_checksum[idx]['cnt'],
-                                new_table_checksum[idx]['cnt']))
-                    log.error(
-                        "Current replayed max(__OSC_ID) of chg table {}"
-                        .format(self.last_replayed_id)
+                        "mismatch: OLD={}, NEW={}".format(
+                            old_table_checksum[idx]["cnt"],
+                            new_table_checksum[idx]["cnt"],
+                        )
                     )
-                    raise OSCError('CHECKSUM_MISMATCH')
+                    log.error(
+                        "Current replayed max(__OSC_ID) of chg table {}".format(
+                            self.last_replayed_id
+                        )
+                    )
+                    raise OSCError("CHECKSUM_MISMATCH")
 
     def checksum_full_table(self):
         """
@@ -2105,21 +2275,20 @@ class CopyPayload(Payload):
         """
         # Calculate checksum for old table
         old_checksum = self.query(
-            sql.checksum_full_table(
-                self.table_name, self._old_table.column_list))
+            sql.checksum_full_table(self.table_name, self._old_table.column_list)
+        )
 
         # Calculate checksum for new table
         new_checksum = self.query(
-            sql.checksum_full_table(
-                self.new_table_name, self._old_table.column_list))
+            sql.checksum_full_table(self.new_table_name, self._old_table.column_list)
+        )
         self.commit()
 
         # Compare checksum
         if old_checksum and new_checksum:
             self.compare_checksum(old_checksum, new_checksum)
 
-    def checksum_for_single_chunk(
-            self, table_name, use_where, idx_for_checksum):
+    def checksum_for_single_chunk(self, table_name, use_where, idx_for_checksum):
         """
         Using the same set of session variable as chunk start point and
         calculate checksum for old table/new table. If assign is provided,
@@ -2128,11 +2297,16 @@ class CopyPayload(Payload):
         """
         return self.query(
             sql.checksum_by_chunk_with_assign(
-                table_name, self.checksum_column_list,
+                table_name,
+                self.checksum_column_list,
                 self._pk_for_filter,
-                self.range_start_vars_array, self.range_end_vars_array,
-                self.select_chunk_size, use_where,
-                idx_for_checksum))[0]
+                self.range_start_vars_array,
+                self.range_end_vars_array,
+                self.select_chunk_size,
+                use_where,
+                idx_for_checksum,
+            )
+        )[0]
 
     def dump_current_chunk(self, use_where):
         """
@@ -2151,20 +2325,24 @@ class CopyPayload(Payload):
                 # index for new scehma can be any indexes that provides
                 # uniqueness and covering old PK lookup
                 idx_for_checksum = self.find_coverage_index()
-                outfile = '{}.new'.format(self.outfile)
+                outfile = "{}.new".format(self.outfile)
             else:
                 # index for old schema should always be PK
-                idx_for_checksum = 'PRIMARY'
-                outfile = '{}.old'.format(self.outfile)
-            log.info("Dump offending chunk from {} into {}"
-                     .format(table_name, outfile))
+                idx_for_checksum = "PRIMARY"
+                outfile = "{}.old".format(self.outfile)
+            log.info("Dump offending chunk from {} into {}".format(table_name, outfile))
             self.execute_sql(
                 sql.dump_current_chunk(
-                    table_name, self.checksum_column_list,
+                    table_name,
+                    self.checksum_column_list,
                     self._pk_for_filter,
                     self.range_start_vars_array,
                     self.select_chunk_size,
-                    idx_for_checksum, use_where), (outfile,))
+                    idx_for_checksum,
+                    use_where,
+                ),
+                (outfile,),
+            )
 
     @wrap_hook
     def detailed_checksum(self):
@@ -2176,25 +2354,25 @@ class CopyPayload(Payload):
         affected_rows = 1
         use_where = False
         new_idx_for_checksum = self.find_coverage_index()
-        old_idx_for_checksum = 'PRIMARY'
+        old_idx_for_checksum = "PRIMARY"
         chunk_id = 0
-        while(affected_rows):
+        while affected_rows:
             chunk_id += 1
             old_checksum = self.checksum_for_single_chunk(
-                self.table_name, use_where, old_idx_for_checksum)
+                self.table_name, use_where, old_idx_for_checksum
+            )
             new_checksum = self.checksum_for_single_chunk(
-                self.new_table_name, use_where, new_idx_for_checksum)
-            affected_rows = old_checksum['_osc_chunk_cnt']
+                self.new_table_name, use_where, new_idx_for_checksum
+            )
+            affected_rows = old_checksum["_osc_chunk_cnt"]
             # Need to convert to List here because dict_values type will always
             # claim two sides as different
             if list(old_checksum.values()) != list(new_checksum.values()):
-                log.info(
-                    "Checksum mismatch detected for chunk {}: "
-                    .format(chunk_id))
+                log.info("Checksum mismatch detected for chunk {}: ".format(chunk_id))
                 log.info("OLD: {}".format(str(old_checksum)))
                 log.info("NEW: {}".format(str(new_checksum)))
                 self.dump_current_chunk(use_where)
-                raise OSCError('CHECKSUM_MISMATCH')
+                raise OSCError("CHECKSUM_MISMATCH")
 
             # Refresh where condition range for next select
             if affected_rows:
@@ -2220,34 +2398,42 @@ class CopyPayload(Payload):
         else:
             idx_for_checksum = self._idx_name_for_filter
             outfile_prefix = "{}.old".format(self.outfile)
-        while(affected_rows):
+        while affected_rows:
             checksum = self.query(
                 sql.checksum_by_chunk(
-                    table_name, self.checksum_column_list,
+                    table_name,
+                    self.checksum_column_list,
                     self._pk_for_filter,
-                    self.range_start_vars_array, self.range_end_vars_array,
-                    self.select_chunk_size, use_where,
+                    self.range_start_vars_array,
+                    self.range_end_vars_array,
+                    self.select_chunk_size,
+                    use_where,
                     self.is_skip_fcache_supported,
-                    idx_for_checksum))
+                    idx_for_checksum,
+                )
+            )
             # Dump the data onto local disk for further investigation
             # This will be very helpful when there's a reproducable checksum
             # mismatch issue
             if dump_after_checksum:
                 self.execute_sql(
                     sql.dump_current_chunk(
-                        table_name, self.checksum_column_list,
+                        table_name,
+                        self.checksum_column_list,
                         self._pk_for_filter,
                         self.range_start_vars_array,
                         self.select_chunk_size,
-                        idx_for_checksum, use_where),
-                    ('{}.{}'.format(outfile_prefix, str(outfile_id)), )
+                        idx_for_checksum,
+                        use_where,
+                    ),
+                    ("{}.{}".format(outfile_prefix, str(outfile_id)),),
                 )
                 outfile_id += 1
 
             # Refresh where condition range for next select
             if checksum:
                 self.refresh_range_start()
-                affected_rows = checksum[0]['cnt']
+                affected_rows = checksum[0]["cnt"]
                 checksum_result.append(checksum[0])
                 use_where = True
         return checksum_result
@@ -2268,19 +2454,22 @@ class CopyPayload(Payload):
         # the returning sequence after order by primary key may be vary
         # for different collations
         for pri_column in self._pk_for_filter:
-            old_column_tmp = [col for col in self._old_table.column_list
-                              if col.name == pri_column]
+            old_column_tmp = [
+                col for col in self._old_table.column_list if col.name == pri_column
+            ]
             if old_column_tmp:
                 old_column = old_column_tmp[0]
-            new_column_tmp = [col for col in self._new_table.column_list
-                              if col.name == pri_column]
+            new_column_tmp = [
+                col for col in self._new_table.column_list if col.name == pri_column
+            ]
             if new_column_tmp:
                 new_column = new_column_tmp[0]
             if old_column and new_column:
                 if not is_equal(old_column.collate, new_column.collate):
                     log.warning(
                         "Collation of primary key column {} has been "
-                        "changed. Skip checksum ".format(old_column.name))
+                        "changed. Skip checksum ".format(old_column.name)
+                    )
                     return False
         # There's no way we can run checksum by chunk if the primary key cannot
         # be covered by any index of the new schema
@@ -2289,8 +2478,8 @@ class CopyPayload(Payload):
                 log.warning(
                     "Skipping checksuming because there's no unique index "
                     "in new table schema can perfectly cover old primary key "
-                    "combination for search"
-                    .format(old_column.name))
+                    "combination for search".format(old_column.name)
+                )
                 return False
         else:
             # Though we have enough coverage for primary key doesn't
@@ -2300,8 +2489,8 @@ class CopyPayload(Payload):
                 log.warning(
                     "Skipping checksuming because there's no unique index "
                     "in new table schema can perfectly cover old primary key "
-                    "combination for search"
-                    .format(old_column.name))
+                    "combination for search".format(old_column.name)
+                )
                 return False
         return True
 
@@ -2316,7 +2505,8 @@ class CopyPayload(Payload):
         if self.is_full_table_dump:
             log.warning(
                 "We're adding new primary key to the table. Skip running "
-                "checksum for changes, because that's inefficient")
+                "checksum for changes, because that's inefficient"
+            )
             return False
         return True
 
@@ -2333,8 +2523,7 @@ class CopyPayload(Payload):
 
         stage_start_time = time.time()
         if self.eliminate_dups:
-            log.warning("Skip checksum, because --eliminate-duplicate "
-                        "specified")
+            log.warning("Skip checksum, because --eliminate-duplicate " "specified")
             return
 
         # Replay outside of transaction so that we won't hit max allowed
@@ -2356,8 +2545,8 @@ class CopyPayload(Payload):
         if not self.detailed_mismatch_info:
             log.info("Checksuming data from old table")
             old_table_checksum = self.checksum_by_chunk(
-                self.table_name,
-                dump_after_checksum=self.dump_after_checksum)
+                self.table_name, dump_after_checksum=self.dump_after_checksum
+            )
 
             # We can calculate the checksum for new table outside the
             # transaction, because the data in new table is static without
@@ -2366,8 +2555,8 @@ class CopyPayload(Payload):
 
             log.info("Checksuming data from new table")
             new_table_checksum = self.checksum_by_chunk(
-                self.new_table_name,
-                dump_after_checksum=self.dump_after_checksum)
+                self.new_table_name, dump_after_checksum=self.dump_after_checksum
+            )
 
             log.info("Compare checksum")
             self.compare_checksum(old_table_checksum, new_table_checksum)
@@ -2377,7 +2566,7 @@ class CopyPayload(Payload):
         self.last_checksumed_id = self.last_replayed_id
 
         log.info("Checksum match between new and old table")
-        self.stats['time_in_table_checksum'] = time.time() - stage_start_time
+        self.stats["time_in_table_checksum"] = time.time() - stage_start_time
 
     @wrap_hook
     def replay_till_good2go(self, checksum):
@@ -2393,11 +2582,12 @@ class CopyPayload(Payload):
         @type  checksum:  bool
 
         """
-        log.info("Replay at most {} more round(s) until we can finish in {} "
-                 "seconds"
-                 .format(self.replay_max_attempt, self.replay_timeout))
+        log.info(
+            "Replay at most {} more round(s) until we can finish in {} "
+            "seconds".format(self.replay_max_attempt, self.replay_timeout)
+        )
         # Temporarily enable slow query log for slow replay statements
-        self.execute_sql(sql.set_session_variable('long_query_time'), (1,))
+        self.execute_sql(sql.set_session_variable("long_query_time"), (1,))
         for i in range(self.replay_max_attempt):
             log.info("Catchup Attempt: {}".format(i + 1))
             start_time = time.time()
@@ -2405,37 +2595,38 @@ class CopyPayload(Payload):
             # spent in replay+checksum is below replay_timeout.
             if checksum and self.need_checksum():
                 self.start_transaction()
-                log.info("Catch up in order to compare checksum for the "
-                         "rows that have been changed")
+                log.info(
+                    "Catch up in order to compare checksum for the "
+                    "rows that have been changed"
+                )
                 self.replay_changes(single_trx=True)
                 self.checksum_for_changes(single_trx=False)
             else:
                 # Break replay into smaller chunks if it's too big
                 max_id_now = self.get_max_delta_id()
-                while max_id_now - self.last_replayed_id > \
-                        self.max_replay_batch_size:
-                    delta_id_limit = self.last_replayed_id + \
-                        self.max_replay_batch_size
+                while max_id_now - self.last_replayed_id > self.max_replay_batch_size:
+                    delta_id_limit = self.last_replayed_id + self.max_replay_batch_size
                     log.info("Replay up to {}".format(delta_id_limit))
-                    self.replay_changes(
-                        single_trx=False, delta_id_limit=delta_id_limit)
+                    self.replay_changes(single_trx=False, delta_id_limit=delta_id_limit)
                 self.replay_changes(single_trx=False, delta_id_limit=max_id_now)
 
             time_in_replay = time.time() - start_time
             if time_in_replay < self.replay_timeout:
-                log.info("Time spent in last round of replay is {:.2f}, which "
-                         "is less than replay_timeout: {} for final replay. "
-                         "We are good to proceed"
-                         .format(time_in_replay, self.replay_timeout))
+                log.info(
+                    "Time spent in last round of replay is {:.2f}, which "
+                    "is less than replay_timeout: {} for final replay. "
+                    "We are good to proceed".format(time_in_replay, self.replay_timeout)
+                )
                 break
         else:
             # We are not able to bring the replay time down to replay_timeout
             if not self.bypass_replay_timeout:
-                raise OSCError('MAX_ATTEMPT_EXCEEDED',
-                               {'timeout': self.replay_timeout})
+                raise OSCError("MAX_ATTEMPT_EXCEEDED", {"timeout": self.replay_timeout})
             else:
-                log.warning("Proceed after max replay attempts exceeded. "
-                            "Because --bypass-replay-timeout is specified")
+                log.warning(
+                    "Proceed after max replay attempts exceeded. "
+                    "Because --bypass-replay-timeout is specified"
+                )
 
     @wrap_hook
     def checksum_by_replay_chunk(self, table_name):
@@ -2451,11 +2642,16 @@ class CopyPayload(Payload):
         while id_limit < self.last_replayed_id:
             result = self.query(
                 sql.checksum_by_replay_chunk(
-                    table_name, self.delta_table_name,
-                    self.old_column_list, self._pk_for_filter,
-                    self.IDCOLNAME, id_limit, self.last_replayed_id,
-                    self.replay_batch_size
-                ))
+                    table_name,
+                    self.delta_table_name,
+                    self.old_column_list,
+                    self._pk_for_filter,
+                    self.IDCOLNAME,
+                    id_limit,
+                    self.last_replayed_id,
+                    self.replay_batch_size,
+                )
+            )
             checksum_result.append(result[0])
             id_limit += self.replay_batch_size
         return checksum_result
@@ -2475,8 +2671,7 @@ class CopyPayload(Payload):
 
         """
         if self.eliminate_dups:
-            log.warning("Skip checksum, because --elimiate-duplicate "
-                        "specified")
+            log.warning("Skip checksum, because --elimiate-duplicate " "specified")
             return
         elif not self.need_checksum_for_changes():
             return
@@ -2486,9 +2681,10 @@ class CopyPayload(Payload):
         elif self.is_full_table_dump:
             return
         else:
-            log.info("Running checksum for rows have been changed since "
-                     "last checksum from change ID: {}"
-                     .format(self.last_checksumed_id))
+            log.info(
+                "Running checksum for rows have been changed since "
+                "last checksum from change ID: {}".format(self.last_checksumed_id)
+            )
         start_time = time.time()
         old_table_checksum = self.checksum_by_replay_chunk(self.table_name)
         # Checksum for the __new table should be issued inside the transcation
@@ -2501,14 +2697,14 @@ class CopyPayload(Payload):
             self.commit()
         self.compare_checksum(old_table_checksum, new_table_checksum)
         self.last_checksumed_id = self.last_replayed_id
-        self.stats['time_in_delta_checksum'] = \
-            self.stats.setdefault('time_in_delta_checksum', 0) + \
-            (time.time() - start_time)
+        self.stats["time_in_delta_checksum"] = self.stats.setdefault(
+            "time_in_delta_checksum", 0
+        ) + (time.time() - start_time)
 
     @wrap_hook
     def apply_partition_differences(
-            self, parts_to_drop: Optional[Set[str]],
-            parts_to_add: Optional[Set[str]]) -> None:
+        self, parts_to_drop: Optional[Set[str]], parts_to_add: Optional[Set[str]]
+    ) -> None:
         # we can just drop partitions by name (ie, p[0-9]+), but to add
         # partitions we need the range value for each - get this from orig
         # table
@@ -2517,20 +2713,19 @@ class CopyPayload(Payload):
             for part_name in parts_to_add:
                 part_value = self.partition_value_for_name(self.table_name, part_name)
                 add_parts.append(
-                    "PARTITION {} VALUES LESS THAN ({})".format(part_name, part_value))
-            add_parts_str = ', '.join(add_parts)
-            add_sql = (
-                "ALTER TABLE `{}` ADD PARTITION ({})".format(
-                    self.new_table_name, add_parts_str)
+                    "PARTITION {} VALUES LESS THAN ({})".format(part_name, part_value)
+                )
+            add_parts_str = ", ".join(add_parts)
+            add_sql = "ALTER TABLE `{}` ADD PARTITION ({})".format(
+                self.new_table_name, add_parts_str
             )
             log.info(add_sql)
             self.execute_sql(add_sql)
 
         if parts_to_drop:
-            drop_parts_str = ', '.join(parts_to_drop)
-            drop_sql = (
-                "ALTER TABLE `{}` DROP PARTITION {}".format(
-                    self.new_table_name, drop_parts_str)
+            drop_parts_str = ", ".join(parts_to_drop)
+            drop_sql = "ALTER TABLE `{}` DROP PARTITION {}".format(
+                self.new_table_name, drop_parts_str
             )
             log.info(drop_sql)
             self.execute_sql(drop_sql)
@@ -2538,19 +2733,23 @@ class CopyPayload(Payload):
     @wrap_hook
     def partition_value_for_name(self, table_name: str, part_name: str) -> str:
         result = self.query(
-            sql.fetch_partition_value, (
-                self._current_db, table_name, part_name,))
+            sql.fetch_partition_value,
+            (
+                self._current_db,
+                table_name,
+                part_name,
+            ),
+        )
         for r in result:
-            return r['PARTITION_DESCRIPTION']
+            return r["PARTITION_DESCRIPTION"]
         raise RuntimeError(f"No partition value found for {table_name} {part_name}")
 
     @wrap_hook
     def list_partition_names(self, table_name: str) -> List[str]:
         tbl_parts = []
-        result = self.query(
-            sql.fetch_partition, (self._current_db, table_name))
+        result = self.query(sql.fetch_partition, (self._current_db, table_name))
         for r in result:
-            tbl_parts.append(r['PARTITION_NAME'])
+            tbl_parts.append(r["PARTITION_NAME"])
         if not tbl_parts:
             raise RuntimeError(f"No partition values found for {table_name}")
         return tbl_parts
@@ -2574,8 +2773,9 @@ class CopyPayload(Payload):
         # only apply this logic to RANGE partitioning, as other types
         # are usually static
         partition_method = self.get_partition_method(
-            self._current_db, self.new_table_name)
-        if partition_method != 'RANGE':
+            self._current_db, self.new_table_name
+        )
+        if partition_method != "RANGE":
             return
 
         try:
@@ -2588,26 +2788,34 @@ class CopyPayload(Payload):
             # information schema literally has the string None for
             # non-partitioned tables.  Previous checks *should* prevent us
             # from hitting this.
-            if 'None' in parts_to_add or 'None' in parts_to_drop:
+            if "None" in parts_to_add or "None" in parts_to_drop:
                 log.warning(
                     "MySQL claims either %s or %s are not partitioned",
-                    self.new_table_name, self.table_name)
+                    self.new_table_name,
+                    self.table_name,
+                )
                 return
 
             if parts_to_drop:
                 log.info(
                     "Partitions missing from source table "
                     "to drop from new table %s: %s",
-                    self.new_table_name, ', '.join(parts_to_drop))
+                    self.new_table_name,
+                    ", ".join(parts_to_drop),
+                )
             if parts_to_add:
                 log.info(
                     "Partitions in source table to add to new table %s: %s",
-                    self.new_table_name, ', '.join(parts_to_add))
+                    self.new_table_name,
+                    ", ".join(parts_to_add),
+                )
             self.apply_partition_differences(parts_to_drop, parts_to_add)
         except Exception:
             log.exception(
                 "Unable to sync new table %s with orig table %s partitions",
-                self.new_table_name, self.table_name)
+                self.new_table_name,
+                self.table_name,
+            )
 
     @wrap_hook
     def swap_tables(self):
@@ -2619,31 +2827,29 @@ class CopyPayload(Payload):
             return True
         log.info("== Stage 6: Swap table ==")
         self.stop_slave_sql()
-        self.execute_sql(sql.set_session_variable('autocommit'), (0,))
+        self.execute_sql(sql.set_session_variable("autocommit"), (0,))
         self.start_transaction()
         stage_start_time = time.time()
-        self.lock_tables((self.new_table_name, self.table_name,
-                          self.delta_table_name))
+        self.lock_tables((self.new_table_name, self.table_name, self.delta_table_name))
         log.info("Final round of replay before swap table")
         self.replay_changes(single_trx=True, holding_locks=True)
         # We will not run delta checksum here, because there will be an error
         # like this, if we run a nested query using `NOT EXISTS`:
         # SQL execution error: [1100] Table 't' was not locked with LOCK TABLES
-        self.execute_sql(
-            sql.rename_table(self.table_name, self.renamed_table_name))
+        self.execute_sql(sql.rename_table(self.table_name, self.renamed_table_name))
         self.table_swapped = True
         self.add_drop_table_entry(self.renamed_table_name)
-        self.execute_sql(
-            sql.rename_table(self.new_table_name, self.table_name))
+        self.execute_sql(sql.rename_table(self.new_table_name, self.table_name))
         log.info("Table has successfully swapped, new schema takes effect now")
         self._cleanup_payload.remove_drop_table_entry(
-            self._current_db, self.new_table_name)
+            self._current_db, self.new_table_name
+        )
         self.commit()
         self.unlock_tables()
-        self.stats['time_in_lock'] = \
-            self.stats.setdefault('time_in_lock', 0) + \
-            (time.time() - stage_start_time)
-        self.execute_sql(sql.set_session_variable('autocommit'), (1,))
+        self.stats["time_in_lock"] = self.stats.setdefault("time_in_lock", 0) + (
+            time.time() - stage_start_time
+        )
+        self.execute_sql(sql.set_session_variable("autocommit"), (1,))
         self.start_slave_sql()
 
     def rename_back(self):
@@ -2652,14 +2858,12 @@ class CopyPayload(Payload):
         rename operation failed, rollback the first renaming
         """
         if (
-                self.table_swapped
-                and self.table_exists(self.renamed_table_name)
-                and not self.table_exists(self.table_name)
+            self.table_swapped
+            and self.table_exists(self.renamed_table_name)
+            and not self.table_exists(self.table_name)
         ):
             self.unlock_tables()
-            self.execute_sql(
-                sql.rename_table(self.renamed_table_name,
-                                 self.table_name))
+            self.execute_sql(sql.rename_table(self.renamed_table_name, self.table_name))
 
     @wrap_hook
     def cleanup(self):
@@ -2679,7 +2883,8 @@ class CopyPayload(Payload):
         except Exception:
             log.exception(
                 "Ignore following exception, because we want to try our "
-                "best to cleanup, and free disk space:")
+                "best to cleanup, and free disk space:"
+            )
         self._cleanup_payload.mysql_user = self.mysql_user
         self._cleanup_payload.mysql_pass = self.mysql_pass
         self._cleanup_payload.socket = self.socket
@@ -2687,18 +2892,22 @@ class CopyPayload(Payload):
         self._cleanup_payload.cleanup(self._current_db)
 
     def print_stats(self):
-        log.info("Time in dump: {:.3f}s"
-                 .format(self.stats.get('time_in_dump', 0)))
-        log.info("Time in load: {:.3f}s"
-                 .format(self.stats.get('time_in_load', 0)))
-        log.info("Time in replay: {:.3f}s"
-                 .format(self.stats.get('time_in_replay', 0)))
-        log.info("Time in table checksum: {:.3f}s"
-                 .format(self.stats.get('time_in_table_checksum', 0)))
-        log.info("Time in delta checksum: {:.3f}s"
-                 .format(self.stats.get('time_in_delta_checksum', 0)))
-        log.info("Time holding locks: {:.3f}s"
-                 .format(self.stats.get('time_in_lock', 0)))
+        log.info("Time in dump: {:.3f}s".format(self.stats.get("time_in_dump", 0)))
+        log.info("Time in load: {:.3f}s".format(self.stats.get("time_in_load", 0)))
+        log.info("Time in replay: {:.3f}s".format(self.stats.get("time_in_replay", 0)))
+        log.info(
+            "Time in table checksum: {:.3f}s".format(
+                self.stats.get("time_in_table_checksum", 0)
+            )
+        )
+        log.info(
+            "Time in delta checksum: {:.3f}s".format(
+                self.stats.get("time_in_delta_checksum", 0)
+            )
+        )
+        log.info(
+            "Time holding locks: {:.3f}s".format(self.stats.get("time_in_lock", 0))
+        )
 
     @wrap_hook
     def run_ddl(self, db, sql):
@@ -2734,15 +2943,20 @@ class CopyPayload(Payload):
             self.reset_no_pk_creation()
             self.cleanup()
             self.print_stats()
-            self.stats['wall_time'] = time.time() - time_started
-        except (MySQLdb.OperationalError, MySQLdb.ProgrammingError,
-                MySQLdb.IntegrityError) as e:
+            self.stats["wall_time"] = time.time() - time_started
+        except (
+            MySQLdb.OperationalError,
+            MySQLdb.ProgrammingError,
+            MySQLdb.IntegrityError,
+        ) as e:
             errnum, errmsg = e.args
             log.error(
                 "SQL execution error: [{}] {}\n"
                 "When executing: {}\n"
-                "With args: {}"
-                .format(errnum, errmsg, self._sql_now, self._sql_args_now))
+                "With args: {}".format(
+                    errnum, errmsg, self._sql_now, self._sql_args_now
+                )
+            )
             # 2013 stands for lost connection to MySQL
             # 2006 stands for MySQL has gone away
             # Both means we have been killed
@@ -2752,26 +2966,34 @@ class CopyPayload(Payload):
                 # replication which is really bad. So trigger is the only
                 # thing we need to clean up in this case
                 self._cleanup_payload.remove_drop_table_entry(
-                    self._current_db, self.new_table_name)
+                    self._current_db, self.new_table_name
+                )
                 self._cleanup_payload.remove_drop_table_entry(
-                    self._current_db, self.delta_table_name)
+                    self._current_db, self.delta_table_name
+                )
                 self._cleanup_payload.remove_all_file_entries()
             if not self.keep_tmp_table:
                 self.cleanup()
-            raise OSCError('GENERIC_MYSQL_ERROR',
-                           {'stage': "running DDL on db '{}'".format(db),
-                            'errnum': errnum,
-                            'errmsg': errmsg},
-                           mysql_err_code=errnum)
+            raise OSCError(
+                "GENERIC_MYSQL_ERROR",
+                {
+                    "stage": "running DDL on db '{}'".format(db),
+                    "errnum": errnum,
+                    "errmsg": errmsg,
+                },
+                mysql_err_code=errnum,
+            )
         except Exception as e:
             log.exception(
-                "{0} Exception raised, start to cleanup before exit {0}"
-                .format("-" * 10))
+                "{0} Exception raised, start to cleanup before exit {0}".format(
+                    "-" * 10
+                )
+            )
             # We want keep the temporary table for further investigation
             if not self.keep_tmp_table:
                 self.cleanup()
             if not isinstance(e, OSCError):
                 # It's a python exception
-                raise OSCError('OSC_INTERNAL_ERROR', {'msg': str(e)})
+                raise OSCError("OSC_INTERNAL_ERROR", {"msg": str(e)})
             else:
                 raise

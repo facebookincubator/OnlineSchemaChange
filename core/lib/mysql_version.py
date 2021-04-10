@@ -7,19 +7,19 @@ This source code is licensed under the BSD-style license found in the
 LICENSE file in the root directory of this source tree.
 """
 
-FB_FORK_NAME = 'fb'
+FB_FORK_NAME = "fb"
 
 
 class MySQLVersion(object):
     def __init__(self, version_str):
         self._version_str = version_str
-        self._version = ''
-        self._fork = ''
-        self._build = ''
+        self._version = ""
+        self._fork = ""
+        self._build = ""
         self.parse_str()
 
     def parse_str(self):
-        segments = self._version_str.split('-')
+        segments = self._version_str.split("-")
         self._version = segments[0]
         # It's possible for a version string to have no fork and build segment
         if len(segments) > 1:
@@ -32,21 +32,21 @@ class MySQLVersion(object):
         """
         Major version is the first segment of a version string
         """
-        return int(self._version.split('.')[0])
+        return int(self._version.split(".")[0])
 
     @property
     def minor(self):
         """
         Minor version is the seconds segment of a version string
         """
-        return int(self._version.split('.')[1])
+        return int(self._version.split(".")[1])
 
     @property
     def release(self):
         """
         Release is the third segment of a version string
         """
-        return int(self._version.split('.')[2])
+        return int(self._version.split(".")[2])
 
     @property
     def build(self):

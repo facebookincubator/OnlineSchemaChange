@@ -20,7 +20,7 @@ def escape(keyword):
     """
     Escape the backtick for keyword when generating an actual SQL.
     """
-    return keyword.replace('`', '``')
+    return keyword.replace("`", "``")
 
 
 def is_equal(left, right):
@@ -54,6 +54,7 @@ class IndexColumn(object):
     This is different from a table column definition, because only `name` and
     `length` is required for a index column definition
     """
+
     def __init__(self):
         self.name = None
         self.length = None
@@ -89,6 +90,7 @@ class DocStoreIndexColumn(object):
     A column definition inside index section for DocStore.
     DocStore index column has more attributes than the normal one
     """
+
     def __init__(self):
         self.document_path = None
         self.key_type = None
@@ -96,13 +98,12 @@ class DocStoreIndexColumn(object):
 
     def __str__(self):
         if self.length is not None:
-            return "{} AS {}({})".format(
-                self.document_path, self.key_type, self.length)
+            return "{} AS {}({})".format(self.document_path, self.key_type, self.length)
         else:
             return "{} AS {}".format(self.document_path, self.key_type)
 
     def __eq__(self, other):
-        for attr in ('document_path', 'key_type', 'length'):
+        for attr in ("document_path", "key_type", "length"):
             if not is_equal(getattr(self, attr), getattr(other, attr)):
                 return False
         return True
@@ -112,8 +113,7 @@ class DocStoreIndexColumn(object):
 
     def to_sql(self):
         if self.length is not None:
-            return "{} AS {}({})".format(
-                self.document_path, self.key_type, self.length)
+            return "{} AS {}({})".format(self.document_path, self.key_type, self.length)
         else:
             return "{} AS {}".format(self.document_path, self.key_type)
 
@@ -123,6 +123,7 @@ class TableIndex(object):
     An index definition. This can defined either directly after single column
     definition or after all column definitions
     """
+
     def __init__(self, name=None, is_unique=False):
         self.name = name
         self.key_block_size = None
@@ -140,17 +141,22 @@ class TableIndex(object):
         col_list_str = []
         for col_str in self.column_list:
             col_list_str.append(str(col_str))
-        idx_str.append("KEY LIST: {}".format(','.join(col_list_str)))
+        idx_str.append("KEY LIST: {}".format(",".join(col_list_str)))
         if self.using:
             idx_str.append("USING: {}".format(self.using))
         idx_str.append("KEY_BLOCK_SIZE: {}".format(self.key_block_size))
         idx_str.append("COMMENT: {}".format(self.comment))
-        return '/ '.join(idx_str)
+        return "/ ".join(idx_str)
 
     def __eq__(self, other):
         for attr in (
-                'name', 'key_block_size', 'comment', 'is_unique', 'key_type',
-                'using'):
+            "name",
+            "key_block_size",
+            "comment",
+            "is_unique",
+            "key_type",
+            "using",
+        ):
             if not is_equal(getattr(self, attr), getattr(other, attr)):
                 return False
         return self.column_list == other.column_list
@@ -161,39 +167,38 @@ class TableIndex(object):
     def to_sql(self):
         segments = []
         if self.name is not None:
-            if self.name == 'PRIMARY':
-                segments.append('PRIMARY KEY')
+            if self.name == "PRIMARY":
+                segments.append("PRIMARY KEY")
             else:
                 if self.is_unique:
-                    segments.append('UNIQUE KEY `{}`'
-                                    .format(escape(self.name)))
+                    segments.append("UNIQUE KEY `{}`".format(escape(self.name)))
                 elif self.key_type is not None:
                     segments.append(
-                        '{} KEY `{}`'.format(self.key_type,
-                                             escape(self.name)))
+                        "{} KEY `{}`".format(self.key_type, escape(self.name))
+                    )
                 else:
-                    segments.append('KEY `{}`'.format(escape(self.name)))
+                    segments.append("KEY `{}`".format(escape(self.name)))
         else:
-            segments.append('KEY')
+            segments.append("KEY")
 
         segments.append(
-            "({})"
-            .format(', '.join([col.to_sql() for col in self.column_list]))
+            "({})".format(", ".join([col.to_sql() for col in self.column_list]))
         )
 
         if self.using is not None:
-            segments.append('USING {}'.format(self.using))
+            segments.append("USING {}".format(self.using))
         if self.key_block_size is not None:
-            segments.append('KEY_BLOCK_SIZE={}'.format(self.key_block_size))
+            segments.append("KEY_BLOCK_SIZE={}".format(self.key_block_size))
         if self.comment is not None:
-            segments.append('COMMENT {}'.format(self.comment))
-        return ' '.join(segments)
+            segments.append("COMMENT {}".format(self.comment))
+        return " ".join(segments)
 
 
 class Column(object):
     """
     Representing a column definiton in a table
     """
+
     def __init__(self):
         self.name = None
         self.column_type = None
@@ -221,7 +226,7 @@ class Column(object):
         col_str.append("NULLABLE: {}".format(self.nullable))
         col_str.append("UNSIGNED: {}".format(self.unsigned))
         col_str.append("COMMENT: {}".format(self.comment))
-        return ' '.join(col_str)
+        return " ".join(col_str)
 
     @property
     def quoted_default(self):
@@ -237,17 +242,25 @@ class Column(object):
 
     def __eq__(self, other):
         for attr in (
-                'name', 'column_type', 'charset', 'collate',
-                'length', 'comment', 'nullable', 'unsigned', 'is_default_bit',
-                'auto_increment'):
+            "name",
+            "column_type",
+            "charset",
+            "collate",
+            "length",
+            "comment",
+            "nullable",
+            "unsigned",
+            "is_default_bit",
+            "auto_increment",
+        ):
 
             # Ignore display width of *int types, because of the new default in 8.0.20.
             # This is a bit of a heavy hammer, but it's the simpler alternative to be
             # able to support mixed version comparisons
             # Ref: https://dev.mysql.com/doc/relnotes/mysql/8.0/en/news-8-0-19.html
             # (search for: "Display width specification for integer data types")
-            int_types = {'int', 'bigint', 'tinyint', 'smallint', 'mediumint'}
-            if self.column_type.lower() in int_types and attr == 'length':
+            int_types = {"int", "bigint", "tinyint", "smallint", "mediumint"}
+            if self.column_type.lower() in int_types and attr == "length":
                 continue
 
             if not is_equal(getattr(self, attr), getattr(other, attr)):
@@ -259,9 +272,11 @@ class Column(object):
                 # Other than that if there's any difference between two
                 # default values they are semanticly different
                 left_default_is_null = (
-                    self.default is None or self.default.upper() == 'NULL')
+                    self.default is None or self.default.upper() == "NULL"
+                )
                 right_default_is_null = (
-                    other.default is None or other.default.upper() == 'NULL')
+                    other.default is None or other.default.upper() == "NULL"
+                )
                 if not (left_default_is_null and right_default_is_null):
                     return False
         else:
@@ -275,36 +290,35 @@ class Column(object):
 
     def to_sql(self):
         column_segment = []
-        column_segment.append('`{}`'.format(escape(self.name)))
+        column_segment.append("`{}`".format(escape(self.name)))
         if self.length is not None:
-            column_segment.append('{}({})'
-                                  .format(self.column_type, self.length))
+            column_segment.append("{}({})".format(self.column_type, self.length))
         else:
-            column_segment.append('{}'.format(self.column_type))
+            column_segment.append("{}".format(self.column_type))
 
         if self.charset is not None:
-            column_segment.append('CHARACTER SET {}'.format(self.charset))
+            column_segment.append("CHARACTER SET {}".format(self.charset))
         if self.unsigned is not None:
-            column_segment.append('UNSIGNED')
+            column_segment.append("UNSIGNED")
         if self.collate is not None:
-            column_segment.append('COLLATE {}'.format(self.collate))
+            column_segment.append("COLLATE {}".format(self.collate))
         # By default MySQL will implicitly make column as nullable if not
         # specified
         if self.nullable or self.nullable is None:
-            column_segment.append('NULL')
+            column_segment.append("NULL")
         else:
-            column_segment.append('NOT NULL')
+            column_segment.append("NOT NULL")
         if self.default is not None:
             if self.is_default_bit:
-                column_segment.append('DEFAULT b{}'.format(self.default))
+                column_segment.append("DEFAULT b{}".format(self.default))
             else:
-                column_segment.append('DEFAULT {}'.format(self.default))
+                column_segment.append("DEFAULT {}".format(self.default))
         if self.auto_increment is not None:
-            column_segment.append('AUTO_INCREMENT')
+            column_segment.append("AUTO_INCREMENT")
         if self.comment is not None:
-            column_segment.append('COMMENT {}'.format(self.comment))
+            column_segment.append("COMMENT {}".format(self.comment))
 
-        return ' '.join(column_segment)
+        return " ".join(column_segment)
 
 
 class TimestampColumn(Column):
@@ -313,6 +327,7 @@ class TimestampColumn(Column):
     it allow CURRENT_TIMESTAMP as a default value, and has a special attribute
     called "ON UPDATE"
     """
+
     def __init__(self):
         super(TimestampColumn, self).__init__()
         self.on_update_current_timestamp = None
@@ -322,11 +337,11 @@ class TimestampColumn(Column):
 
     def __str__(self):
         col_str = super(TimestampColumn, self).__str__()
-        col_str += ' ON UPDATE: {}'.format(self.on_update_current_timestamp)
+        col_str += " ON UPDATE: {}".format(self.on_update_current_timestamp)
         return col_str
 
     def explicit_ts_default(self):
-        """"
+        """ "
         This is a special case for TimeStamp.
         If you define a column as
           `col` timestamp
@@ -336,13 +351,17 @@ class TimestampColumn(Column):
         See also:
         http://dev.mysql.com/doc/refman/5.6/en/timestamp-initialization.html
         """
-        if self.column_type == 'TIMESTAMP':
-            if all([(self.nullable is None or not self.nullable),
+        if self.column_type == "TIMESTAMP":
+            if all(
+                [
+                    (self.nullable is None or not self.nullable),
                     self.default is None,
-                    self.on_update_current_timestamp is None]):
+                    self.on_update_current_timestamp is None,
+                ]
+            ):
                 self.nullable = False
-                self.default = 'CURRENT_TIMESTAMP'
-                self.on_update_current_timestamp = 'CURRENT_TIMESTAMP'
+                self.default = "CURRENT_TIMESTAMP"
+                self.on_update_current_timestamp = "CURRENT_TIMESTAMP"
         else:
             # Except timestamp, all other types have the implicit nullable
             # behavior.
@@ -351,11 +370,11 @@ class TimestampColumn(Column):
 
     def __eq__(self, other):
         self.explicit_ts_default()
-        if getattr(other, 'explicit_ts_default', None):
+        if getattr(other, "explicit_ts_default", None):
             other.explicit_ts_default()
         if not super(TimestampColumn, self).__eq__(other):
             return False
-        for attr in ('on_update_current_timestamp',):
+        for attr in ("on_update_current_timestamp",):
             if not is_equal(getattr(self, attr), getattr(other, attr)):
                 return False
         return True
@@ -366,25 +385,25 @@ class TimestampColumn(Column):
     def to_sql(self):
         self.explicit_ts_default()
         column_segment = []
-        column_segment.append('`{}`'.format(escape(self.name)))
+        column_segment.append("`{}`".format(escape(self.name)))
         if self.length is not None:
-            column_segment.append('{}({})'
-                                  .format(self.column_type, self.length))
+            column_segment.append("{}({})".format(self.column_type, self.length))
         else:
-            column_segment.append('{}'.format(self.column_type))
+            column_segment.append("{}".format(self.column_type))
         if self.nullable:
-            column_segment.append('NULL')
+            column_segment.append("NULL")
         else:
-            column_segment.append('NOT NULL')
+            column_segment.append("NOT NULL")
         if self.default is not None:
-            column_segment.append('DEFAULT {}'.format(self.default))
+            column_segment.append("DEFAULT {}".format(self.default))
         if self.on_update_current_timestamp is not None:
-            column_segment.append('ON UPDATE {}'
-                                  .format(self.on_update_current_timestamp))
+            column_segment.append(
+                "ON UPDATE {}".format(self.on_update_current_timestamp)
+            )
         if self.comment is not None:
-            column_segment.append('COMMENT {}'.format(self.comment))
+            column_segment.append("COMMENT {}".format(self.comment))
 
-        return ' '.join(column_segment)
+        return " ".join(column_segment)
 
 
 class SetColumn(Column):
@@ -392,13 +411,14 @@ class SetColumn(Column):
     A set type column. It's different from other type of columns because it
     has a list of allowed values for definition
     """
+
     def __init__(self):
         super(SetColumn, self).__init__()
         self.set_list = []
 
     def __str__(self):
         col_str = super(SetColumn, self).__str__()
-        col_str += ' SET VALUES: [{}]'.format(', '.join(self.set_list))
+        col_str += " SET VALUES: [{}]".format(", ".join(self.set_list))
         return col_str
 
     def __eq__(self, other):
@@ -411,20 +431,20 @@ class SetColumn(Column):
 
     def to_sql(self):
         column_segment = []
-        column_segment.append('`{}`'.format(escape(self.name)))
-        column_segment.append('{}({})'.format(
-            self.column_type, ', '.join(self.set_list)
-        ))
+        column_segment.append("`{}`".format(escape(self.name)))
+        column_segment.append(
+            "{}({})".format(self.column_type, ", ".join(self.set_list))
+        )
         if self.nullable:
-            column_segment.append('NULL')
+            column_segment.append("NULL")
         else:
-            column_segment.append('NOT NULL')
+            column_segment.append("NOT NULL")
         if self.default is not None:
-            column_segment.append('DEFAULT {}'.format(self.default))
+            column_segment.append("DEFAULT {}".format(self.default))
         if self.comment is not None:
-            column_segment.append('COMMENT {}'.format(self.comment))
+            column_segment.append("COMMENT {}".format(self.comment))
 
-        return ' '.join(column_segment)
+        return " ".join(column_segment)
 
 
 class EnumColumn(Column):
@@ -432,13 +452,14 @@ class EnumColumn(Column):
     A enum type column. It's different from other type of columns because it
     has a list of allowed values for definition
     """
+
     def __init__(self):
         super(EnumColumn, self).__init__()
         self.enum_list = []
 
     def __str__(self):
         col_str = super(EnumColumn, self).__str__()
-        col_str += 'ENUM VALUES: [{}]'.format(', '.join(self.enum_list))
+        col_str += "ENUM VALUES: [{}]".format(", ".join(self.enum_list))
         return col_str
 
     def __eq__(self, other):
@@ -451,30 +472,31 @@ class EnumColumn(Column):
 
     def to_sql(self):
         column_segment = []
-        column_segment.append('`{}`'.format(escape(self.name)))
-        column_segment.append('{}({})'.format(
-            self.column_type, ', '.join(self.enum_list)
-        ))
+        column_segment.append("`{}`".format(escape(self.name)))
+        column_segment.append(
+            "{}({})".format(self.column_type, ", ".join(self.enum_list))
+        )
         if self.charset is not None:
-            column_segment.append('CHARACTER SET {}'.format(self.charset))
+            column_segment.append("CHARACTER SET {}".format(self.charset))
         if self.collate is not None:
-            column_segment.append('COLLATE {}'.format(self.collate))
+            column_segment.append("COLLATE {}".format(self.collate))
         if self.nullable:
-            column_segment.append('NULL')
+            column_segment.append("NULL")
         else:
-            column_segment.append('NOT NULL')
+            column_segment.append("NOT NULL")
         if self.default is not None:
-            column_segment.append('DEFAULT {}'.format(self.default))
+            column_segment.append("DEFAULT {}".format(self.default))
         if self.comment is not None:
-            column_segment.append('COMMENT {}'.format(self.comment))
+            column_segment.append("COMMENT {}".format(self.comment))
 
-        return ' '.join(column_segment)
+        return " ".join(column_segment)
 
 
 class Table(object):
     """
     Representing a table definiton
     """
+
     def __init__(self):
         self.table_options = []
         self.name = None
@@ -487,13 +509,13 @@ class Table(object):
         self.auto_increment = None
         self.comment = None
         self.column_list = []
-        self.primary_key = TableIndex(name='PRIMARY', is_unique=True)
+        self.primary_key = TableIndex(name="PRIMARY", is_unique=True)
         self.indexes = []
         self.partition = None
         self.constraint = None
 
     def __str__(self):
-        table_str = ''
+        table_str = ""
         table_str += "NAME: {}\n".format(self.name)
         table_str += "ENGINE: {}\n".format(self.engine)
         table_str += "CHARSET: {}\n".format(self.charset)
@@ -517,8 +539,15 @@ class Table(object):
 
     def __eq__(self, other):
         for attr in (
-                'name', 'engine', 'charset', 'collate', 'row_format',
-                'key_block_size', 'comment', 'partition'):
+            "name",
+            "engine",
+            "charset",
+            "collate",
+            "row_format",
+            "key_block_size",
+            "comment",
+            "partition",
+        ):
             if not is_equal(getattr(self, attr), getattr(other, attr)):
                 return False
         if self.primary_key != other.primary_key:
@@ -586,7 +615,7 @@ class Table(object):
         So you can tell whether two schema has the same structure by comparing
         their checksum value.
         """
-        md5_obj = hashlib.md5(self.to_sql().encode('utf-8'))
+        md5_obj = hashlib.md5(self.to_sql().encode("utf-8"))
         return md5_obj.hexdigest()
 
     def droppable_indexes(self, keep_unique_key=False):
@@ -606,7 +635,7 @@ class Table(object):
         # Primary key should not be dropped, but it's not included in
         # table.indexes so we are fine here
         idx_list = []
-        auto_incre_name = ''
+        auto_incre_name = ""
         for col in self.column_list:
             if col.auto_increment:
                 auto_incre_name = col.name
@@ -615,8 +644,7 @@ class Table(object):
             # Drop index which contains only the auto_increment column is
             # not allowed
             if len(idx.column_list) == 1:
-                if auto_incre_name and \
-                        auto_incre_name == idx.column_list[0].name:
+                if auto_incre_name and auto_incre_name == idx.column_list[0].name:
                     continue
             # We can drop unique index for most of the time. Only if we want
             # to ignore duplicate key when adding new unique indexes, we need
@@ -631,13 +659,13 @@ class Table(object):
     def is_myrocks_ttl_table(self):
         if not self.engine:
             return False
-        if self.engine.upper() == 'ROCKSDB':
+        if self.engine.upper() == "ROCKSDB":
             if self.comment:
                 # partition level ttl
-                if re.search(r'\S+_ttl_duration=[0-9]+;', self.comment):
+                if re.search(r"\S+_ttl_duration=[0-9]+;", self.comment):
                     return True
                 # table level ttl
-                elif re.search(r'ttl_duration=[0-9]+;', self.comment):
+                elif re.search(r"ttl_duration=[0-9]+;", self.comment):
                     return True
                 else:
                     return False

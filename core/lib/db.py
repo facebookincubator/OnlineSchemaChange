@@ -18,8 +18,14 @@ log = logging.getLogger(__name__)
 
 
 def default_get_mysql_connection(
-        user_name, user_pass, socket, dbname='',
-        timeout=60, connect_timeout=10, charset=None):
+    user_name,
+    user_pass,
+    socket,
+    dbname="",
+    timeout=60,
+    connect_timeout=10,
+    charset=None,
+):
     """
     Default method for connection to a MySQL instance.
     You can override this behaviour by define/import in cli.py and pass it to
@@ -28,15 +34,15 @@ def default_get_mysql_connection(
     MySQLdb.Connect does.
     """
     connection_config = {
-        'user': user_name,
-        'passwd': user_pass,
-        'unix_socket': socket,
-        'db': dbname,
-        'use_unicode': True,
-        'connect_timeout': connect_timeout
+        "user": user_name,
+        "passwd": user_pass,
+        "unix_socket": socket,
+        "db": dbname,
+        "use_unicode": True,
+        "connect_timeout": connect_timeout,
     }
     if charset:
-        connection_config['charset'] = charset
+        connection_config["charset"] = charset
     dbh = MySQLdb.Connect(**connection_config)
     dbh.autocommit(True)
     if timeout:
@@ -53,8 +59,16 @@ class MySQLSocketConnection:
     self.conn will contain the actual database handler.
     """
 
-    def __init__(self, user, password, socket, dbname='',
-                 connect_timeout=10, connect_function=None, charset=None):
+    def __init__(
+        self,
+        user,
+        password,
+        socket,
+        dbname="",
+        connect_timeout=10,
+        connect_function=None,
+        charset=None,
+    ):
         self.user = user
         self.password = password
         self.db = dbname
@@ -69,7 +83,8 @@ class MySQLSocketConnection:
         else:
             self.connect_function = default_get_mysql_connection
         self.query_header = "/* {} */".format(
-            ":".join((sys.argv[0], os.path.basename(__file__))))
+            ":".join((sys.argv[0], os.path.basename(__file__)))
+        )
 
     def connect(self):
         """Establish a connection to a database.
@@ -81,8 +96,13 @@ class MySQLSocketConnection:
         @raise:
         """
         self.conn = self.connect_function(
-            self.user, self.password, self.socket, self.db,
-            connect_timeout=self.connect_timeout, charset=self.charset)
+            self.user,
+            self.password,
+            self.socket,
+            self.db,
+            connect_timeout=self.connect_timeout,
+            charset=self.charset,
+        )
 
     def disconnect(self):
         """Close an existing open connection to a MySQL server."""
@@ -136,14 +156,16 @@ class MySQLSocketConnection:
         # Turning MySQLdb.Warning into exception, so that we can catch it
         # and maintain the same log output format
         with warnings.catch_warnings():
-            warnings.filterwarnings('error', category=MySQLdb.Warning)
+            warnings.filterwarnings("error", category=MySQLdb.Warning)
             try:
                 cursor = self.conn.cursor()
                 cursor.execute("%s %s" % (self.query_header, sql), args)
             except Warning as db_warning:
                 log.warning(
-                    "MySQL warning: {}, when executing sql: {}, args: {}"
-                    .format(db_warning, sql, args))
+                    "MySQL warning: {}, when executing sql: {}, args: {}".format(
+                        db_warning, sql, args
+                    )
+                )
             return cursor.rowcount
 
     def get_running_queries(self):

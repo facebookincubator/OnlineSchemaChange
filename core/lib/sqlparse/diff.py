@@ -35,20 +35,25 @@ class SchemaDiff(object):
         self.left = left
         self.right = right
         self.attrs_to_check = [
-            'charset', 'collate', 'comment',
-            'engine', 'key_block_size', 'name', 'row_format',
+            "charset",
+            "collate",
+            "comment",
+            "engine",
+            "key_block_size",
+            "name",
+            "row_format",
         ]
         if not ignore_partition:
-            self.attrs_to_check.append('partition')
+            self.attrs_to_check.append("partition")
 
     def _calculate_diff(self):
         diffs = {
-            'removed': [],
-            'added': [],
+            "removed": [],
+            "added": [],
             # Customized messages
-            'msgs': [],
+            "msgs": [],
             # Any attributes that were modified
-            'attrs_modified': [],
+            "attrs_modified": [],
         }
         # We are copying here since we want to change the col list.
         # Shallow copy should be enough here
@@ -56,17 +61,18 @@ class SchemaDiff(object):
         col_right_copy = copy.copy(self.right.column_list)
         for col in self.left.column_list:
             if col not in self.right.column_list:
-                diffs['removed'].append(col)
+                diffs["removed"].append(col)
                 col_left_copy.remove(col)
 
         for col in self.right.column_list:
             if col not in self.left.column_list:
-                diffs['added'].append(col)
+                diffs["added"].append(col)
                 col_right_copy.remove(col)
 
         # Two tables have different col order
         if sorted(col_left_copy, key=lambda col: col.name) == sorted(
-                col_right_copy, key=lambda col: col.name):
+            col_right_copy, key=lambda col: col.name
+        ):
             old_order = []
             new_order = []
             for col1, col2 in zip(col_left_copy, col_right_copy):
@@ -80,24 +86,24 @@ class SchemaDiff(object):
 
         for idx in self.left.indexes:
             if idx not in self.right.indexes:
-                diffs['removed'].append(idx)
+                diffs["removed"].append(idx)
         for idx in self.right.indexes:
             if idx not in self.left.indexes:
-                diffs['added'].append(idx)
+                diffs["added"].append(idx)
 
         if self.left.primary_key != self.right.primary_key:
             if self.left.primary_key.column_list:
-                diffs['removed'].append(self.left.primary_key)
+                diffs["removed"].append(self.left.primary_key)
             if self.right.primary_key.column_list:
-                diffs['added'].append(self.right.primary_key)
+                diffs["added"].append(self.right.primary_key)
 
         for attr in self.attrs_to_check:
             tbl_option_old = getattr(self.left, attr)
             tbl_option_new = getattr(self.right, attr)
             if not is_equal(tbl_option_old, tbl_option_new):
-                diffs['removed'].append(TableOptionDiff(attr, tbl_option_old))
-                diffs['added'].append(TableOptionDiff(attr, tbl_option_new))
-                diffs['attrs_modified'].append(attr)
+                diffs["removed"].append(TableOptionDiff(attr, tbl_option_old))
+                diffs["added"].append(TableOptionDiff(attr, tbl_option_new))
+                diffs["attrs_modified"].append(attr)
 
         return diffs
 
@@ -107,14 +113,14 @@ class SchemaDiff(object):
         else:
             diff_strs = []
             diffs = self._calculate_diff()
-            for diff in diffs['removed']:
-                diff_strs.append('- ' + diff.to_sql())
-            for diff in diffs['added']:
-                diff_strs.append('+ ' + diff.to_sql())
+            for diff in diffs["removed"]:
+                diff_strs.append("- " + diff.to_sql())
+            for diff in diffs["added"]:
+                diff_strs.append("+ " + diff.to_sql())
             for diff in diffs["msgs"]:
                 diff_strs.append(diff)
             for attr in diffs["attrs_modified"]:
-                diff_strs.append(f'attrs_modified: {attr}')
+                diff_strs.append(f"attrs_modified: {attr}")
             diff_str = "\n".join(diff_strs)
             return diff_str
 
@@ -142,16 +148,21 @@ class SchemaDiff(object):
         for idx, col in enumerate(self.right.column_list):
             if col.name not in old_columns.keys():
                 if idx == 0:
-                    position = 'FIRST'
+                    position = "FIRST"
                     old_column_names = [col.name] + old_column_names
                 else:
-                    position = 'AFTER `{}`'.format(escape(
-                        self.right.column_list[idx - 1].name))
+                    position = "AFTER `{}`".format(
+                        escape(self.right.column_list[idx - 1].name)
+                    )
                     old_column_names = [col.name] + old_column_names
-                    new_idx = old_column_names.index(
-                        self.right.column_list[idx - 1].name) + 1
-                    old_column_names = old_column_names[:new_idx] + [col.name] \
+                    new_idx = (
+                        old_column_names.index(self.right.column_list[idx - 1].name) + 1
+                    )
+                    old_column_names = (
+                        old_column_names[:new_idx]
+                        + [col.name]
                         + old_column_names[new_idx:]
+                    )
                 handled_cols.append(col.name)
                 segments.append("ADD {} {}".format(col.to_sql(), position))
 
@@ -182,9 +193,11 @@ class SchemaDiff(object):
             if new_column_names[idx - 1] == old_column_names[old_pos - 1]:
                 continue
 
-            segments.append("MODIFY {} AFTER `{}`".format(
-                col.to_sql(), escape(new_column_names[idx - 1])
-            ))
+            segments.append(
+                "MODIFY {} AFTER `{}`".format(
+                    col.to_sql(), escape(new_column_names[idx - 1])
+                )
+            )
             handled_cols.append(col_name)
 
         # Modify columns
@@ -215,8 +228,9 @@ class SchemaDiff(object):
 
         if self.left.primary_key and not self.right.primary_key:
             segments.append("DROP PRIMARY KEY")
-        elif not self.left.primary_key.column_list \
-                and self.right.primary_key.column_list:
+        elif (
+            not self.left.primary_key.column_list and self.right.primary_key.column_list
+        ):
             segments.append("ADD {}".format(self.right.primary_key.to_sql()))
         elif self.left.primary_key != self.right.primary_key:
             segments.append("DROP PRIMARY KEY")
@@ -251,7 +265,8 @@ class SchemaDiff(object):
 
         if segments:
             return "ALTER TABLE `{}` {}".format(
-                escape(self.right.name), ", ".join(segments))
+                escape(self.right.name), ", ".join(segments)
+            )
 
 
 def get_type_conv_columns(old_obj, new_obj):
@@ -297,18 +312,20 @@ def need_default_ts_bootstrap(old_obj, new_obj):
         old_col = current_cols.get(name)
 
         # This check only applies to column types that support default ts value
-        if new_col.column_type not in ['TIMESTAMP', 'DATE', 'DATETIME']:
+        if new_col.column_type not in ["TIMESTAMP", "DATE", "DATETIME"]:
             continue
-        if new_col.column_type == 'TIMESTAMP':
+        if new_col.column_type == "TIMESTAMP":
             new_col.explicit_ts_default()
 
         # Nothing to worry if a vulnerable column type doesn't use current time
         # as default
         if str(new_col.column_type) == "TIMESTAMP":
             # Cases for TIMESTAMP type
-            if str(new_col.default).upper() != "CURRENT_TIMESTAMP" and \
-                    str(new_col.on_update_current_timestamp).upper() != \
-                    "CURRENT_TIMESTAMP":
+            if (
+                str(new_col.default).upper() != "CURRENT_TIMESTAMP"
+                and str(new_col.on_update_current_timestamp).upper()
+                != "CURRENT_TIMESTAMP"
+            ):
                 continue
         else:
             # Cases for DATE and DATETIME type
@@ -323,13 +340,16 @@ def need_default_ts_bootstrap(old_obj, new_obj):
         # At this point we know this column in new schema need default value setting
         # to curernt ts. We will need to further confirm if old schema does the same
         # or not. If not, this will be consider as dangerous for replication
-        if str(new_col.default).upper() == "CURRENT_TIMESTAMP" \
-                and str(old_col.default).upper() != "CURRENT_TIMESTAMP":
+        if (
+            str(new_col.default).upper() == "CURRENT_TIMESTAMP"
+            and str(old_col.default).upper() != "CURRENT_TIMESTAMP"
+        ):
             return True
 
-        if str(new_col.on_update_current_timestamp).upper() == "CURRENT_TIMESTAMP" \
-                and str(old_col.on_update_current_timestamp).upper() \
-                != "CURRENT_TIMESTAMP":
+        if (
+            str(new_col.on_update_current_timestamp).upper() == "CURRENT_TIMESTAMP"
+            and str(old_col.on_update_current_timestamp).upper() != "CURRENT_TIMESTAMP"
+        ):
             return True
 
     return False

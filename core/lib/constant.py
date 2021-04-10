@@ -7,29 +7,29 @@ This source code is licensed under the BSD-style license found in the
 LICENSE file in the root directory of this source tree.
 """
 
-PREFIX = '__osc_'
-OUTFILE_TABLE = '__osc_tbl_'
-OUTFILE_EXCLUDE_ID = '__osc_ex_'
-OUTFILE_INCLUDE_ID = '__osc_in_'
-NEW_TABLE_PREFIX = '__osc_new_'
-DELTA_TABLE_PREFIX = '__osc_chg_'
-RENAMED_TABLE_PREFIX = '__osc_old_'
-INSERT_TRIGGER_PREFIX = '__osc_ins_'
-UPDATE_TRIGGER_PREFIX = '__osc_upd_'
-DELETE_TRIGGER_PREFIX = '__osc_del_'
+PREFIX = "__osc_"
+OUTFILE_TABLE = "__osc_tbl_"
+OUTFILE_EXCLUDE_ID = "__osc_ex_"
+OUTFILE_INCLUDE_ID = "__osc_in_"
+NEW_TABLE_PREFIX = "__osc_new_"
+DELTA_TABLE_PREFIX = "__osc_chg_"
+RENAMED_TABLE_PREFIX = "__osc_old_"
+INSERT_TRIGGER_PREFIX = "__osc_ins_"
+UPDATE_TRIGGER_PREFIX = "__osc_upd_"
+DELETE_TRIGGER_PREFIX = "__osc_del_"
 
 # tables with 64 character length names need a generic place-holder name
-GENERIC_TABLE_NAME = 'online_schema_change_temp_tbl'
+GENERIC_TABLE_NAME = "online_schema_change_temp_tbl"
 
 # Special prefixes for tables that have longer table names
-SHORT_NEW_TABLE_PREFIX = 'n!'
-SHORT_DELTA_TABLE_PREFIX = 'c!'
-SHORT_RENAMED_TABLE_PREFIX = 'o!'
-SHORT_INSERT_TRIGGER_PREFIX = 'i!'
-SHORT_UPDATE_TRIGGER_PREFIX = 'u!'
-SHORT_DELETE_TRIGGER_PREFIX = 'd!'
+SHORT_NEW_TABLE_PREFIX = "n!"
+SHORT_DELTA_TABLE_PREFIX = "c!"
+SHORT_RENAMED_TABLE_PREFIX = "o!"
+SHORT_INSERT_TRIGGER_PREFIX = "i!"
+SHORT_UPDATE_TRIGGER_PREFIX = "u!"
+SHORT_DELETE_TRIGGER_PREFIX = "d!"
 
-OSC_LOCK_NAME = 'OnlineSchemaChange'
+OSC_LOCK_NAME = "OnlineSchemaChange"
 
 CHUNK_BYTES = 2 * 1024 * 1024
 REPLAY_DEFAULT_TIMEOUT = 5  # replay until we can finish in 5 seconds

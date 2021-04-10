@@ -31,31 +31,31 @@ class Payload(object):
     """
 
     def __init__(self, **kwargs):
-        self.outfile_dir = ''
-        self.repl_status = ''
+        self.outfile_dir = ""
+        self.repl_status = ""
         self._mysql_vars = {}
         self.session_timeout = 1200
         self.sql_list = []
         self.force = False
         self.standardize = False
         self.dry_run = False
-        self.mysql_engine = ''
+        self.mysql_engine = ""
         self._conn = None
         self._sql_now = None
         self._sql_args_now = None
-        self.ddl_file_list = kwargs.get('ddl_file_list', None)
-        self.get_conn_func = kwargs.get('get_conn_func', None)
+        self.ddl_file_list = kwargs.get("ddl_file_list", None)
+        self.get_conn_func = kwargs.get("get_conn_func", None)
         self.hook_map = kwargs.get(
-            'hook_map', collections.defaultdict(lambda: hook.NoopHook()))
-        self.socket = kwargs.get('socket', '')
-        self.mysql_user = kwargs.get('mysql_user', '')
-        self.mysql_pass = kwargs.get('mysql_password', '')
-        self.charset = kwargs.get('charset', None)
-        self.db_list = kwargs.get('database', [])
-        self.mysql_engine = kwargs.get('mysql_engine', None)
-        self.sudo = kwargs.get('sudo', False)
-        self.skip_named_lock = kwargs.get(
-            'skip_named_lock', False)
+            "hook_map", collections.defaultdict(lambda: hook.NoopHook())
+        )
+        self.socket = kwargs.get("socket", "")
+        self.mysql_user = kwargs.get("mysql_user", "")
+        self.mysql_pass = kwargs.get("mysql_password", "")
+        self.charset = kwargs.get("charset", None)
+        self.db_list = kwargs.get("database", [])
+        self.mysql_engine = kwargs.get("mysql_engine", None)
+        self.sudo = kwargs.get("sudo", False)
+        self.skip_named_lock = kwargs.get("skip_named_lock", False)
         self.mysql_vars = {}
         self.is_slave_stopped_by_me = False
 
@@ -69,7 +69,7 @@ class Payload(object):
         """
         return self._conn
 
-    def init_conn(self, dbname=''):
+    def init_conn(self, dbname=""):
         """
         Initialize database connection handler
         """
@@ -80,29 +80,34 @@ class Payload(object):
         else:
             return True
 
-    def get_conn(self, dbname=''):
+    def get_conn(self, dbname=""):
         """
         Create the connection to MySQL instance, there will be only one
         connection during the whole schema change
         """
         try:
             conn = db_lib.MySQLSocketConnection(
-                self.mysql_user, self.mysql_pass, self.socket, dbname,
-                connect_function=self.get_conn_func, charset=self.charset)
+                self.mysql_user,
+                self.mysql_pass,
+                self.socket,
+                dbname,
+                connect_function=self.get_conn_func,
+                charset=self.charset,
+            )
             if conn:
                 conn.connect()
                 if self.session_timeout:
-                    conn.execute("SET SESSION wait_timeout = {}"
-                                 .format(self.session_timeout))
+                    conn.execute(
+                        "SET SESSION wait_timeout = {}".format(self.session_timeout)
+                    )
                 return conn
         except MySQLdb.MySQLError as e:
             errcode, errmsg = e.args
-            log.error("Error when connecting to MySQL [{}] {}"
-                      .format(errcode, errmsg))
+            log.error("Error when connecting to MySQL [{}] {}".format(errcode, errmsg))
             raise OSCError(
-                'GENERIC_MYSQL_ERROR',
-                {'stage': 'Connecting to MySQL',
-                 'errnum': errcode, 'errmsg': errmsg})
+                "GENERIC_MYSQL_ERROR",
+                {"stage": "Connecting to MySQL", "errnum": errcode, "errmsg": errmsg},
+            )
 
     def close_conn(self):
         """
@@ -130,36 +135,42 @@ class Payload(object):
     def get_mysql_settings(self):
         result = self.query("SHOW SESSION VARIABLES")
         for row in result:
-            self.mysql_vars[row['Variable_name']] = row['Value']
+            self.mysql_vars[row["Variable_name"]] = row["Value"]
 
     def init_mysql_version(self):
         """
         Parse the mysql_version string into a version object
         """
-        self.mysql_version = MySQLVersion(self.mysql_vars['version'])
+        self.mysql_version = MySQLVersion(self.mysql_vars["version"])
 
     def check_replication_type(self):
         """
         Get current replication role for the instance attached to this payload
         """
-        repl_status_now = 'slave'
-        log.debug("Checking replication role type, expecting: {}"
-                  .format(self.repl_status))
+        repl_status_now = "slave"
+        log.debug(
+            "Checking replication role type, expecting: {}".format(self.repl_status)
+        )
         r = self.query("SHOW SLAVE STATUS")
         if not r:
-            repl_status_now = 'master'
-        log.debug("Replication mode for database is: {}"
-                  .format(repl_status_now))
+            repl_status_now = "master"
+        log.debug("Replication mode for database is: {}".format(repl_status_now))
         return repl_status_now == self.repl_status
 
     def get_partition_method(self, db, table):
         """
         Get partition method for the db/table
         """
-        result = self.query(sql.partition_method, (db, table,))
+        result = self.query(
+            sql.partition_method,
+            (
+                db,
+                table,
+            ),
+        )
 
         if result:
-            return result[0]['pm'] or False
+            return result[0]["pm"] or False
         return False
 
     def query(self, sql, args=None):
@@ -168,8 +179,7 @@ class Payload(object):
         """
         self._sql_now = sql
         self._sql_args_now = args
-        log.debug("Running the following SQL on MySQL: {} {}"
-                  .format(sql, args))
+        log.debug("Running the following SQL on MySQL: {} {}".format(sql, args))
         return self._conn.query(sql, args)
 
     def execute_sql(self, sql, args=None):
@@ -179,8 +189,7 @@ class Payload(object):
         """
         self._sql_now = sql
         self._sql_args_now = args
-        log.debug("Running the following SQL on MySQL: {} {}"
-                  .format(sql, args))
+        log.debug("Running the following SQL on MySQL: {} {}".format(sql, args))
         return self._conn.execute(sql, args)
 
     def fetch_mysql_vars(self):
@@ -189,16 +198,17 @@ class Payload(object):
         """
         log.debug("Fetching variables from MySQL")
         variables = self._conn.query("SHOW VARIABLES")
-        self._mysql_vars = {
-            r['Variable_name']: r['Value'] for r in variables}
+        self._mysql_vars = {r["Variable_name"]: r["Value"] for r in variables}
         if self._mysql_vars:
             return True
 
     @property
     def mysql_var(self):
         if not self._mysql_vars:
-            log.exception("fetch_mysql_vars hasn't been not called before "
-                          "accessing _mysql_vars")
+            log.exception(
+                "fetch_mysql_vars hasn't been not called before "
+                "accessing _mysql_vars"
+            )
             return []
         return self._mysql_vars
 
@@ -210,7 +220,7 @@ class Payload(object):
         non_exist_dbs = []
         try:
             databases = self.query("SHOW DATABASES")
-            dbs = {r['Database'] for r in databases}
+            dbs = {r["Database"] for r in databases}
             for db in self.db_list:
                 if db not in dbs:
                     log.warning("DB: {} doesn't exist in MySQL".format(db))
@@ -227,15 +237,15 @@ class Payload(object):
         """
         for ddl_file in self.ddl_file_list:
             with codecs.open(ddl_file, "r", "utf-8") as fh:
-                raw_sql = "\n".join([
-                    line for line in fh.readlines()
-                    if not line.startswith('--')])
+                raw_sql = "\n".join(
+                    [line for line in fh.readlines() if not line.startswith("--")]
+                )
                 try:
                     parsed_sql = parse_create(raw_sql)
                 except ParseError as e:
                     raise OSCError(
-                        'INVALID_SYNTAX',
-                        {'filepath': ddl_file, 'msg': str(e)})
+                        "INVALID_SYNTAX", {"filepath": ddl_file, "msg": str(e)}
+                    )
                 # If engine enforcement is given on CLI, we need to compare
                 # whether the engine in file is the same as what we expect
                 if self.mysql_engine:
@@ -243,17 +253,16 @@ class Payload(object):
                         log.warning(
                             "Engine enforcement specified, but engine option"
                             "is not specified in: '{}'. It will use MySQL's "
-                            "default engine"
-                            .format(ddl_file))
-                    elif self.mysql_engine.lower() != \
-                            parsed_sql.engine.lower():
-                        raise OSCError('WRONG_ENGINE',
-                                       {'engine': parsed_sql.engine,
-                                        'expect': self.mysql_engine})
-                self.sql_list.append({
-                    'filepath': ddl_file,
-                    'raw_sql': raw_sql,
-                    'sql_obj': parsed_sql})
+                            "default engine".format(ddl_file)
+                        )
+                    elif self.mysql_engine.lower() != parsed_sql.engine.lower():
+                        raise OSCError(
+                            "WRONG_ENGINE",
+                            {"engine": parsed_sql.engine, "expect": self.mysql_engine},
+                        )
+                self.sql_list.append(
+                    {"filepath": ddl_file, "raw_sql": raw_sql, "sql_obj": parsed_sql}
+                )
 
     def set_no_binlog(self):
         """
@@ -264,9 +273,9 @@ class Payload(object):
         except MySQLdb.MySQLError as e:
             errcode, errmsg = e.args
             raise OSCError(
-                'GENERIC_MYSQL_ERROR',
-                {'stage': 'before running ddl',
-                 'errnum': errcode, 'errmsg': errmsg})
+                "GENERIC_MYSQL_ERROR",
+                {"stage": "before running ddl", "errnum": errcode, "errmsg": errmsg},
+            )
 
     @property
     def is_high_pri_ddl_supported(self):
@@ -275,7 +284,7 @@ class Payload(object):
         setting high_priority_ddl=1
         """
         if self.mysql_version.is_fb:
-            if self.mysql_version >= MySQLVersion('5.6.35'):
+            if self.mysql_version >= MySQLVersion("5.6.35"):
                 return True
             else:
                 return False
@@ -292,10 +301,10 @@ class Payload(object):
         The caller should try the first scope, and if that fails, use the second.
         """
         if self.mysql_version.is_mysql8:
-            return 'sql_require_primary_key', 'session', 'session'
+            return "sql_require_primary_key", "session", "session"
         else:
             if self.mysql_version.is_fb:
-                return 'block_create_no_primary_key', 'session', 'global'
+                return "block_create_no_primary_key", "session", "global"
 
         return None, None, None
 
@@ -304,26 +313,25 @@ class Payload(object):
         Enable high priority DDL if current MySQL supports it
         """
         if self.is_high_pri_ddl_supported:
-            self.execute_sql(
-                sql.set_session_variable('high_priority_ddl'), (1,))
+            self.execute_sql(sql.set_session_variable("high_priority_ddl"), (1,))
 
     def query_variable(self, var_name, scope):
         """
         Query system variable and return its value.
         """
-        if scope == 'global':
+        if scope == "global":
             row = self.query(sql.get_global_variable(var_name))
         else:
             row = self.query(sql.get_session_variable(var_name))
 
         if row:
-            return row[0]['Value']
+            return row[0]["Value"]
 
     def set_variable(self, var_name, scope, value):
         """
         Set system variable value.
         """
-        if scope == 'global':
+        if scope == "global":
             sql_str = sql.set_global_variable(var_name)
         else:
             sql_str = sql.set_session_variable(var_name)
@@ -345,7 +353,7 @@ class Payload(object):
                     return self.query_variable(var_name, scope2)
                 raise
 
-    def set_unset_require_pk(self, value='OFF'):
+    def set_unset_require_pk(self, value="OFF"):
         """
         Set/unset blocking creation of tables without PK if current MySQL supports it
         """
@@ -394,8 +402,12 @@ class Payload(object):
         """
         result = self.query(sql.show_slave_status)
         if result:
-            return all((result[0]['Slave_IO_Running'] == "Yes",
-                       result[0]['Slave_SQL_Running'] == "Yes"))
+            return all(
+                (
+                    result[0]["Slave_IO_Running"] == "Yes",
+                    result[0]["Slave_SQL_Running"] == "Yes",
+                )
+            )
         else:
             return False
 
@@ -423,11 +435,12 @@ class Payload(object):
         It is basically an exclusive meta lock instead of table locks
         """
         if self.skip_named_lock:
-            log.warning("Skipping attempt to get lock, "
-                        "because skip_named_lock is specified")
+            log.warning(
+                "Skipping attempt to get lock, " "because skip_named_lock is specified"
+            )
             return
         result = self.query(sql.get_lock, (constant.OSC_LOCK_NAME,))
-        if not result or not result[0]['lockstatus'] == 1:
+        if not result or not result[0]["lockstatus"] == 1:
             raise OSCError("UNABLE_TO_GET_LOCK")
 
     def release_osc_lock(self):
@@ -439,9 +452,8 @@ class Payload(object):
         if self.skip_named_lock:
             return
         result = self.query(sql.release_lock, (constant.OSC_LOCK_NAME,))
-        if not result or not result[0]['lockstatus'] == 1:
-            log.warning("Unable to release osc lock: {}"
-                        .format(constant.OSC_LOCK_NAME))
+        if not result or not result[0]["lockstatus"] == 1:
+            log.warning("Unable to release osc lock: {}".format(constant.OSC_LOCK_NAME))
 
     def run(self):
         """
@@ -453,59 +465,62 @@ class Payload(object):
         # Get the connection to MySQL ready, so we don't have to create a new
         # connection each time we want to execute a SQL
         if not self.init_conn():
-            raise OSCError('FAILED_TO_CONNECT_DB',
-                           {'user': self.mysql_user,
-                            'socket': self.socket})
+            raise OSCError(
+                "FAILED_TO_CONNECT_DB", {"user": self.mysql_user, "socket": self.socket}
+            )
         self.set_no_binlog()
 
         # Check database existence
         if not bool(self.db_list):
-            raise OSCError('DB_NOT_GIVEN')
+            raise OSCError("DB_NOT_GIVEN")
 
         # Check database existence
         non_exist_dbs = self.check_db_existence()
         if non_exist_dbs:
-            raise OSCError('DB_NOT_EXIST',
-                           {'db_list': ', '.join(non_exist_dbs)})
+            raise OSCError("DB_NOT_EXIST", {"db_list": ", ".join(non_exist_dbs)})
 
         # Test whether the replication role matches
         if self.repl_status:
             if not self.check_replication_type():
-                raise OSCError('REPL_ROLE_MISMATCH',
-                               {'given_role': self.repl_status})
+                raise OSCError("REPL_ROLE_MISMATCH", {"given_role": self.repl_status})
 
         # Fetch mysql variables from server
         if not self.fetch_mysql_vars():
-            raise OSCError('FAILED_TO_FETCH_MYSQL_VARS')
+            raise OSCError("FAILED_TO_FETCH_MYSQL_VARS")
 
         # Iterate through all the specified databases
         for db in self.db_list:
             log.info("Running changes for database: '{}'".format(db))
             # Iterate through all the given sql files
             for job in self.sql_list:
-                log.info("Running SQLs from file: '{}'"
-                         .format(job['filepath']))
+                log.info("Running SQLs from file: '{}'".format(job["filepath"]))
                 try:
                     if not self.init_conn():
-                        raise OSCError('FAILED_TO_CONNECT_DB',
-                                       {'user': self.mysql_user,
-                                        'socket': self.socket})
+                        raise OSCError(
+                            "FAILED_TO_CONNECT_DB",
+                            {"user": self.mysql_user, "socket": self.socket},
+                        )
                     if self.standardize:
-                        self.run_ddl(db, job['sql_obj'].to_sql())
+                        self.run_ddl(db, job["sql_obj"].to_sql())
                     else:
-                        self.run_ddl(db, job['raw_sql'])
-                    log.info("Successfully run changes from file: '{}'"
-                             .format(job['filepath']))
+                        self.run_ddl(db, job["raw_sql"])
+                    log.info(
+                        "Successfully run changes from file: '{}'".format(
+                            job["filepath"]
+                        )
+                    )
                 except Exception as e:
                     if not self.force:
                         raise
                     else:
-                        log.warning("Following error is ignored because of "
-                                    "force mode is enabled: ")
+                        log.warning(
+                            "Following error is ignored because of "
+                            "force mode is enabled: "
+                        )
                         log.warning("\t{}".format(e))
             log.info("Changes for database '{}' finished".format(db))
 
-    def execute_hook(self, hook_point=''):
+    def execute_hook(self, hook_point=""):
         """Look up predefined hook in hook_map and execute it
 
         @param hook_point:  Name of a hook to execute. A hook point is defined
@@ -520,6 +535,9 @@ class Payload(object):
         log.debug("Trigger hook point: {}".format(hook_point))
         hook_obj = self.hook_map[hook_point]
         if not isinstance(hook_obj, hook.NoopHook):
-            log.debug("Executing hook: {} for hook point: {}"
-                      .format(hook_obj.__class__.__name__, hook_point))
+            log.debug(
+                "Executing hook: {} for hook point: {}".format(
+                    hook_obj.__class__.__name__, hook_point
+                )
+            )
             hook_obj.execute(self)

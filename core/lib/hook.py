@@ -30,12 +30,14 @@ def wrap_hook(func):
     will register both 'before_foo' and 'after_foo', which will be invoked
     before and after the foo function being executed.
     """
+
     @functools.wraps(func)
     def func_with_hook(self, *args, **kwargs):
-        self.execute_hook('before_{}'.format(func.__name__))
+        self.execute_hook("before_{}".format(func.__name__))
         result = func(self, *args, **kwargs)
-        self.execute_hook('after_{}'.format(func.__name__))
+        self.execute_hook("after_{}".format(func.__name__))
         return result
+
     return func_with_hook
 
 
@@ -43,6 +45,7 @@ class HookBase(object):
     """
     Base hook, cannot be used directly
     """
+
     def __init__(self, critical=False, **kwargs):
         self.critical = critical
 
@@ -65,6 +68,7 @@ class NoopHook(HookBase):
     None-op hook, this is the default hook if we don't specify an override for
     certain hook point
     """
+
     def _execute(self, payload):
         log.debug("Noop hook, doing nothing here")
 
@@ -73,7 +77,8 @@ class SQLHook(HookBase):
     """
     Hook for executing SQLs inside sql_file_path
     """
-    def __init__(self, sql_file_path='', *args, **kwargs):
+
+    def __init__(self, sql_file_path="", *args, **kwargs):
         super(SQLHook, self).__init__(*args, **kwargs)
         self.file_path = sql_file_path
         self._dbh = None
@@ -85,16 +90,16 @@ class SQLHook(HookBase):
     def read_sqls(self):
         log.debug("Reading {}".format(self.file_path))
         with codecs.open(self.file_path, "r", "utf-8") as fh:
-            current_sql = ''
+            current_sql = ""
             for line in fh:
                 # ignore sql comments
-                if line.startswith('--'):
+                if line.startswith("--"):
                     continue
                 # ignore empty line
                 if not line.strip():
                     continue
                 if self._is_select is None:
-                    if line.startswith('SELECT'):
+                    if line.startswith("SELECT"):
                         # The first line of expected result is always SELECT
                         # statement
                         self._is_select = True
@@ -107,9 +112,9 @@ class SQLHook(HookBase):
                     self._expected_lines.append(line.strip())
                 else:
                     current_sql += line
-                    if line.endswith(';\n'):
+                    if line.endswith(";\n"):
                         self._sqls.append(current_sql)
-                        current_sql = ''
+                        current_sql = ""
         log.debug(self._sqls)
 
     def execute_sqls(self):
@@ -124,29 +129,29 @@ class SQLHook(HookBase):
             result = self._dbh.query_array(self._sqls[0])
             if len(result) != len(self._expected_lines):
                 raise OSCError(
-                    'ASSERTION_ERROR',
+                    "ASSERTION_ERROR",
                     {
-                        'expected': "{} lines of result set".format(
-                            len(self._expected_lines)),
-                        'got': "{} lines of result set".format(len(result))
-                    })
+                        "expected": "{} lines of result set".format(
+                            len(self._expected_lines)
+                        ),
+                        "got": "{} lines of result set".format(len(result)),
+                    },
+                )
 
             for idx, expected_row in enumerate(self._expected_lines):
                 got_line = "\t".join([str(col) for col in result[idx]])
                 if got_line != expected_row:
                     raise OSCError(
-                        'ASSERTION_ERROR',
-                        {'expected': expected_row, 'got': got_line})
+                        "ASSERTION_ERROR", {"expected": expected_row, "got": got_line}
+                    )
         else:
             for sql in self._sqls:
-                log.debug(
-                    "Running the following SQL on MySQL: {} ".format(sql))
+                log.debug("Running the following SQL on MySQL: {} ".format(sql))
                 self._dbh.execute(sql)
 
     def _execute(self, payload):
         self._dbh = payload.conn
-        log.info("Running sql file: {} for {}"
-                 .format(self.file_path, payload.socket))
+        log.info("Running sql file: {} for {}".format(self.file_path, payload.socket))
 
 
 class SQLNewConnHook(SQLHook):
@@ -156,10 +161,10 @@ class SQLNewConnHook(SQLHook):
     as the one used for OSC operation, so that it can has different sql_mode,
     session setting, etc
     """
+
     def _execute(self, payload):
         self._dbh = payload.get_conn(payload.current_db)
-        log.info("Running sql file: {} for {}"
-                 .format(self.file_path, payload.socket))
+        log.info("Running sql file: {} for {}".format(self.file_path, payload.socket))
         self.execute_sqls()
         self._dbh.close()
 
@@ -171,11 +176,11 @@ class SQLNewConnInThreadHook(SQLHook):
     This is useful when you want to run a slow SQL in the trigger, and don't
     want to block the main OSC logic from running
     """
+
     def _execute(self, payload):
         thd = Thread(target=self.execute_sqls)
         self._dbh = payload.get_conn(payload.current_db)
-        log.info("Running sql file: {} for {}"
-                 .format(self.file_path, payload.socket))
+        log.info("Running sql file: {} for {}".format(self.file_path, payload.socket))
         thd.start()
         # Wait for a while to make sure the SQL has started running before we
         # proceed

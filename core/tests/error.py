@@ -16,5 +16,5 @@ class OSCErrorTest(unittest.TestCase):
         # Make sure all the error codes in ERR_MAPPING do not have duplicates
         err_dict = {}
         for err in OSCError.ERR_MAPPING.values():
-            self.assertNotIn(err['code'], err_dict)
-            err_dict[err['code']] = err['desc']
+            self.assertNotIn(err["code"], err_dict)
+            err_dict[err["code"]] = err["desc"]

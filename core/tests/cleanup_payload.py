@@ -14,13 +14,13 @@ from ..lib.payload.cleanup import CleanupPayload
 class CleanupPayloadTestCase(unittest.TestCase):
     def test_remove_all_file_entries(self):
         payload = CleanupPayload()
-        payload.add_file_entry('/this/is/a/path/')
-        payload.add_file_entry('/this/is/another/path/')
+        payload.add_file_entry("/this/is/a/path/")
+        payload.add_file_entry("/this/is/another/path/")
         payload.remove_all_file_entries()
         self.assertEqual(len(payload.files_to_clean), 0)
 
     def test_add_file_entry(self):
         payload = CleanupPayload()
-        path = '/this/is/a/path/'
+        path = "/this/is/a/path/"
         payload.add_file_entry(path)
         self.assertEqual(payload.files_to_clean, [path])

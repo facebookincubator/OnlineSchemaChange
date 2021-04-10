@@ -27,18 +27,17 @@ def rm(filename, sudo=False):
     """
     cmd_args = []
     if sudo:
-        cmd_args += ['sudo']
-    cmd_args += ['/bin/rm', filename]
+        cmd_args += ["sudo"]
+    cmd_args += ["/bin/rm", filename]
     log.debug("Executing cmd: {}".format(str(cmd_args)))
-    proc = subprocess.Popen(cmd_args, stdin=subprocess.PIPE,
-                            stdout=subprocess.PIPE)
+    proc = subprocess.Popen(cmd_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     try:
         (stdout, stderr) = proc.communicate(timeout=20)
         # return True if returncode is success (0)
         return not proc.returncode
     except subprocess.TimeoutExpired:
         proc.kill()
-        raise OSCError('SHELL_TIMEOUT', {'cmd': ' '.join(cmd_args)})
+        raise OSCError("SHELL_TIMEOUT", {"cmd": " ".join(cmd_args)})
 
 
 def sync_dir(dirname):
@@ -95,7 +94,7 @@ def disk_partition_free(path):
         return vfs.f_bavail * vfs.f_bsize
     except Exception:
         log.exception("Exception when trying to get disk free space: ")
-        raise OSCError('UNABLE_TO_GET_FREE_DISK_SPACE', {'path': path})
+        raise OSCError("UNABLE_TO_GET_FREE_DISK_SPACE", {"path": path})
 
 
 def disk_partition_size(path):
@@ -115,7 +114,7 @@ def disk_partition_size(path):
         return vfs.f_blocks * vfs.f_bsize
     except Exception:
         log.exception("Exception when trying to get partition size: ")
-        raise OSCError('UNABLE_TO_GET_PARTITION_SIZE', {'path': path})
+        raise OSCError("UNABLE_TO_GET_PARTITION_SIZE", {"path": path})
 
 
 def readable_size(nbytes):
@@ -127,15 +126,15 @@ def readable_size(nbytes):
     @return:  readable size
     @rtype :  string
     """
-    suffixes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+    suffixes = ["B", "KB", "MB", "GB", "TB", "PB"]
     if nbytes == 0:
-        return '0 B'
+        return "0 B"
     i = 0
     while nbytes >= 1024 and i < len(suffixes) - 1:
-        nbytes /= 1024.
+        nbytes /= 1024.0
         i += 1
-    f = ('%.2f' % nbytes).rstrip('0').rstrip('.')
-    return '%s %s' % (f, suffixes[i])
+    f = ("%.2f" % nbytes).rstrip("0").rstrip(".")
+    return "%s %s" % (f, suffixes[i])
 
 
 class RangeChain(object):
@@ -145,6 +144,7 @@ class RangeChain(object):
     Knowing that the missing points are much less than the number of filling
     points, we only store missing points and record a end point of the range
     """
+
     def __init__(self):
         self._stop = 0
         self._gap = []
@@ -167,12 +167,12 @@ class RangeChain(object):
             if point > self._stop:
                 raise Exception(
                     "Trying to fill a value {} "
-                    "beyond current covering range"
-                    .format(point))
+                    "beyond current covering range".format(point)
+                )
             else:
                 raise Exception(
-                    "Trying to fill a value {} which already exists"
-                    .format(point))
+                    "Trying to fill a value {} which already exists".format(point)
+                )
 
     def missing_points(self):
         return self._gap
@@ -192,6 +192,5 @@ def dirname_for_db(db_name):
                 converted_chars.append(new_char)
         return "".join(converted_chars)
     except Exception:
-        log.exception(
-            "Unable to convert db name %s to a valid directory name", db_name)
+        log.exception("Unable to convert db name %s to a valid directory name", db_name)
         raise

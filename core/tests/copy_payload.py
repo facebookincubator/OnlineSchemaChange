@@ -22,14 +22,12 @@ from unittest.mock import Mock
 class CopyPayloadTestCase(unittest.TestCase):
     def payload_setup(self, **payload_kwargs):
         payload = CopyPayload(**payload_kwargs)
-        table_obj = parse_create(
-            " CREATE TABLE a "
-            "( ID int primary key ) ")
+        table_obj = parse_create(" CREATE TABLE a " "( ID int primary key ) ")
         payload._old_table = table_obj
         payload._new_table = table_obj
-        payload._current_db = 'test'
-        payload.range_start_vars_array = ['@ID']
-        payload.range_end_vars_array = ['@ID']
+        payload._current_db = "test"
+        payload.range_start_vars_array = ["@ID"]
+        payload.range_end_vars_array = ["@ID"]
         return payload
 
     def test_checksum_running_with_proper_idx(self):
@@ -39,35 +37,35 @@ class CopyPayloadTestCase(unittest.TestCase):
         pri_key_list = []
         for i in range(3):
             col = Mock()
-            col.name = 'col{}'.format(i)
+            col.name = "col{}".format(i)
             pri_key_list.append(col)
 
         payload._old_table.primary_key = Mock(is_unique=True)
-        payload._old_table.primary_key.name = 'PRIMARY'
+        payload._old_table.primary_key.name = "PRIMARY"
         payload._old_table.primary_key.column_list = pri_key_list
 
         payload._new_table.primary_key = Mock(is_unique=True)
-        payload._new_table.primary_key.name = 'PRIMARY'
+        payload._new_table.primary_key.name = "PRIMARY"
         payload._new_table.primary_key.column_list = pri_key_list
 
         # If primary key hasn't been changed, we can use that one for checksum
         payload._pk_for_filter = [c.name for c in pri_key_list]
-        self.assertEqual(payload.find_coverage_index(), 'PRIMARY')
+        self.assertEqual(payload.find_coverage_index(), "PRIMARY")
 
         # If new primary key has its left most prefix covering the old primary
         # key, we can use that as well
         col = Mock()
-        col.name = 'col4'
+        col.name = "col4"
         pri_key_list.append(col)
         payload._new_table.primary_key.column_list = pri_key_list
-        self.assertEqual(payload.find_coverage_index(), 'PRIMARY')
+        self.assertEqual(payload.find_coverage_index(), "PRIMARY")
 
         # If new primary key has its left most prefix covering the old primary
         # key, but the sequence is different, then we cannot use that
         pri_key_list = []
         for i in range(2, -1, -1):
             col = Mock()
-            col.name = 'col{}'.format(i)
+            col.name = "col{}".format(i)
             pri_key_list.append(col)
         payload._new_table.primary_key.column_list = pri_key_list
         self.assertEqual(payload.find_coverage_index(), None)
@@ -80,8 +78,7 @@ class CopyPayloadTestCase(unittest.TestCase):
         payload = self.payload_setup()
         payload._replayed_chg_ids.extend([1, 2, 4, 5])
         delta = [{payload.IDCOLNAME: 3}]
-        payload.query = Mock(
-            return_value=delta)
+        payload.query = Mock(return_value=delta)
         # We will get whatever gap returned from MySQL database
         self.assertEqual(payload.get_gap_changes(), delta)
         # No more missing points after replay
@@ -93,25 +90,23 @@ class CopyPayloadTestCase(unittest.TestCase):
         """
 
         payload = CopyPayload()
-        table_obj = parse_create(
-            " CREATE TABLE a "
-            "( ID int primary key ) ")
+        table_obj = parse_create(" CREATE TABLE a " "( ID int primary key ) ")
         payload._old_table = table_obj
         payload._new_table = table_obj
 
         payload.replay_changes = Mock()
-        payload.execute_sql = Mock(
-            side_effect=MySQLdb.OperationalError(1231, 'abc'))
+        payload.execute_sql = Mock(side_effect=MySQLdb.OperationalError(1231, "abc"))
 
         # Call the function make sure it catch the 1231 error
-        payload.set_innodb_tmpdir('mock/path')
+        payload.set_innodb_tmpdir("mock/path")
 
         # Call the function make sure it will still raise anything other than
         # 1231
         with self.assertRaises(MySQLdb.OperationalError) as err_context:
             payload.execute_sql = Mock(
-                side_effect=MySQLdb.OperationalError(1111, 'abc'))
-            payload.set_innodb_tmpdir('mock/path')
+                side_effect=MySQLdb.OperationalError(1111, "abc")
+            )
+            payload.set_innodb_tmpdir("mock/path")
         self.assertEqual(err_context.exception.args[0], 1111)
 
     def test_long_selects_being_killed(self):
@@ -123,23 +118,34 @@ class CopyPayloadTestCase(unittest.TestCase):
         payload.execute_sql = Mock(side_effect=lambda _: time.sleep(0.5))
 
         query_id = 100
-        mocked_conn.get_running_queries = Mock(return_value=[
-            {'Info': b'SELECT 1 from a', 'db': 'test', 'Id': query_id},
-            {'Info': b'SELECT 1 from `a`', 'db': 'test', 'Id': query_id + 1},
-            {'Info': b'alter table a add column `bar` text',
-             'db': 'test', 'Id': query_id + 2},
-            {'Info': b'select 1 from b', 'db': 'test', 'Id': query_id + 3},
-            {'Info': b'select 1 from `b`', 'db': 'test', 'Id': query_id + 4},
-            {'Info': b'SELECT 1 from c', 'db': 'test', 'Id': query_id + 5},
-            {'Info': b'SELECT 1 from `c`', 'db': 'test', 'Id': query_id + 6},
-            {'Info': b'SELECT 1 from a', 'db': 'information_schema',
-             'Id': query_id + 7},
-            {'Info': b'SELECT 1 from `a`', 'db': 'information_schema',
-             'Id': query_id + 8},
-        ])
+        mocked_conn.get_running_queries = Mock(
+            return_value=[
+                {"Info": b"SELECT 1 from a", "db": "test", "Id": query_id},
+                {"Info": b"SELECT 1 from `a`", "db": "test", "Id": query_id + 1},
+                {
+                    "Info": b"alter table a add column `bar` text",
+                    "db": "test",
+                    "Id": query_id + 2,
+                },
+                {"Info": b"select 1 from b", "db": "test", "Id": query_id + 3},
+                {"Info": b"select 1 from `b`", "db": "test", "Id": query_id + 4},
+                {"Info": b"SELECT 1 from c", "db": "test", "Id": query_id + 5},
+                {"Info": b"SELECT 1 from `c`", "db": "test", "Id": query_id + 6},
+                {
+                    "Info": b"SELECT 1 from a",
+                    "db": "information_schema",
+                    "Id": query_id + 7,
+                },
+                {
+                    "Info": b"SELECT 1 from `a`",
+                    "db": "information_schema",
+                    "Id": query_id + 8,
+                },
+            ]
+        )
 
         # Try lock tables
-        payload.lock_tables(tables=['a', 'b'])
+        payload.lock_tables(tables=["a", "b"])
 
         # Be sure that the kill timer is finished
         payload._last_kill_timer.join(1)
@@ -148,8 +154,9 @@ class CopyPayloadTestCase(unittest.TestCase):
         # Make sure kill selects only on tables a and b
         kill_calls = mocked_conn.kill_query_by_id.call_args_list
         self.assertEquals(len(kill_calls), 5)
-        for idx, killed in enumerate((query_id, query_id + 1, query_id + 2,
-                                      query_id + 3, query_id + 4)):
+        for idx, killed in enumerate(
+            (query_id, query_id + 1, query_id + 2, query_id + 3, query_id + 4)
+        ):
             args, kwargs = kill_calls[idx]
             self.assertEquals(len(args), 1)
             self.assertEquals(args[0], killed)
@@ -163,23 +170,34 @@ class CopyPayloadTestCase(unittest.TestCase):
         payload.execute_sql = Mock()
 
         query_id = 100
-        mocked_conn.get_running_queries = Mock(return_value=[
-            {'Info': b'SELECT 1 from a', 'db': 'test', 'Id': query_id},
-            {'Info': b'SELECT 1 from `a`', 'db': 'test', 'Id': query_id + 1},
-            {'Info': b'alter table a add column `bar` text',
-             'db': 'test', 'Id': query_id + 2},
-            {'Info': b'select 1 from b', 'db': 'test', 'Id': query_id + 3},
-            {'Info': b'select 1 from `b`', 'db': 'test', 'Id': query_id + 4},
-            {'Info': b'SELECT 1 from c', 'db': 'test', 'Id': query_id + 5},
-            {'Info': b'SELECT 1 from `c`', 'db': 'test', 'Id': query_id + 6},
-            {'Info': b'SELECT 1 from a', 'db': 'information_schema',
-             'Id': query_id + 7},
-            {'Info': b'SELECT 1 from `a`', 'db': 'information_schema',
-             'Id': query_id + 8},
-        ])
+        mocked_conn.get_running_queries = Mock(
+            return_value=[
+                {"Info": b"SELECT 1 from a", "db": "test", "Id": query_id},
+                {"Info": b"SELECT 1 from `a`", "db": "test", "Id": query_id + 1},
+                {
+                    "Info": b"alter table a add column `bar` text",
+                    "db": "test",
+                    "Id": query_id + 2,
+                },
+                {"Info": b"select 1 from b", "db": "test", "Id": query_id + 3},
+                {"Info": b"select 1 from `b`", "db": "test", "Id": query_id + 4},
+                {"Info": b"SELECT 1 from c", "db": "test", "Id": query_id + 5},
+                {"Info": b"SELECT 1 from `c`", "db": "test", "Id": query_id + 6},
+                {
+                    "Info": b"SELECT 1 from a",
+                    "db": "information_schema",
+                    "Id": query_id + 7,
+                },
+                {
+                    "Info": b"SELECT 1 from `a`",
+                    "db": "information_schema",
+                    "Id": query_id + 8,
+                },
+            ]
+        )
 
         # Try lock tables
-        payload.lock_tables(tables=['a', 'b'])
+        payload.lock_tables(tables=["a", "b"])
 
         # Be sure that the kill timer is finished
         payload._last_kill_timer.join(1)
@@ -191,8 +209,8 @@ class CopyPayloadTestCase(unittest.TestCase):
     def test_set_rocksdb_bulk_load(self):
         payload = CopyPayload()
         table_obj = parse_create(
-            " CREATE TABLE a "
-            "( ID int primary key ) ENGINE=ROCKSDB")
+            " CREATE TABLE a " "( ID int primary key ) ENGINE=ROCKSDB"
+        )
         payload._old_table = table_obj
         payload._new_table = table_obj
         payload.execute_sql = Mock()
@@ -200,12 +218,13 @@ class CopyPayloadTestCase(unittest.TestCase):
         self.assertTrue(payload.execute_sql.called)
 
         table_obj = parse_create(
-            " CREATE TABLE a "
-            "( ID int primary key ) ENGINE=ROCKSDB")
+            " CREATE TABLE a " "( ID int primary key ) ENGINE=ROCKSDB"
+        )
         new_table_obj = parse_create(
             " CREATE TABLE a "
             "( ID int, id2 int, "
-            "primary key (ID,id2)) ENGINE=ROCKSDB")
+            "primary key (ID,id2)) ENGINE=ROCKSDB"
+        )
         payload._old_table = table_obj
         payload._new_table = new_table_obj
         payload.execute_sql = Mock()
@@ -213,83 +232,84 @@ class CopyPayloadTestCase(unittest.TestCase):
         self.assertFalse(payload.execute_sql.called)
 
         table_obj = parse_create(
-            " CREATE TABLE a "
-            "( ID int primary key ) ENGINE=ROCKSDB")
+            " CREATE TABLE a " "( ID int primary key ) ENGINE=ROCKSDB"
+        )
         payload._old_table = table_obj
         payload._new_table = table_obj
 
-        payload.execute_sql = Mock(
-            side_effect=MySQLdb.OperationalError(1193, 'abc'))
+        payload.execute_sql = Mock(side_effect=MySQLdb.OperationalError(1193, "abc"))
         payload.change_rocksdb_bulk_load()
 
     def test_skip_cleanup(self):
         payload = CopyPayload()
-        sql = 'CREATE TABLE abc (ID int)'
-        database = 'db'
+        sql = "CREATE TABLE abc (ID int)"
+        database = "db"
         payload._old_table = Mock()
-        payload._old_table.name = 'abc'
+        payload._old_table.name = "abc"
         payload._new_table = Mock()
-        payload._new_table.name = 'abc'
-        payload.outfile_dir = '/path/to/file/dump'
+        payload._new_table.name = "abc"
+        payload.outfile_dir = "/path/to/file/dump"
         payload.outfile_suffix_end = 2
 
         # add some drop table entry pretending we've done some work
         payload._cleanup_payload = CleanupPayload(db=database)
         payload._cleanup_payload.add_drop_table_entry(
-            database,
-            constant.DELTA_TABLE_PREFIX + 'abc')
+            database, constant.DELTA_TABLE_PREFIX + "abc"
+        )
         payload._cleanup_payload.add_drop_table_entry(
-            database,
-            constant.NEW_TABLE_PREFIX + 'abc')
+            database, constant.NEW_TABLE_PREFIX + "abc"
+        )
         payload._cleanup_payload.cleanup = Mock()
         for suffix in range(1, payload.outfile_suffix_end + 1):
-            payload._cleanup_payload.add_file_entry(
-                payload.outfile + '.' + str(suffix)
-            )
+            payload._cleanup_payload.add_file_entry(payload.outfile + "." + str(suffix))
 
         # If we don't skip cleanup, then we should have 2 tables to clean up
         payload.skip_cleanup_after_kill = False
         with self.assertRaises(OSCError) as err_context:
             payload.init_connection = Mock(
-                side_effect=MySQLdb.OperationalError(
-                    2006, 'MySQL has gone away'))
+                side_effect=MySQLdb.OperationalError(2006, "MySQL has gone away")
+            )
             payload.run_ddl(database, sql)
         self.assertEqual(len(payload._cleanup_payload.to_drop), 2)
-        self.assertEqual(len(payload._cleanup_payload.files_to_clean),
-                         payload.outfile_suffix_end)
-        self.assertEqual(err_context.exception.err_key, 'GENERIC_MYSQL_ERROR')
+        self.assertEqual(
+            len(payload._cleanup_payload.files_to_clean), payload.outfile_suffix_end
+        )
+        self.assertEqual(err_context.exception.err_key, "GENERIC_MYSQL_ERROR")
 
         # If we are skipping cleanup, then there's nothing to cleanup
         payload.skip_cleanup_after_kill = True
         with self.assertRaises(OSCError) as err_context:
             payload.init_connection = Mock(
-                side_effect=MySQLdb.OperationalError(
-                    2006, 'MySQL has gone away'))
+                side_effect=MySQLdb.OperationalError(2006, "MySQL has gone away")
+            )
             payload.run_ddl(database, sql)
         # There should be no cleanup entry at all if we skip the table cleanup
         self.assertEqual(payload._cleanup_payload.to_drop, [])
         self.assertEqual(len(payload._cleanup_payload.files_to_clean), 0)
-        self.assertEqual(err_context.exception.err_key, 'GENERIC_MYSQL_ERROR')
+        self.assertEqual(err_context.exception.err_key, "GENERIC_MYSQL_ERROR")
 
     def test_file_exists(self):
         payload = self.payload_setup()
         with self.assertRaises(OSCError) as err_context:
             payload.execute_sql = Mock(
-                side_effect=MySQLdb.OperationalError(1086, 'abc'))
+                side_effect=MySQLdb.OperationalError(1086, "abc")
+            )
             payload.select_full_table_into_outfile()
-        self.assertEqual(err_context.exception.err_key, 'FILE_ALREADY_EXIST')
+        self.assertEqual(err_context.exception.err_key, "FILE_ALREADY_EXIST")
 
         with self.assertRaises(OSCError) as err_context:
             payload.execute_sql = Mock(
-                side_effect=MySQLdb.OperationalError(1086, 'abc'))
-            payload.select_chunk_into_outfile('path/to/outfile', False)
-        self.assertEqual(err_context.exception.err_key, 'FILE_ALREADY_EXIST')
+                side_effect=MySQLdb.OperationalError(1086, "abc")
+            )
+            payload.select_chunk_into_outfile("path/to/outfile", False)
+        self.assertEqual(err_context.exception.err_key, "FILE_ALREADY_EXIST")
 
         # Any mysql error other than 1086 should surface
         with self.assertRaises(MySQLdb.OperationalError) as err_context:
             payload.execute_sql = Mock(
-                side_effect=MySQLdb.OperationalError(1111, 'abc'))
-            payload.select_chunk_into_outfile('path/to/outfile', False)
+                side_effect=MySQLdb.OperationalError(1111, "abc")
+            )
+            payload.select_chunk_into_outfile("path/to/outfile", False)
         self.assertEqual(err_context.exception.args[0], 1111)
 
     def test_partitions_being_added(self):
@@ -310,7 +330,7 @@ class CopyPayloadTestCase(unittest.TestCase):
         )
         payload._old_table = table_obj
         payload._new_table = table_obj
-        partitions = ['p1', 'p2', 'p3']
+        partitions = ["p1", "p2", "p3"]
 
         # No difference between old and new
         payload.query = Mock(return_value=None)
@@ -321,7 +341,8 @@ class CopyPayloadTestCase(unittest.TestCase):
         payload._cleanup_payload.add_drop_table_entry = Mock()
         payload.create_copy_table()
         payload._cleanup_payload.add_drop_table_entry.assert_called_with(
-            payload._current_db, payload.new_table_name, partitions)
+            payload._current_db, payload.new_table_name, partitions
+        )
 
     def test_dropped_columns(self):
         payload = CopyPayload()
@@ -348,36 +369,21 @@ class CopyPayloadTestCase(unittest.TestCase):
             "PRIMARY KEY (id1, id2))"
         )
         table_obj_both_dropped = parse_create(
-            " CREATE TABLE a "
-            "( id1 int ,  "
-            "col1 varchar(10), "
-            "PRIMARY KEY (id1))"
+            " CREATE TABLE a " "( id1 int ,  " "col1 varchar(10), " "PRIMARY KEY (id1))"
         )
         payload._old_table = table_obj
         payload._new_table = table_obj
         # No change in the schema
-        self.assertEqual(
-            payload.dropped_column_name_list,
-            []
-        )
+        self.assertEqual(payload.dropped_column_name_list, [])
 
         payload._new_table = table_obj_pri_dropped
-        self.assertEqual(
-            payload.dropped_column_name_list,
-            ['id2']
-        )
+        self.assertEqual(payload.dropped_column_name_list, ["id2"])
 
         payload._new_table = table_obj_col_dropped
-        self.assertEqual(
-            payload.dropped_column_name_list,
-            ['col2']
-        )
+        self.assertEqual(payload.dropped_column_name_list, ["col2"])
 
         payload._new_table = table_obj_both_dropped
-        self.assertEqual(
-            payload.dropped_column_name_list,
-            ['id2', 'col2']
-        )
+        self.assertEqual(payload.dropped_column_name_list, ["id2", "col2"])
 
     def test_checksum_column_list(self):
         payload = CopyPayload()
@@ -394,91 +400,73 @@ class CopyPayloadTestCase(unittest.TestCase):
             "col2 varchar(100)) "
         )
         table_obj_dropped = parse_create(
-            " CREATE TABLE a "
-            "( ID int primary key,  "
-            "col2 varchar(100)) "
+            " CREATE TABLE a " "( ID int primary key,  " "col2 varchar(100)) "
         )
         payload._old_table = table_obj
         payload._new_table = table_obj
         # No change in the schema
-        self.assertEqual(
-            payload.checksum_column_list,
-            ['col1', 'col2']
-        )
+        self.assertEqual(payload.checksum_column_list, ["col1", "col2"])
 
         # changed column being kept
         payload._new_table = table_obj_new
         payload.skip_checksum_for_modified = False
-        self.assertEqual(
-            payload.checksum_column_list,
-            ['col1', 'col2']
-        )
+        self.assertEqual(payload.checksum_column_list, ["col1", "col2"])
 
         # skip changed
         payload._new_table = table_obj_new
         payload.skip_checksum_for_modified = True
-        self.assertEqual(
-            payload.checksum_column_list,
-            ['col1']
-        )
+        self.assertEqual(payload.checksum_column_list, ["col1"])
 
         # skip dropped
         payload._new_table = table_obj_dropped
         payload.skip_checksum_for_modified = False
-        self.assertEqual(
-            payload.checksum_column_list,
-            ['col2']
-        )
+        self.assertEqual(payload.checksum_column_list, ["col2"])
 
         # skip dropped
         payload._new_table = table_obj_dropped
         payload.skip_checksum_for_modified = False
-        self.assertEqual(
-            payload.checksum_column_list,
-            ['col2']
-        )
+        self.assertEqual(payload.checksum_column_list, ["col2"])
 
     def test_parse_session_overrides_str_empty(self):
         payload = self.payload_setup()
-        overrides_str = ''
+        overrides_str = ""
         expected_overrides = []
         overrides = payload.parse_session_overrides_str(overrides_str)
         self.assertEqual(overrides, expected_overrides)
 
     def test_parse_session_overrides_str_num(self):
         payload = self.payload_setup()
-        overrides_str = 'var1=1'
-        expected_overrides = [['var1', '1']]
+        overrides_str = "var1=1"
+        expected_overrides = [["var1", "1"]]
         overrides = payload.parse_session_overrides_str(overrides_str)
         self.assertEqual(overrides, expected_overrides)
 
     def test_parse_session_overrides_str_str(self):
         payload = self.payload_setup()
-        overrides_str = 'var1=v'
-        expected_overrides = [['var1', 'v']]
+        overrides_str = "var1=v"
+        expected_overrides = [["var1", "v"]]
         overrides = payload.parse_session_overrides_str(overrides_str)
         self.assertEqual(overrides, expected_overrides)
 
     def test_parse_session_overrides_str_list(self):
         payload = self.payload_setup()
-        overrides_str = 'var1=v;var2=1'
-        expected_overrides = [['var1', 'v'], ['var2', '1']]
+        overrides_str = "var1=v;var2=1"
+        expected_overrides = [["var1", "v"], ["var2", "1"]]
         overrides = payload.parse_session_overrides_str(overrides_str)
         self.assertEqual(overrides, expected_overrides)
 
     def test_parse_session_overrides_str_malform(self):
         payload = self.payload_setup()
-        overrides_str = 'var1=v;var2='
+        overrides_str = "var1=v;var2="
         with self.assertRaises(OSCError) as err_context:
             payload.parse_session_overrides_str(overrides_str)
-        self.assertEqual(err_context.exception.err_key,
-                         'INCORRECT_SESSION_OVERRIDE')
+        self.assertEqual(err_context.exception.err_key, "INCORRECT_SESSION_OVERRIDE")
 
     def test_execute_sql_not_called_for_empty_overrides(self):
         # we shouldn't execute any sql if there's no session overrides
         payload = self.payload_setup()
         payload.execute_sql = Mock()
-        payload.session_overrides_str = ''
+        payload.session_overrides_str = ""
         payload.override_session_vars()
         self.assertFalse(payload.execute_sql.called)
 
@@ -490,8 +478,7 @@ class CopyPayloadTestCase(unittest.TestCase):
         row = {payload.IDCOLNAME: 1}
         with self.assertRaises(OSCError) as err_context:
             payload.replay_insert_row(row)
-        self.assertEqual(err_context.exception.err_key,
-                         'REPLAY_WRONG_AFFECTED')
+        self.assertEqual(err_context.exception.err_key, "REPLAY_WRONG_AFFECTED")
 
     def test_skip_affected_rows_check(self):
         # No exception should be raised if we skip affected_rows check and 0
@@ -506,34 +493,34 @@ class CopyPayloadTestCase(unittest.TestCase):
         # is_trigger_rbr_safe should always be True if STATEMENT binlog_format
         # is being used
         payload = self.payload_setup()
-        payload.mysql_vars['binlog_format'] = 'STATEMENT'
-        payload.mysql_version = MySQLVersion('5.1.1')
+        payload.mysql_vars["binlog_format"] = "STATEMENT"
+        payload.mysql_version = MySQLVersion("5.1.1")
         self.assertTrue(payload.is_trigger_rbr_safe)
 
     def test_is_rbr_safe_row_fb(self):
         # is_trigger_rbr_safe should always be True if Facebook version
         # is being used and sql_log_bin_triggers is OFF
         payload = self.payload_setup()
-        payload.mysql_vars['binlog_format'] = 'ROW'
-        payload.mysql_vars['sql_log_bin_triggers'] = 'OFF'
-        payload.mysql_version = MySQLVersion('5.1.1-fb')
+        payload.mysql_vars["binlog_format"] = "ROW"
+        payload.mysql_vars["sql_log_bin_triggers"] = "OFF"
+        payload.mysql_version = MySQLVersion("5.1.1-fb")
         self.assertTrue(payload.is_trigger_rbr_safe)
 
     def test_is_rbr_safe_row_fb_but_logs_on(self):
         # is_trigger_rbr_safe should False if we are using a Facebook version
         # but sql_log_bin_triggers is still enabled
         payload = self.payload_setup()
-        payload.mysql_vars['binlog_format'] = 'ROW'
-        payload.mysql_vars['sql_log_bin_triggers'] = 'ON'
-        payload.mysql_version = MySQLVersion('5.1.1-fb')
+        payload.mysql_vars["binlog_format"] = "ROW"
+        payload.mysql_vars["sql_log_bin_triggers"] = "ON"
+        payload.mysql_version = MySQLVersion("5.1.1-fb")
         self.assertFalse(payload.is_trigger_rbr_safe)
 
     def test_is_rbr_safe_row_other_forks(self):
         # is_trigger_rbr_safe should False if we are using a Facebook version
         # but sql_log_bin_triggers is still enabled
         payload = self.payload_setup()
-        payload.mysql_vars['binlog_format'] = 'ROW'
-        payload.mysql_version = MySQLVersion('5.5.30-percona')
+        payload.mysql_vars["binlog_format"] = "ROW"
+        payload.mysql_version = MySQLVersion("5.5.30-percona")
         self.assertFalse(payload.is_trigger_rbr_safe)
 
     def test_divide_changes_all_the_same_type(self):
@@ -580,14 +567,16 @@ class CopyPayloadTestCase(unittest.TestCase):
         ]
         groups = list(payload.divide_changes_to_group(chg_rows))
         self.assertEqual(
-            groups, [
+            groups,
+            [
                 (1, [1]),
                 (2, [2]),
                 (3, [3]),
                 (1, [4]),
                 (2, [5]),
                 (3, [6]),
-            ])
+            ],
+        )
 
     def test_divide_changes_simple_group(self):
         payload = CopyPayload()
@@ -603,11 +592,13 @@ class CopyPayloadTestCase(unittest.TestCase):
         ]
         groups = list(payload.divide_changes_to_group(chg_rows))
         self.assertEqual(
-            groups, [
+            groups,
+            [
                 (1, [1]),
                 (2, [2, 3, 4]),
                 (1, [5]),
-            ])
+            ],
+        )
 
     def test_divide_changes_no_grouping_for_update(self):
         """
@@ -626,13 +617,15 @@ class CopyPayloadTestCase(unittest.TestCase):
         ]
         groups = list(payload.divide_changes_to_group(chg_rows))
         self.assertEqual(
-            groups, [
+            groups,
+            [
                 (1, [1]),
                 (3, [2]),
                 (3, [3]),
                 (3, [4]),
                 (1, [5]),
-            ])
+            ],
+        )
 
     def test_divide_changes_group_size_reach_limit(self):
         """
@@ -652,37 +645,33 @@ class CopyPayloadTestCase(unittest.TestCase):
         ]
         groups = list(payload.divide_changes_to_group(chg_rows))
         self.assertEqual(
-            groups, [
+            groups,
+            [
                 (1, [1]),
                 (2, [2, 3]),
                 (2, [4]),
                 (1, [5]),
-            ])
+            ],
+        )
 
     def test_is_myrocks_table(self):
         payload = CopyPayload()
         payload._new_table = parse_create(
-            "CREATE TABLE abc ( "
-            "id int primary key "
-            ") ENGINE = RocksDB "
+            "CREATE TABLE abc ( " "id int primary key " ") ENGINE = RocksDB "
         )
         self.assertTrue(payload.is_myrocks_table)
 
     def test_is_myrocks_table_for_innodb(self):
         payload = CopyPayload()
         payload._new_table = parse_create(
-            "CREATE TABLE abc ( "
-            "id int primary key "
-            ") ENGINE = InnoDB "
+            "CREATE TABLE abc ( " "id int primary key " ") ENGINE = InnoDB "
         )
         self.assertFalse(payload.is_myrocks_table)
 
     def test_myrocks_table_skip_foreign_key_check(self):
         payload = CopyPayload()
         payload._new_table = parse_create(
-            "CREATE TABLE abc ( "
-            "id int primary key "
-            ") ENGINE = RocksDB "
+            "CREATE TABLE abc ( " "id int primary key " ") ENGINE = RocksDB "
         )
         payload.query = Mock()
         payload.foreign_key_check()
@@ -700,15 +689,17 @@ class CopyPayloadTestCase(unittest.TestCase):
         # If the slow query never finishes, then an OSCError should be raised
         payload = self.payload_setup()
         payload.max_wait_for_slow_query = 1
-        payload.get_long_trx = Mock(return_value={
-            'Time': 100,
-            'db': 'mydb',
-            'Id': 123,
-            'Info': 'select * from a'
-        })
+        payload.get_long_trx = Mock(
+            return_value={
+                "Time": 100,
+                "db": "mydb",
+                "Id": 123,
+                "Info": "select * from a",
+            }
+        )
         with self.assertRaises(OSCError) as err_context:
             payload.wait_until_slow_query_finish()
-        self.assertEqual(err_context.exception.err_key, 'LONG_RUNNING_TRX')
+        self.assertEqual(err_context.exception.err_key, "LONG_RUNNING_TRX")
 
     def test_auto_table_collation_population(self):
         payload = self.payload_setup()
@@ -718,9 +709,9 @@ class CopyPayloadTestCase(unittest.TestCase):
         ) charset = latin1
         """
         payload._new_table = parse_create(sql)
-        default_collate = 'latin1_swedish_ci'
-        payload.get_default_collations = Mock(return_value={'latin1': default_collate})
-        payload.get_collations = Mock(return_value={default_collate: 'latin1'})
+        default_collate = "latin1_swedish_ci"
+        payload.get_default_collations = Mock(return_value={"latin1": default_collate})
+        payload.get_collations = Mock(return_value={default_collate: "latin1"})
         payload.populate_charset_collation_for_80()
 
         # Collation should not be populated only if charset is provided
@@ -734,13 +725,13 @@ class CopyPayloadTestCase(unittest.TestCase):
         ) collate = latin1_swedish_ci
         """
         payload._new_table = parse_create(sql)
-        default_collate = 'latin1_swedish_ci'
-        payload.get_default_collations = Mock(return_value={'latin1': default_collate})
-        payload.get_collations = Mock(return_value={default_collate: 'latin1'})
+        default_collate = "latin1_swedish_ci"
+        payload.get_default_collations = Mock(return_value={"latin1": default_collate})
+        payload.get_collations = Mock(return_value={default_collate: "latin1"})
         payload.populate_charset_collation_for_80()
 
         # charset should be populated if collate is provided
-        self.assertEqual(payload._new_table.charset, 'latin1')
+        self.assertEqual(payload._new_table.charset, "latin1")
 
     def test_auto_removal_of_using_hash(self):
         payload = self.payload_setup()
@@ -798,7 +789,7 @@ class CopyPayloadTestCase(unittest.TestCase):
         payload.find_coverage_index = Mock()
         payload.dump_current_chunk = Mock()
         payload.checksum_for_single_chunk = Mock(
-            return_value={'col1': 'abce123', 'col2': 'fghi456', '_osc_chunk_cnt': 0}
+            return_value={"col1": "abce123", "col2": "fghi456", "_osc_chunk_cnt": 0}
         )
 
         # No error should be raised if there's no mismatch
@@ -811,8 +802,8 @@ class CopyPayloadTestCase(unittest.TestCase):
         payload.dump_current_chunk = Mock()
         payload.checksum_for_single_chunk = Mock(
             side_effect=[
-                {'col1': 'abcd123', 'col2': 'fghi456', '_osc_chunk_cnt': 0},
-                {'col1': '123abcd', 'col2': 'fghi456', '_osc_chunk_cnt': 0},
+                {"col1": "abcd123", "col2": "fghi456", "_osc_chunk_cnt": 0},
+                {"col1": "123abcd", "col2": "fghi456", "_osc_chunk_cnt": 0},
             ]
         )
 
@@ -850,11 +841,7 @@ class CopyPayloadPKFilterTestCase(unittest.TestCase):
             ") "
         )
         self.table_obj_no_uk = parse_create(
-            " CREATE TABLE a ("
-            "id1 int, "
-            "id2 int, "
-            "id3 int "
-            ") "
+            " CREATE TABLE a (" "id1 int, " "id2 int, " "id3 int " ") "
         )
         self.table_obj_newcol = parse_create(
             " CREATE TABLE a ("
@@ -904,21 +891,21 @@ class CopyPayloadPKFilterTestCase(unittest.TestCase):
             ") "
         )
 
-        self.payload._current_db = 'test'
+        self.payload._current_db = "test"
 
     def test_decide_pk_for_filter_1pk_to_2pk(self):
         # Adding new columns to pk should still use old pk for filtering
         self.payload._old_table = self.table_obj_1pk
         self.payload._new_table = self.table_obj_2pk
         self.payload.decide_pk_for_filter()
-        self.assertEquals(self.payload._pk_for_filter, ['id1'])
+        self.assertEquals(self.payload._pk_for_filter, ["id1"])
 
     def test_decide_pk_for_filter_uk_to_2pk(self):
         # An UK should be used if there's no existing pk
         self.payload._old_table = self.table_obj_uk
         self.payload._new_table = self.table_obj_2pk
         self.payload.decide_pk_for_filter()
-        self.assertEquals(self.payload._pk_for_filter, ['id1'])
+        self.assertEquals(self.payload._pk_for_filter, ["id1"])
 
     def test_decide_pk_for_filter_no_uk_allow(self):
         # An UK should be used if there's no existing pk
@@ -926,7 +913,7 @@ class CopyPayloadPKFilterTestCase(unittest.TestCase):
         self.payload._new_table = self.table_obj_1pk
         self.payload.allow_new_pk = True
         self.payload.decide_pk_for_filter()
-        self.assertEquals(self.payload._pk_for_filter, ['id1', 'id2', 'id3'])
+        self.assertEquals(self.payload._pk_for_filter, ["id1", "id2", "id3"])
         self.assertTrue(self.payload.is_full_table_dump)
 
     def test_decide_pk_for_filter_newcol_not_indexed(self):
@@ -935,18 +922,18 @@ class CopyPayloadPKFilterTestCase(unittest.TestCase):
         self.payload._new_table = self.table_obj_newcol
         self.payload.decide_pk_for_filter()
 
-        self.assertEquals(self.payload._pk_for_filter, ['id1'])
+        self.assertEquals(self.payload._pk_for_filter, ["id1"])
         self.assertFalse(self.payload.is_full_table_dump)
-        self.assertEqual(self.payload.find_coverage_index(), 'PRIMARY')
+        self.assertEqual(self.payload.find_coverage_index(), "PRIMARY")
         self.assertTrue(self.payload.validate_post_alter_pk())
 
         # (That new table has idx on added col is a NOP)
         self.payload._new_table = self.table_obj_newcol_with_idx
         self.payload.decide_pk_for_filter()
 
-        self.assertEquals(self.payload._pk_for_filter, ['id1'])
+        self.assertEquals(self.payload._pk_for_filter, ["id1"])
         self.assertFalse(self.payload.is_full_table_dump)
-        self.assertEqual(self.payload.find_coverage_index(), 'PRIMARY')
+        self.assertEqual(self.payload.find_coverage_index(), "PRIMARY")
         self.assertTrue(self.payload.validate_post_alter_pk())
 
     def test_decide_pk_for_filter_prefixed(self):
@@ -955,7 +942,7 @@ class CopyPayloadPKFilterTestCase(unittest.TestCase):
         self.payload._new_table = self.table_obj_pk2_prefixed
         self.payload.decide_pk_for_filter()
 
-        self.assertEquals(self.payload._pk_for_filter, ['id1', 'name', 'dummy1'])
+        self.assertEquals(self.payload._pk_for_filter, ["id1", "name", "dummy1"])
         self.assertTrue(self.payload.is_full_table_dump)
         self.assertIsNone(self.payload.find_coverage_index())
         self.assertFalse(self.payload.validate_post_alter_pk())
@@ -966,6 +953,6 @@ class CopyPayloadPKFilterTestCase(unittest.TestCase):
         self.payload.decide_pk_for_filter()
 
         # Going from 2 PK columns into 1 is considered as efficient
-        self.assertEquals(self.payload._pk_for_filter, ['id1', 'id2'])
+        self.assertEquals(self.payload._pk_for_filter, ["id1", "id2"])
         self.assertFalse(self.payload.is_full_table_dump)
         self.assertTrue(self.payload.validate_post_alter_pk())

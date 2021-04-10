@@ -28,18 +28,19 @@ class CleanupPayload(Payload):
     This payload is not a schema change payload itself. It'll cleanup all the
     mess left behind by last OSC run
     """
+
     def __init__(self, *args, **kwargs):
         super(CleanupPayload, self).__init__(*args, **kwargs)
         self.files_to_clean = []
         self.to_drop = []
         self.sqls_to_execute = []
-        self._current_db = kwargs.get('db')
-        self._current_table = kwargs.get('table')
-        self.databases = kwargs.get('database')
-        self.kill_first = kwargs.get('kill', False)
-        self.kill_only = kwargs.get('kill_only', False)
+        self._current_db = kwargs.get("db")
+        self._current_table = kwargs.get("table")
+        self.databases = kwargs.get("database")
+        self.kill_first = kwargs.get("kill", False)
+        self.kill_only = kwargs.get("kill_only", False)
 
-    def cleanup(self, db='mysql'):
+    def cleanup(self, db="mysql"):
         """
         The actual cleanup logic, we will:
             - remove all the given files
@@ -74,7 +75,7 @@ class CleanupPayload(Payload):
                 self.is_slave_stopped_by_me = True
             self.enable_priority_ddl()
 
-        self.execute_sql('USE `{}`'.format(escape(db)))
+        self.execute_sql("USE `{}`".format(escape(db)))
         current_db = db
         for stmt, stmt_db in self.sqls_to_execute:
             cleanupError = False
@@ -82,7 +83,7 @@ class CleanupPayload(Payload):
                 # Switch to the database we are going to work on to avoid
                 # cross db SQL execution
                 if stmt_db != current_db:
-                    self.execute_sql('USE `{}`'.format(escape(stmt_db)))
+                    self.execute_sql("USE `{}`".format(escape(stmt_db)))
                     current_db = stmt_db
                 log.info("Executing db: {} sql: {}".format(stmt_db, stmt))
                 self.execute_sql(stmt)
@@ -104,17 +105,19 @@ class CleanupPayload(Payload):
                 self.sqls_to_execute = []
                 # If sql_thread was killed as a result of high_pri_ddl we need to
                 # revive it
-                if self.is_high_pri_ddl_supported \
-                        and self.is_slave_stopped_by_me \
-                        and not self.is_repl_running():
+                if (
+                    self.is_high_pri_ddl_supported
+                    and self.is_slave_stopped_by_me
+                    and not self.is_repl_running()
+                ):
                     log.info("Resuming sql_thread as it was killed by high_pri_ddl")
                     self.start_slave_sql()
                     self.is_slave_stopped_by_me = True
             if cleanupError:
                 log.error("Failed to execute sql for cleanup")
                 raise OSCError(
-                    'CLEANUP_EXECUTION_ERROR',
-                    {'sql': stmt, 'msg': str(error)})
+                    "CLEANUP_EXECUTION_ERROR", {"sql": stmt, "msg": str(error)}
+                )
 
     def add_file_entry(self, filepath):
         log.debug("Cleanup file entry added: {}".format(filepath))
@@ -139,38 +142,39 @@ class CleanupPayload(Payload):
         # will break
         log.info("Generating drop trigger queries")
         for entry in self.to_drop:
-            if entry['type'] == 'trigger':
-                db = entry['db']
-                trigger_name = entry['name']
-                sql_query = "DROP TRIGGER IF EXISTS `{}`".format(
-                    escape(trigger_name))
+            if entry["type"] == "trigger":
+                db = entry["db"]
+                trigger_name = entry["name"]
+                sql_query = "DROP TRIGGER IF EXISTS `{}`".format(escape(trigger_name))
                 self.sqls_to_execute.append((sql_query, db))
 
         log.info("Generating drop table queries")
         for entry in self.to_drop:
-            if entry['type'] == 'table':
-                db = entry['db']
-                table = entry['name']
+            if entry["type"] == "table":
+                db = entry["db"]
+                table = entry["name"]
 
                 partition_method = self.get_partition_method(db, table)
-                if partition_method in ('RANGE', 'LIST'):
+                if partition_method in ("RANGE", "LIST"):
                     # MySQL doesn't allow remove all the partitions in a
                     # partitioned table, so we will leave single partition
                     # there before drop the table
-                    if entry['partitions']:
-                        entry['partitions'].pop()
+                    if entry["partitions"]:
+                        entry["partitions"].pop()
 
                         # Gradually drop partitions, so that we will not hold
                         # metadata lock for too long and block requests with
                         # single drop table
-                        log.debug("{}/{} using {} partitioning method".format(
-                                  db, table, partition_method))
-                        for partition_name in entry['partitions']:
+                        log.debug(
+                            "{}/{} using {} partitioning method".format(
+                                db, table, partition_method
+                            )
+                        )
+                        for partition_name in entry["partitions"]:
                             # As of version 8.0.17, MySQL does not support
                             # "DROP PARTITION IF EXISTS".
                             sql_query = (
-                                "ALTER TABLE `{}` "
-                                "DROP PARTITION `{}`"
+                                "ALTER TABLE `{}` " "DROP PARTITION `{}`"
                             ).format(escape(table), escape(partition_name))
                             self.sqls_to_execute.append((sql_query, db))
 
@@ -180,22 +184,17 @@ class CleanupPayload(Payload):
         self.to_drop = []
 
     def add_drop_table_entry(self, db, table, partitions=None):
-        self.to_drop.append({
-            'type': 'table',
-            'db': db,
-            'name': table,
-            'partitions': partitions})
+        self.to_drop.append(
+            {"type": "table", "db": db, "name": table, "partitions": partitions}
+        )
 
     def remove_drop_table_entry(self, db, table_name):
         for entry in self.to_drop:
-            if entry['type'] == 'table' and entry['name'] == table_name:
+            if entry["type"] == "table" and entry["name"] == table_name:
                 self.to_drop.remove(entry)
 
     def add_drop_trigger_entry(self, db, trigger_name):
-        self.to_drop.append({
-            'type': 'trigger',
-            'db': db,
-            'name': trigger_name})
+        self.to_drop.append({"type": "trigger", "db": db, "name": trigger_name})
 
     def run_ddl(self):
         """
@@ -211,17 +210,24 @@ class CleanupPayload(Payload):
             for db in self.databases:
                 results = self.query(
                     sql.get_all_osc_tables(db),
-                    (constant.PREFIX, constant.PREFIX, db,))
+                    (
+                        constant.PREFIX,
+                        constant.PREFIX,
+                        db,
+                    ),
+                )
                 for row in results:
-                    self.add_drop_table_entry(
-                        db, row['TABLE_NAME'])
+                    self.add_drop_table_entry(db, row["TABLE_NAME"])
         else:
             results = self.query(
                 sql.get_all_osc_tables(),
-                (constant.PREFIX, constant.PREFIX, ))
+                (
+                    constant.PREFIX,
+                    constant.PREFIX,
+                ),
+            )
             for row in results:
-                self.add_drop_table_entry(
-                    row['db'], row['TABLE_NAME'])
+                self.add_drop_table_entry(row["db"], row["TABLE_NAME"])
 
     def search_for_triggers(self):
         """
@@ -231,17 +237,24 @@ class CleanupPayload(Payload):
             for db in self.databases:
                 results = self.query(
                     sql.get_all_osc_triggers(db),
-                    (constant.PREFIX, constant.PREFIX, db,))
+                    (
+                        constant.PREFIX,
+                        constant.PREFIX,
+                        db,
+                    ),
+                )
                 for row in results:
-                    self.add_drop_trigger_entry(
-                        db, row['TRIGGER_NAME'])
+                    self.add_drop_trigger_entry(db, row["TRIGGER_NAME"])
         else:
             results = self.query(
                 sql.get_all_osc_triggers(),
-                (constant.PREFIX, constant.PREFIX, ))
+                (
+                    constant.PREFIX,
+                    constant.PREFIX,
+                ),
+            )
             for row in results:
-                self.add_drop_trigger_entry(
-                    row['db'], row['TRIGGER_NAME'])
+                self.add_drop_trigger_entry(row["db"], row["TRIGGER_NAME"])
 
     def search_for_files(self):
         """
@@ -251,10 +264,10 @@ class CleanupPayload(Payload):
         improvement here could be to refactor OSC in such a way that the
         cleanup part can be easily reused. T28154647
         """
-        datadir = self.query(sql.select_as('@@datadir', 'dir'))[0]['dir']
+        datadir = self.query(sql.select_as("@@datadir", "dir"))[0]["dir"]
         for root, _, files in os.walk(datadir):
             for fname in files:
-                if re.match('__osc_.*\.[0-9]+', fname):
+                if re.match("__osc_.*\.[0-9]+", fname):
                     self.add_file_entry(os.path.join(root, fname))
 
     def kill_osc(self):
@@ -262,12 +275,14 @@ class CleanupPayload(Payload):
         Kill the running OSC process if there's one running.
         """
         result = self.query(
-            "SELECT IS_USED_LOCK(%s) as owner_id", (constant.OSC_LOCK_NAME,))
-        owner_id = result[0]['owner_id']
+            "SELECT IS_USED_LOCK(%s) as owner_id", (constant.OSC_LOCK_NAME,)
+        )
+        owner_id = result[0]["owner_id"]
         if owner_id:
-            log.info("Named lock: {} is held by {}. Killing it to free up "
-                     "the lock"
-                     .format(constant.OSC_LOCK_NAME, owner_id))
+            log.info(
+                "Named lock: {} is held by {}. Killing it to free up "
+                "the lock".format(constant.OSC_LOCK_NAME, owner_id)
+            )
             # If we kill the mysql connection which is holding the named lock,
             # then OSC's python process will encounter a "MySQL has gone away"
             # error, and do the cleanup, then exit
@@ -282,8 +297,7 @@ class CleanupPayload(Payload):
         """
         if self.kill_first:
             self.kill_osc()
-            log.info(
-                "Wait 5 seconds for the running OSC to cleanup its own stuff ")
+            log.info("Wait 5 seconds for the running OSC to cleanup its own stuff ")
             time.sleep(5)
 
         if self.kill_only:

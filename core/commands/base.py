@@ -13,9 +13,9 @@ log = logging.getLogger(__name__)
 
 
 class CommandBase(object):
-    DESCRIPTION = ("""
+    DESCRIPTION = """
     This is a default description. You should overwrite it in your sub-class.
-    """)
+    """
 
     # args from ArgumentParser.parse_args()
     args = None
@@ -66,49 +66,64 @@ class CommandBase(object):
         """
         return self.DESCRIPTION
 
-    def setup_parser(self, parser, optional_db=False,
-                     require_user=False, require_password=False):
+    def setup_parser(
+        self, parser, optional_db=False, require_user=False, require_password=False
+    ):
         """
         Common parser shared across all the modes
         """
-        parser.add_argument("--socket",
-                            help="Socket file for the mysql "
-                            "connection",
-                            required=True)
-        parser.add_argument("--database",
-                            help="Database name(s) to run the schema change",
-                            nargs='+', required=(not optional_db))
-        parser.add_argument("--repl-status",
-                            help="Force script to run only on instances with "
-                            "the replication role. ",
-                            choices=['master', 'slave'])
-        parser.add_argument("--mysql-user",
-                            help="MySQL username to connect to the instance",
-                            required=require_user)
-        parser.add_argument("--mysql-password",
-                            help="MySQL user password to connect to the "
-                            "instance",
-                            required=require_password)
-        parser.add_argument("--charset", default='ascii',
-                            help="Character set used for MySQL connection "
-                            "(defaults to '%(default)s').")
-        parser.add_argument("--force",
-                            help="Ignore non-critical errors and continue "
-                            "making schema changes for all the given "
-                            "databases ")
+        parser.add_argument(
+            "--socket", help="Socket file for the mysql " "connection", required=True
+        )
+        parser.add_argument(
+            "--database",
+            help="Database name(s) to run the schema change",
+            nargs="+",
+            required=(not optional_db),
+        )
+        parser.add_argument(
+            "--repl-status",
+            help="Force script to run only on instances with " "the replication role. ",
+            choices=["master", "slave"],
+        )
+        parser.add_argument(
+            "--mysql-user",
+            help="MySQL username to connect to the instance",
+            required=require_user,
+        )
+        parser.add_argument(
+            "--mysql-password",
+            help="MySQL user password to connect to the " "instance",
+            required=require_password,
+        )
+        parser.add_argument(
+            "--charset",
+            default="ascii",
+            help="Character set used for MySQL connection "
+            "(defaults to '%(default)s').",
+        )
+        parser.add_argument(
+            "--force",
+            help="Ignore non-critical errors and continue "
+            "making schema changes for all the given "
+            "databases ",
+        )
 
     def add_file_list_parser(self, parser):
-        parser.add_argument("--ddl-file-list",
-                            help="Files with CREATE statements. "
-                            "Multiple files are supported as list separated "
-                            "by space",
-                            required=True,
-                            nargs='+')
+        parser.add_argument(
+            "--ddl-file-list",
+            help="Files with CREATE statements. "
+            "Multiple files are supported as list separated "
+            "by space",
+            required=True,
+            nargs="+",
+        )
 
     def add_engine_parser(self, parser):
-        parser.add_argument("--mysql-engine",
-                            help="Make sure the table is created with only "
-                            "the specified engine")
+        parser.add_argument(
+            "--mysql-engine",
+            help="Make sure the table is created with only " "the specified engine",
+        )
 
     def usage(self, *args, **kwargs):
         self.parser.error(*args, **kwargs)
