@@ -395,28 +395,22 @@ class Payload(object):
         """
         return util.rm(filename, sudo=self.sudo)
 
-    def is_repl_running(self):
+    def is_sql_thread_running(self):
         """
-        Check current replication status. We need to know that exact state
+        Check current SQL thread status. We need to know that exact state
         before we trying to stop the sql_thread. If the sql_thread is not
         stopped by us, then we'll skip starting it afterwards
         """
         result = self.query(sql.show_slave_status)
         if result:
-            return all(
-                (
-                    result[0]["Slave_IO_Running"] == "Yes",
-                    result[0]["Slave_SQL_Running"] == "Yes",
-                )
-            )
-        else:
-            return False
+            return result[0]["Slave_SQL_Running"] == "Yes"
+        return False
 
     def stop_slave_sql(self):
         """
         Stop sql_thread for such operations as create trigger and swap table
         """
-        if self.is_repl_running():
+        if self.is_sql_thread_running():
             log.warning("Stopping slave sql thread.")
             self.execute_sql(sql.stop_slave_sql)
             self.is_slave_stopped_by_me = True

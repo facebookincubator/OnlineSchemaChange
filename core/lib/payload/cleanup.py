@@ -72,7 +72,7 @@ class CleanupPayload(Payload):
         # Stop sql thread to avoid MDL lock contention and blocking reads before
         # running DDLs. Will use high_pri_ddl instead if it's supported
         if self.is_high_pri_ddl_supported:
-            if self.is_repl_running():
+            if self.is_sql_thread_running():
                 self.is_slave_stopped_by_me = True
             self.enable_priority_ddl()
 
@@ -109,7 +109,7 @@ class CleanupPayload(Payload):
                 if (
                     self.is_high_pri_ddl_supported
                     and self.is_slave_stopped_by_me
-                    and not self.is_repl_running()
+                    and not self.is_sql_thread_running()
                 ):
                     log.info("Resuming sql_thread as it was killed by high_pri_ddl")
                     self.start_slave_sql()
