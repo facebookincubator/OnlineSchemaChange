@@ -14,7 +14,7 @@ from __future__ import unicode_literals
 
 from .create import parse_create, ParseError
 from .diff import SchemaDiff, get_type_conv_columns, need_default_ts_bootstrap
-from .models import is_equal, Column
+from .models import is_equal, Column, TableIndex
 
 __all__ = [
     "parse_create",
@@ -24,4 +24,5 @@ __all__ = [
     "get_type_conv_columns",
     "Column",
     "need_default_ts_bootstrap",
+    "TableIndex",
 ]
