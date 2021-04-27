@@ -282,7 +282,7 @@ def create_delta_table(
 ):
     return (
         "CREATE TABLE `{}` "
-        "(`{}` INT AUTO_INCREMENT, `{}` INT, PRIMARY KEY({}))"
+        "(`{}` BIGINT AUTO_INCREMENT, `{}` BIGINT, PRIMARY KEY({}))"
         "ENGINE={} "
         "AS (SELECT {} FROM `{}` LIMIT 0)"
     ).format(
