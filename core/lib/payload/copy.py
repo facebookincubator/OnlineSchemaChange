@@ -31,7 +31,7 @@ from ..sqlparse import (
 from .base import Payload
 from .cleanup import CleanupPayload
 
-log = logging.getLogger(__name__)
+log: logging.Logger = logging.getLogger(__name__)
 
 
 class CopyPayload(Payload):
