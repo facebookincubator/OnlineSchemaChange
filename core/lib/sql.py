@@ -6,6 +6,7 @@ All rights reserved.
 This source code is licensed under the BSD-style license found in the
 LICENSE file in the root directory of this source tree.
 """
+from typing import Any, List, Union
 
 
 get_lock = "SELECT get_lock(%s, 0) as lockstatus"
@@ -116,7 +117,7 @@ def escape(literal):
     return literal.replace("`", "``")
 
 
-def list_to_col_str(column_list):
+def list_to_col_str(column_list) -> str:
     """Basic helper function for turn a list of column names into a single
     string separated by comma, and escaping the column name in the meanwhile
 
@@ -129,7 +130,7 @@ def list_to_col_str(column_list):
     return ", ".join("`{}`".format(escape(col)) for col in column_list)
 
 
-def column_name_with_tbl_prefix(column_list, prefix):
+def column_name_with_tbl_prefix(column_list, prefix) -> str:
     """Generate a comma seprated string, which attaches given prefix to the
     given list of column names.
 
@@ -170,14 +171,14 @@ def get_match_clause(left_table_name, right_table_name, columns, separator):
     )
 
 
-def select_as(var_name, as_name):
+def select_as(var_name, as_name) -> str:
     """
     SQL component for selecting column/variables with an alias
     """
     return "SELECT {} AS `{}`".format(var_name, escape(as_name))
 
 
-def select_into(left_vars, right_vars):
+def select_into(left_vars, right_vars) -> str:
     """
     SQL component for selecting left session variable's value into right one
     """
@@ -185,7 +186,7 @@ def select_into(left_vars, right_vars):
     return "SELECT {} INTO {}".format(left_vars, right_vars)
 
 
-def assign_range_end_vars(columns, variables):
+def assign_range_end_vars(columns, variables) -> Union[List[Any], List[str], str]:
     """
     SQL component for passing session variables around when executing SELECT.
     This will generate list with elements like:
@@ -199,7 +200,7 @@ def assign_range_end_vars(columns, variables):
     return assign_array
 
 
-def wrap_checksum_function(column_to_wrap):
+def wrap_checksum_function(column_to_wrap) -> str:
     """
     Wrap aggregation and checksum function outside column name.
     If we want to support customized checksum function, we will just need
@@ -209,7 +210,7 @@ def wrap_checksum_function(column_to_wrap):
     return "bit_xor(crc32({}))".format(column_to_wrap)
 
 
-def checksum_column_list(column_list):
+def checksum_column_list(column_list) -> str:
     """
     Given a list of columna name, return a string of concated column names
     with checksum function wrapped
@@ -217,7 +218,7 @@ def checksum_column_list(column_list):
     return ", ".join(wrap_checksum_function(i) for i in column_list)
 
 
-def get_range_start_condition(columns, values):
+def get_range_start_condition(columns, values) -> str:
     """
     Generate a where clase for chunk matching. The size of columns and values
     are equal.
@@ -243,19 +244,19 @@ Section for executable SQL
 """
 
 
-def select_sql_no_fcache(table_name):
+def select_sql_no_fcache(table_name) -> str:
     return "SELECT SQL_NO_FCACHE * from `{}` limit 0".format(escape(table_name))
 
 
-def show_create_table(table_name):
+def show_create_table(table_name) -> str:
     return "SHOW CREATE TABLE `{}`".format(escape(table_name))
 
 
-def show_table_stats(db_name):
+def show_table_stats(db_name) -> str:
     return "SHOW TABLE STATUS IN `{}` LIKE %s".format(escape(db_name))
 
 
-def get_myrocks_table_size():
+def get_myrocks_table_size() -> str:
     return """
         SELECT SUM(DATA_SIZE) as raw_size
         FROM
@@ -279,7 +280,7 @@ def create_delta_table(
     mysql_engine,
     old_column_list,
     old_table_name,
-):
+) -> str:
     return (
         "CREATE TABLE `{}` "
         "(`{}` BIGINT AUTO_INCREMENT, `{}` BIGINT, PRIMARY KEY({}))"
@@ -296,7 +297,7 @@ def create_delta_table(
     )
 
 
-def create_idx_on_delta_table(delta_table_name, pk_list):
+def create_idx_on_delta_table(delta_table_name, pk_list) -> str:
     return ("CREATE INDEX `ix_pri` ON `{}` ({})").format(
         escape(delta_table_name), ", ".join(pk_list)
     )
@@ -309,7 +310,7 @@ def create_insert_trigger(
     dml_col_name,
     old_column_list,
     dml_type_insert,
-):
+) -> str:
     return (
         "CREATE TRIGGER `{}` AFTER INSERT ON `{}` FOR EACH ROW "
         "INSERT INTO `{}` ({}, {}) "
@@ -332,7 +333,7 @@ def create_delete_trigger(
     dml_col_name,
     old_column_list,
     dml_type_delete,
-):
+) -> str:
     return (
         "CREATE TRIGGER `{}` AFTER DELETE ON `{}` FOR EACH ROW "
         "INSERT INTO `{}` ({}, {}) "
@@ -358,7 +359,7 @@ def create_update_trigger(
     dml_type_delete,
     dml_type_insert,
     pk_list,
-):
+) -> str:
     return (
         "CREATE TRIGGER `{}` AFTER UPDATE ON `{}` FOR EACH ROW "
         "IF ({}) THEN "
@@ -388,7 +389,7 @@ def create_update_trigger(
     )
 
 
-def lock_tables(tables):
+def lock_tables(tables) -> str:
     lock_sql = "LOCK TABLE "
     lock_sql += ", ".join(
         ["`{}` WRITE".format(escape(tablename)) for tablename in tables]
@@ -396,7 +397,9 @@ def lock_tables(tables):
     return lock_sql
 
 
-def select_into_file(id_col_name, dml_col_name, delta_table_name, skip_fcache=False):
+def select_into_file(
+    id_col_name, dml_col_name, delta_table_name, skip_fcache: bool = False
+) -> str:
     if skip_fcache:
         no_fcache = "SQL_NO_FCACHE"
     else:
@@ -415,8 +418,8 @@ def select_into_file(id_col_name, dml_col_name, delta_table_name, skip_fcache=Fa
 
 
 def select_full_table_into_file(
-    col_list, table_name, skip_fcache=False, where_filter=None
-):
+    col_list, table_name, skip_fcache: bool = False, where_filter=None
+) -> str:
     if skip_fcache:
         no_fcache = "SQL_NO_FCACHE"
     else:
@@ -440,8 +443,8 @@ def select_full_table_into_file_by_chunk(
     use_where,
     skip_fcache,
     where_filter,
-    idx_name="PRIMARY",
-):
+    idx_name: str = "PRIMARY",
+) -> str:
     assign = ", ".join(assign_range_end_vars(old_pk_list, range_end_vars_array))
     if use_where:
         row_range = get_range_start_condition(old_pk_list, range_start_vars_array)
@@ -481,18 +484,20 @@ def select_full_table_into_file_by_chunk(
     )
 
 
-def load_data_infile(table_name, col_list, ignore=False):
+def load_data_infile(table_name, col_list, ignore: bool = False) -> str:
     ignore_str = "IGNORE" if ignore else ""
     return "LOAD DATA INFILE %s {} INTO TABLE `{}` " "CHARACTER SET BINARY ({})".format(
         ignore_str, escape(table_name), list_to_col_str(col_list)
     )
 
 
-def drop_index(idx_name, table_name):
+def drop_index(idx_name, table_name) -> str:
     return "DROP INDEX `{}` ON `{}`".format(escape(idx_name), escape(table_name))
 
 
-def insert_into_select_from(into_table, into_col_list, from_table, from_col_list):
+def insert_into_select_from(
+    into_table, into_col_list, from_table, from_col_list
+) -> str:
     return ("INSERT INTO `{}` ({}) " "SELECT {} FROM `{}`").format(
         into_table,
         list_to_col_str(into_col_list),
@@ -501,13 +506,13 @@ def insert_into_select_from(into_table, into_col_list, from_table, from_col_list
     )
 
 
-def get_max_id_from(column, table_name):
+def get_max_id_from(column, table_name) -> str:
     return "SELECT ifnull(max(`{}`), 0) as max_id FROM `{}`".format(
         escape(column), escape(table_name)
     )
 
 
-def replay_delete_row(new_table_name, delta_table_name, id_col_name, pk_list):
+def replay_delete_row(new_table_name, delta_table_name, id_col_name, pk_list) -> str:
     return (
         "DELETE {new} FROM `{new}`, `{delta}` WHERE "
         "`{delta}`.`{id_col}` IN %s AND {join_clause}"
@@ -524,8 +529,8 @@ def replay_delete_row(new_table_name, delta_table_name, id_col_name, pk_list):
 
 
 def replay_insert_row(
-    old_column_list, new_table_name, delta_table_name, id_col_name, ignore=False
-):
+    old_column_list, new_table_name, delta_table_name, id_col_name, ignore: str = False
+) -> str:
     ignore = "IGNORE" if ignore else ""
     return (
         "INSERT {ignore} INTO `{new}` ({cols})"
@@ -546,10 +551,10 @@ def replay_update_row(
     old_non_pk_column_list,
     new_table_name,
     delta_table_name,
-    ignore,
+    ignore: str,
     id_col_name,
     pk_list,
-):
+) -> str:
     ignore = "IGNORE" if ignore else ""
     return (
         "UPDATE {ignore} `{new}`, `{delta}` "
@@ -571,7 +576,7 @@ def replay_update_row(
     )
 
 
-def get_chg_row(id_col_name, dml_col_name, tmp_table_include_id):
+def get_chg_row(id_col_name, dml_col_name, tmp_table_include_id) -> str:
     return (
         "SELECT `{id}`, `{dml_type}` " "FROM `{table}` " "WHERE `{id}` = %s "
     ).format(
@@ -584,8 +589,12 @@ def get_chg_row(id_col_name, dml_col_name, tmp_table_include_id):
 
 
 def get_replay_row_ids(
-    id_col_name, dml_col_name, tmp_table_include_id, timeout_ms=None, is_mysql8=False
-):
+    id_col_name,
+    dml_col_name,
+    tmp_table_include_id,
+    timeout_ms=None,
+    is_mysql8: bool = False,
+) -> str:
     if timeout_ms:
         if is_mysql8:
             statement_timeout_sql = "/*+ MAX_EXECUTION_TIME({}) */".format(timeout_ms)
@@ -608,27 +617,27 @@ def get_replay_row_ids(
     )
 
 
-def drop_tmp_table(table_name):
+def drop_tmp_table(table_name) -> str:
     return "DROP TEMPORARY TABLE `{}`".format(escape(table_name))
 
 
-def set_global_variable(variable):
+def set_global_variable(variable) -> str:
     return "SET GLOBAL {} = %s".format(variable)
 
 
-def set_session_variable(variable):
+def set_session_variable(variable) -> str:
     return "SET SESSION {} = %s".format(variable)
 
 
-def get_global_variable(variable):
+def get_global_variable(variable) -> str:
     return "SHOW GLOBAL VARIABLES LIKE '{}'".format(variable)
 
 
-def get_session_variable(variable):
+def get_session_variable(variable) -> str:
     return "SHOW SESSION VARIABLES LIKE '{}'".format(variable)
 
 
-def add_index(table_name, indexes):
+def add_index(table_name, indexes) -> str:
     """Generate sql to add indexes using ALTER TABLE
 
     @param param:  a list of indexes to create
@@ -648,11 +657,11 @@ def add_index(table_name, indexes):
     return sql
 
 
-def analyze_table(table_name):
+def analyze_table(table_name) -> str:
     return "ANALYZE TABLE `{}`".format(escape(table_name))
 
 
-def checksum_full_table(table_name, columns):
+def checksum_full_table(table_name, columns) -> str:
     """
     Generate SQL for checksuming data from given columns in table
     """
@@ -668,9 +677,9 @@ def dump_current_chunk(
     pk_list,
     range_start_values,
     chunk_size,
-    force_index="PRIMARY",
-    use_where=False,
-):
+    force_index: str = "PRIMARY",
+    use_where: bool = False,
+) -> str:
     row_range = get_range_start_condition(pk_list, range_start_values)
     if use_where:
         where_clause = " WHERE {} ".format(row_range)
@@ -704,8 +713,8 @@ def checksum_by_chunk_with_assign(
     range_end_values,
     chunk_size,
     using_where,
-    force_index="PRIMARY",
-):
+    force_index: str = "PRIMARY",
+) -> str:
     """
     Similar to checksum_by_chunk, this function has almost same the logic
     except: here we use original column name as checksum result column alias
@@ -761,9 +770,9 @@ def checksum_by_chunk(
     range_end_values,
     chunk_size,
     using_where,
-    skip_fcache=False,
-    force_index="PRIMARY",
-):
+    skip_fcache: bool = False,
+    force_index: str = "PRIMARY",
+) -> str:
     if using_where:
         row_range = get_range_start_condition(pk_list, range_start_values)
         where_clause = " WHERE {} ".format(row_range)
@@ -810,7 +819,7 @@ def checksum_by_replay_chunk(
     id_limit,
     max_replayed,
     chunk_size,
-):
+) -> str:
     col_list = ["count(*) AS `cnt`"]
     for col in old_column_list:
         column_with_tbl = "`{}`.`{}`".format(escape(table_name), escape(col))
@@ -853,11 +862,11 @@ def checksum_by_replay_chunk(
     )
 
 
-def rename_table(from_name, to_name):
+def rename_table(from_name, to_name) -> str:
     return "ALTER TABLE `{}` rename `{}`".format(escape(from_name), escape(to_name))
 
 
-def get_all_osc_tables(db=None):
+def get_all_osc_tables(db=None) -> str:
     sql = (
         "SELECT TABLE_SCHEMA as db, TABLE_NAME "
         "FROM information_schema.TABLES "
@@ -868,7 +877,7 @@ def get_all_osc_tables(db=None):
     return sql
 
 
-def get_all_osc_triggers(db=None):
+def get_all_osc_triggers(db=None) -> str:
     sql = (
         "SELECT TRIGGER_SCHEMA as db, TRIGGER_NAME "
         "FROM information_schema.TRIGGERS "
