@@ -154,7 +154,6 @@ class SchemaDiff(object):
                     position = "AFTER `{}`".format(
                         escape(self.right.column_list[idx - 1].name)
                     )
-                    old_column_names = [col.name] + old_column_names
                     new_idx = (
                         old_column_names.index(self.right.column_list[idx - 1].name) + 1
                     )
