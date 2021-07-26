@@ -265,6 +265,9 @@ class Column(object):
 
             if not is_equal(getattr(self, attr), getattr(other, attr)):
                 return False
+        return self.has_same_default(other)
+
+    def has_same_default(self, other):
         # nullable column has implicit default as null
         if self.nullable:
             if self.quoted_default != other.quoted_default:
@@ -282,7 +285,6 @@ class Column(object):
         else:
             if self.quoted_default != other.quoted_default:
                 return False
-
         return True
 
     def __ne__(self, other):
