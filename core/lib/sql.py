@@ -244,10 +244,6 @@ Section for executable SQL
 """
 
 
-def select_sql_no_fcache(table_name) -> str:
-    return "SELECT SQL_NO_FCACHE * from `{}` limit 0".format(escape(table_name))
-
-
 def show_create_table(table_name) -> str:
     return "SHOW CREATE TABLE `{}`".format(escape(table_name))
 
@@ -397,18 +393,11 @@ def lock_tables(tables) -> str:
     return lock_sql
 
 
-def select_into_file(
-    id_col_name, dml_col_name, delta_table_name, skip_fcache: bool = False
-) -> str:
-    if skip_fcache:
-        no_fcache = "SQL_NO_FCACHE"
-    else:
-        no_fcache = ""
+def select_into_file(id_col_name, dml_col_name, delta_table_name) -> str:
     return (
-        "SELECT {} `{}`, `{}` "
+        "SELECT `{}`, `{}` "
         "FROM `{}` "
         "ORDER BY `{}` INTO OUTFILE %s".format(
-            no_fcache,
             escape(id_col_name),
             escape(dml_col_name),
             escape(delta_table_name),
@@ -417,19 +406,13 @@ def select_into_file(
     )
 
 
-def select_full_table_into_file(
-    col_list, table_name, skip_fcache: bool = False, where_filter=None
-) -> str:
-    if skip_fcache:
-        no_fcache = "SQL_NO_FCACHE"
-    else:
-        no_fcache = ""
+def select_full_table_into_file(col_list, table_name, where_filter=None) -> str:
     if where_filter:
         where_clause = "WHERE ({})".format(where_filter)
     else:
         where_clause = ""
-    return ("SELECT {} {} " "FROM `{}` " "{} " "INTO OUTFILE %s").format(
-        no_fcache, list_to_col_str(col_list), escape(table_name), where_clause
+    return ("SELECT {} " "FROM `{}` " "{} " "INTO OUTFILE %s").format(
+        list_to_col_str(col_list), escape(table_name), where_clause
     )
 
 
@@ -441,7 +424,6 @@ def select_full_table_into_file_by_chunk(
     old_non_pk_list,
     select_chunk_size,
     use_where,
-    skip_fcache,
     where_filter,
     idx_name: str = "PRIMARY",
 ) -> str:
@@ -463,17 +445,11 @@ def select_full_table_into_file_by_chunk(
     else:
         column_name_list = assign
 
-    if skip_fcache:
-        no_fcache = "SQL_NO_FCACHE"
-    else:
-        no_fcache = ""
-
     return (
-        "SELECT {} {} "
+        "SELECT {} "
         "FROM `{}` FORCE INDEX (`{}`) {} "
         "ORDER BY {} LIMIT {} "
         "INTO OUTFILE %s ".format(
-            no_fcache,
             column_name_list,
             escape(table_name),
             idx_name,
@@ -770,7 +746,6 @@ def checksum_by_chunk(
     range_end_values,
     chunk_size,
     using_where,
-    skip_fcache: bool = False,
     force_index: str = "PRIMARY",
 ) -> str:
     if using_where:
@@ -790,16 +765,11 @@ def checksum_by_chunk(
     else:
         column_name_list = bit_xor_assign
 
-    if skip_fcache:
-        no_fcache = "SQL_NO_FCACHE"
-    else:
-        no_fcache = ""
     return (
-        "SELECT {} count(*) as cnt, {} "
+        "SELECT count(*) as cnt, {} "
         "FROM ( "
         " SELECT * FROM `{}` FORCE INDEX (`{}`) {} "
         "ORDER BY {} LIMIT {} ) as tmp".format(
-            no_fcache,
             column_name_list,
             escape(table_name),
             escape(force_index),

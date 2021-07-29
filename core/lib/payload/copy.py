@@ -70,7 +70,6 @@ class CopyPayload(Payload):
         self.bypass_replay_timeout = False
         self.is_ttl_disabled_by_me = False
         self.stop_before_swap = False
-        self.is_skip_fcache_supported = False
         self.outfile_suffix_end = 0
         self.last_replayed_id = 0
         self.last_checksumed_id = 0
@@ -1084,9 +1083,6 @@ class CopyPayload(Payload):
                 )
                 raise OSCError("NO_INDEX_COVERAGE", {"pk_names": old_pk_names})
 
-        if self.check_no_fcache_support():
-            self.is_skip_fcache_supported = True
-
         log.info(
             "PK filter for replaying changes later: {}".format(self._pk_for_filter)
         )
@@ -1622,7 +1618,6 @@ class CopyPayload(Payload):
             sql_string = sql.select_full_table_into_file(
                 self._pk_for_filter + self.old_non_pk_column_list,
                 self.table_name,
-                self.is_skip_fcache_supported,
                 self.where,
             )
             affected_rows = self.execute_sql(sql_string, (outfile,))
@@ -1650,7 +1645,6 @@ class CopyPayload(Payload):
                 self.old_non_pk_column_list,
                 self.select_chunk_size,
                 use_where,
-                self.is_skip_fcache_supported,
                 self.where,
                 self._idx_name_for_filter,
             )
@@ -1848,20 +1842,6 @@ class CopyPayload(Payload):
             # Disable rocksdb explicit commit after loading data
             self.change_explicit_commit(enable=False)
         self.stats["time_in_load"] = time.time() - stage_start_time
-
-    def check_no_fcache_support(self):
-        """
-        Check whether current MySQL instance support SQL_NO_FCACHE
-        which is only supported by WebScaleSQL
-        """
-        try:
-            self.query(sql.select_sql_no_fcache(self.table_name))
-            return True
-        except Exception:
-            # if any excpetion raised here, we'll treat it as
-            # SQL_NO_FCACHE is not supported
-            log.info("SQL_NO_FCACHE doesn't support in this MySQL")
-            return False
 
     def check_max_statement_time_exists(self):
         """
@@ -2409,7 +2389,6 @@ class CopyPayload(Payload):
                     self.range_end_vars_array,
                     self.select_chunk_size,
                     use_where,
-                    self.is_skip_fcache_supported,
                     idx_for_checksum,
                 )
             )
