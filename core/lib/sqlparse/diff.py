@@ -391,7 +391,15 @@ class SchemaDiff(object):
             tbl_option_old = getattr(self.left, attr)
             tbl_option_new = getattr(self.right, attr)
             if not is_equal(tbl_option_old, tbl_option_new):
-                segments.append("{}={}".format(attr, tbl_option_new))
+                # when tbl_option_new is None, do "alter table xxx attr=None" won't work
+                if attr == "comment" and tbl_option_new is None:
+                    segments.append("{}={}".format(attr, "''"))
+                elif attr == "row_format" and tbl_option_new is None:
+                    segments.append("{}={}".format(attr, "default"))
+                else:
+                    segments.append("{}={}".format(attr, tbl_option_new))
+
+                # populate alter types data
                 if attr == "row_format":
                     self.add_alter_type(TableAlterType.CHANGE_ROW_FORMAT)
                 elif attr == "key_block_size":
