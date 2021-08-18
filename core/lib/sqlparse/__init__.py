@@ -13,7 +13,12 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 from .create import parse_create, ParseError
-from .diff import SchemaDiff, get_type_conv_columns, need_default_ts_bootstrap
+from .diff import (
+    ColAlterType,
+    SchemaDiff,
+    get_type_conv_columns,
+    need_default_ts_bootstrap,
+)
 from .models import is_equal, Column, TableIndex, Table
 
 __all__ = [
@@ -21,6 +26,7 @@ __all__ = [
     "ParseError",
     "is_equal",
     "SchemaDiff",
+    "ColAlterType",
     "get_type_conv_columns",
     "Column",
     "need_default_ts_bootstrap",
