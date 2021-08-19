@@ -461,6 +461,14 @@ class SQLParserTest(unittest.TestCase):
             str_after_parse = parse_create(tbl).to_sql()
             self.assertEqual(tbl, str_after_parse)
 
+    def test_boolean_and_bool(self):
+        sqls = []
+        sqls.append("Create table foo(column1 bool)")
+        sqls.append("Create table foo(column1 boolean)")
+        for sql in sqls:
+            # should not raise
+            parse_create(sql)
+
     def test_inequallity_in_index_col_length(self):
         left = (
             "Create table `foobar`\n"
