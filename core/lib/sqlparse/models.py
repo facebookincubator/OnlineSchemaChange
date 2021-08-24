@@ -494,6 +494,13 @@ class EnumColumn(Column):
         return " ".join(column_segment)
 
 
+class PartitionConfig:
+    # TODO
+    def __init(self):
+        self.p_type = None  # Partition type e.g. RANGE
+        self.p_subtype = None  # e.g. LINEAR / COLUMNS
+
+
 class Table(object):
     """
     Representing a table definiton

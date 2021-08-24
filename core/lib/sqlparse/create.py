@@ -29,6 +29,8 @@ from pyparsing import (
     SkipTo,
     StringEnd,
     upcaseTokens,
+    nestedExpr,
+    delimitedList,
 )
 
 from . import models
@@ -73,6 +75,7 @@ class CreateParser(object):
     """
 
     _parser = None
+    _partitions_parser = None
 
     # Basic token
     WORD_CREATE = CaselessLiteral("CREATE").suppress()
@@ -418,6 +421,128 @@ class CreateParser(object):
         )("partition")
     )
 
+    # Parse partitions in detail
+    # From https://dev.mysql.com/doc/refman/8.0/en/create-table.html
+    PART_FIELD_NAME = (
+        QuotedString(quoteChar="`", escQuote="``", escChar="\\", unquoteResults=True)
+        | OBJECT_NAME
+    )
+    PART_FIELD_LIST = delimitedList(PART_FIELD_NAME)("field_list")
+
+    # e.g 1, 2, 3
+    # and 'a', 'b', 'c'
+    PART_VALUE_LIST = Group(
+        LEFT_PARENTHESES
+        + (delimitedList(Word(nums)) | delimitedList(QUOTED_STRING_WITH_QUOTE))
+        + RIGHT_PARENTHESES
+    )
+    PART_VALUES_IN = (CaselessLiteral("IN").suppress() + PART_VALUE_LIST)("p_values_in")
+
+    # Note: No expr support although full syntax (allowed by mysql8) is
+    # LESS THAN {(expr | value_list) | MAXVALUE}
+    PART_VALUES_LESSTHAN = (
+        CaselessLiteral("LESS").suppress()
+        + CaselessLiteral("THAN").suppress()
+        + (CaselessLiteral("MAXVALUE").setParseAction(upcaseTokens) | PART_VALUE_LIST)
+    )("p_values_less_than")
+
+    PART_NAME = (
+        QuotedString(quoteChar="`", escQuote="``", escChar="\\", unquoteResults=True)
+        | OBJECT_NAME
+    )("part_name")
+
+    # Options for partition definitions - engine/comments only for now.
+    # DO NOT re-use QUOTED_STRING_WITH_QUOTE for these -
+    # *seems* to trigger a pyparsing bug?
+    P_ENGINE = QuotedString(
+        quoteChar="'", escQuote="''", escChar="\\", unquoteResults=False
+    ) | QuotedString(
+        quoteChar='"', escQuote='""', escChar="\\", multiline=True, unquoteResults=False
+    )
+
+    P_COMMENT = QuotedString(
+        quoteChar="'", escQuote="''", escChar="\\", multiline=True, unquoteResults=False
+    ) | QuotedString(
+        quoteChar='"', escQuote='""', escChar="\\", multiline=True, unquoteResults=False
+    )
+
+    P_OPT_ENGINE = (
+        Optional(CaselessLiteral("STORAGE")).suppress()
+        + CaselessLiteral("ENGINE").suppress()
+        + Optional(Literal("=")).suppress()
+        + P_ENGINE.setParseAction(upcaseTokens)("pdef_engine")
+    )
+    P_OPT_COMMENT = (
+        CaselessLiteral("COMMENT").suppress()
+        + Optional(Literal("=")).suppress()
+        + P_COMMENT("pdef_comment")
+    )
+    PDEF_OPTIONS = ZeroOrMore((P_OPT_ENGINE | P_OPT_COMMENT))
+
+    # e.g. PARTITION p99 VALUES (LESS THAN|IN) ...
+    PART_DEFS = delimitedList(
+        Group(
+            CaselessLiteral("PARTITION").suppress()
+            + PART_NAME
+            + CaselessLiteral("VALUES").suppress()
+            + (PART_VALUES_LESSTHAN | PART_VALUES_IN)
+            + PDEF_OPTIONS
+        )
+    )
+
+    # No fancy expressions yet, just a list of cols for now.
+    PART_EXPR = (
+        LEFT_PARENTHESES
+        + delimitedList(
+            QuotedString(
+                quoteChar="`", escQuote="``", escChar="\\", unquoteResults=True
+            )
+            | OBJECT_NAME
+        )("p_expr")
+        + RIGHT_PARENTHESES
+    )
+
+    SUBTYPE_LINEAR = (Optional(CaselessLiteral("LINEAR")).setParseAction(upcaseTokens))(
+        "p_subtype"
+    )
+    # Match: [LINEAR] HASH (expr)
+    PTYPE_HASH = (
+        SUBTYPE_LINEAR
+        + (CaselessLiteral("HASH").setParseAction(upcaseTokens))("part_type")
+        + nestedExpr()("p_hash_expr")  # Lousy approximation, needs post processing
+    )
+
+    # Match: [LINEAR] KEY [ALGORITHM=1|2] (column_list)
+    PART_ALGO = (
+        CaselessLiteral("ALGORITHM").suppress()
+        + Literal("=").suppress()
+        + Word(alphanums)
+    )("p_algo")
+
+    PTYPE_KEY = (
+        SUBTYPE_LINEAR
+        + (CaselessLiteral("KEY").setParseAction(upcaseTokens))("part_type")
+        + Optional(PART_ALGO)
+        + Literal("(")  # don't suppress here
+        + Optional(PART_FIELD_LIST)  # e.g. `PARTITION BY KEY() PARTITIONS 2` is valid
+        + Literal(")")
+    )
+
+    PART_COL_LIST = (
+        (CaselessLiteral("COLUMNS").setParseAction(upcaseTokens))("p_subtype")
+        + LEFT_PARENTHESES
+        + PART_FIELD_LIST
+        + RIGHT_PARENTHESES
+    )
+
+    PTYPE_RANGE = (CaselessLiteral("RANGE").setParseAction(upcaseTokens))(
+        "part_type"
+    ) + (PART_COL_LIST | PART_EXPR)
+
+    PTYPE_LIST = (CaselessLiteral("LIST").setParseAction(upcaseTokens))("part_type") + (
+        PART_COL_LIST | PART_EXPR
+    )
+
     @classmethod
     def generate_rule(cls):
         # The final rule for the whole statement match
@@ -441,6 +566,30 @@ class CreateParser(object):
         if not cls._parser:
             cls._parser = cls.generate_rule()
         return cls._parser
+
+    @classmethod
+    def gen_partitions_parser(cls):
+        # Init full parts matcher only on demand
+        return (
+            CaselessLiteral("PARTITION")
+            + CaselessLiteral("BY")
+            + (cls.PTYPE_HASH | cls.PTYPE_KEY | cls.PTYPE_RANGE | cls.PTYPE_LIST)
+            + Optional(CaselessLiteral("PARTITIONS") + Word(nums)("num_partitions"))
+            + Optional(cls.LEFT_PARENTHESES + cls.PART_DEFS("part_defs") + cls.RIGHT_PARENTHESES)
+        )
+
+    @classmethod
+    def get_partitions_parser(cls):
+        if not cls._partitions_parser:
+            cls._partitions_parser = cls.gen_partitions_parser()
+        return cls._partitions_parser
+
+    @classmethod
+    def parse_partitions(cls, parts):
+        try:
+            return cls.get_partitions_parser().parseString(parts)
+        except ParseException as e:
+            raise ParseError(f"Error parsing partitions: {e.line}, {e.column}")
 
     @classmethod
     def parse(cls, sql):

@@ -12,7 +12,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-from .create import parse_create, ParseError
+from .create import parse_create, ParseError, CreateParser
 from .diff import (
     ColAlterType,
     SchemaDiff,
@@ -32,4 +32,5 @@ __all__ = [
     "need_default_ts_bootstrap",
     "TableIndex",
     "Table",
+    "CreateParser",
 ]
