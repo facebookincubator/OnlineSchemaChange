@@ -575,7 +575,11 @@ class CreateParser(object):
             + CaselessLiteral("BY")
             + (cls.PTYPE_HASH | cls.PTYPE_KEY | cls.PTYPE_RANGE | cls.PTYPE_LIST)
             + Optional(CaselessLiteral("PARTITIONS") + Word(nums)("num_partitions"))
-            + Optional(cls.LEFT_PARENTHESES + cls.PART_DEFS("part_defs") + cls.RIGHT_PARENTHESES)
+            + Optional(
+                cls.LEFT_PARENTHESES
+                + cls.PART_DEFS("part_defs")
+                + cls.RIGHT_PARENTHESES
+            )
         )
 
     @classmethod
