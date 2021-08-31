@@ -13,7 +13,11 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import hashlib
+import logging
 import re
+from typing import Optional, List, Set, NamedTuple, Union
+
+log = logging.getLogger(__name__)
 
 
 def escape(keyword):
@@ -494,11 +498,83 @@ class EnumColumn(Column):
         return " ".join(column_segment)
 
 
+class PartitionDefinitionEntry(NamedTuple):
+    pdef_name: str
+    pdef_type: str
+    pdef_value_list: Union[List[str], str]
+    pdef_comment: Optional[str]
+    pdef_engine: str = "INNODB"
+
+
 class PartitionConfig:
-    # TODO
-    def __init(self):
-        self.p_type = None  # Partition type e.g. RANGE
-        self.p_subtype = None  # e.g. LINEAR / COLUMNS
+    # Partitions config for a table
+    PTYPE_RANGE = "RANGE"
+    PTYPE_LIST = "LIST"
+    PTYPE_HASH = "HASH"
+    PTYPE_KEY = "KEY"
+
+    SUBTYPE_L = "LINEAR"
+    SUBTYPE_C = "COLUMNS"
+
+    KNOWN_PARTITION_TYPES: Set[str] = {PTYPE_LIST, PTYPE_HASH, PTYPE_KEY, PTYPE_RANGE}
+    KNOWN_PARTITION_SUBTYPES: Set[str] = {SUBTYPE_L, SUBTYPE_C}
+
+    PDEF_TYPE_VIN = "p_values_in"
+    PDEF_TYPE_VLT = "p_values_less_than"
+    PDEF_TYPE_ATTRIBS: List[str] = [PDEF_TYPE_VIN, PDEF_TYPE_VLT]
+
+    def __init__(self) -> None:
+        self.part_type: Optional[str] = None  # Partition type e.g. RANGE
+        self.p_subtype: Optional[str] = None  # e.g. LINEAR / COLUMNS
+        self.num_partitions: int = 0
+        self.fields_or_expr: Optional[Union[str, List[str]]] = None
+
+        self.part_defs: List[PartitionDefinitionEntry] = []
+        self.full_type: str = ""
+        # Partition type `KEY` alone allows specifying ALGORITHM=[1|2] e.g.
+        # `PARTITION BY linear key ALGORITHM=2 (id)  partitions 10`
+        self.algorithm_for_key: Optional[int] = None
+
+    def __str__(self):
+        return (
+            f"{self.__class__.__name__}: |"
+            f"type={self.full_type}|"
+            f"fields_or_expr={self.fields_or_expr}|"
+            f"defs={self.part_defs}|numparts={self.num_partitions}"
+        )
+
+    def get_type(self) -> Optional[str]:
+        return self.full_type
+
+    def get_num_parts(self) -> int:
+        return self.num_partitions
+
+    def get_fields_or_expr(self) -> Optional[Union[str, List[str]]]:
+        return self.fields_or_expr
+
+    def get_algo(self) -> Optional[int]:
+        return self.algorithm_for_key if self.part_type == self.PTYPE_KEY else None
+
+    def __eq__(self, other):
+        for attr in (
+            "part_type",
+            "p_subtype",
+            "num_partitions",
+            "fields_or_expr",
+            "full_type",
+            "algorithm_for_key",
+        ):
+            if not is_equal(getattr(self, attr), getattr(other, attr)):
+                return False
+
+        return self.part_defs == other.part_defs
+
+    def __ne__(self, other):
+        return not self == other
+
+    def to_partial_sql(self):
+        # Stringify info a format usable in `create table ...`
+        raise NotImplementedError("TODO PartitionConfig.to_partial_sql")
 
 
 class Table(object):
@@ -520,8 +596,9 @@ class Table(object):
         self.column_list = []
         self.primary_key = TableIndex(name="PRIMARY", is_unique=True)
         self.indexes = []
-        self.partition = None
+        self.partition = None  # Partitions as a string
         self.constraint = None
+        self.partition_config: Optional[PartitionConfig] = None
 
     def __str__(self):
         table_str = ""
@@ -555,7 +632,8 @@ class Table(object):
             "row_format",
             "key_block_size",
             "comment",
-            "partition",
+            # "partition",
+            "partition_config",
         ):
             if not is_equal(getattr(self, attr), getattr(other, attr)):
                 return False

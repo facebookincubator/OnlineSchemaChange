@@ -862,3 +862,73 @@ class ModelTableTestCase(unittest.TestCase):
             ")"
         )
         self.assertEqual(parse_create(sql1), parse_create(sql2))
+
+    def test_partitions_basic(self):
+        # See partitions_parser_test.py for elaborate tests, this
+        # just tests that CreateParser can invoke parse_partitions/partition_to_model
+
+        sql = (
+            "CREATE TABLE `t9` ("
+            "`id` int(11) NOT NULL,"
+            "`blob` varbinary(40000) DEFAULT NULL,"
+            "`identity` varbinary(256) DEFAULT NULL,"
+            "`object_id` varbinary(256) DEFAULT NULL,"
+            "`created_at` bigint(20) DEFAULT NULL,"
+            "PRIMARY KEY (`id`),"
+            "KEY `identity` (`identity`),"
+            "KEY `object_id` (`object_id`),"
+            "KEY `created_at` (`created_at`)"
+            ") ENGINE=InnoDB DEFAULT CHARSET=latin1"
+            "/*!50100 PARTITION BY RANGE (id) ("
+            "PARTITION p0 VALUES LESS THAN (6) ENGINE = 'innodb' COMMENT 'whatever',"
+            "PARTITION p1 VALUES LESS THAN (11),"
+            "PARTITION p2 VALUES LESS THAN (16),"
+            "PARTITION p3 VALUES LESS THAN (21),"
+            "PARTITION p4 VALUES LESS THAN maxvalue"
+            ") */"
+        )
+
+        schema_obj = parse_create(sql)
+        self.assertIsNotNone(schema_obj.partition)
+        self.assertIsNotNone(schema_obj.partition_config)
+        pc = schema_obj.partition_config  # models.PartitionConfig
+        self.assertEqual("RANGE", pc.get_type())
+        self.assertEqual(5, pc.get_num_parts())
+        self.assertEqual(["id"], pc.get_fields_or_expr())
+
+    def test_partitions_failure(self):
+        # Table schema is OK but partitions config is broken
+        sql = (
+            "CREATE TABLE `t9` ("
+            "`id` int(11) NOT NULL,"
+            "`blob` varbinary(40000) DEFAULT NULL,"
+            "`identity` varbinary(256) DEFAULT NULL,"
+            "`object_id` varbinary(256) DEFAULT NULL,"
+            "`created_at` bigint(20) DEFAULT NULL,"
+            "PRIMARY KEY (`id`),"
+            "KEY `identity` (`identity`),"
+            "KEY `object_id` (`object_id`),"
+            "KEY `created_at` (`created_at`)"
+            ") ENGINE=InnoDB DEFAULT CHARSET=latin1"
+            # Note: No partitions defs while RANGE needs them.
+            "/*!50100 PARTITION BY RANGE (id) */"
+        )
+        with self.assertRaises(ParseError):
+            _ = parse_create(sql)
+
+    def test_partitions_notpresent(self):
+        # No partition config in DDL
+        sql = (
+            "CREATE TABLE `t9` ("
+            "`id` int(11) NOT NULL,"
+            "`blob` varbinary(40000) DEFAULT NULL,"
+            "`identity` varbinary(256) DEFAULT NULL,"
+            "`object_id` varbinary(256) DEFAULT NULL,"
+            "`created_at` bigint(20) DEFAULT NULL,"
+            "PRIMARY KEY (`id`)"
+            ") ENGINE=InnoDB DEFAULT CHARSET=latin1"
+        )
+
+        schema_obj = parse_create(sql)
+        self.assertIsNone(schema_obj.partition)
+        self.assertIsNone(schema_obj.partition_config)

@@ -12,7 +12,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-from .create import parse_create, ParseError, CreateParser
+from .create import parse_create, ParseError, CreateParser, PartitionParseError
 from .diff import (
     ColAlterType,
     SchemaDiff,
@@ -33,4 +33,5 @@ __all__ = [
     "TableIndex",
     "Table",
     "CreateParser",
+    "PartitionParseError",
 ]
