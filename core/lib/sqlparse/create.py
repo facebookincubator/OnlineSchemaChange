@@ -13,7 +13,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import logging
-from typing import List, Set
+from typing import List, Set, Union
 
 from pyparsing import (
     Word,
@@ -439,7 +439,20 @@ class CreateParser(object):
     # and 'a', 'b', 'c'
     PART_VALUE_LIST = Group(
         LEFT_PARENTHESES
-        + (delimitedList(Word(nums)) | delimitedList(QUOTED_STRING_WITH_QUOTE))
+        + (
+            delimitedList(Word(nums))  # e.g. (1, 2, 3)
+            | delimitedList(QUOTED_STRING_WITH_QUOTE)  # e.g. ('a', 'b')
+            | (
+                LEFT_PARENTHESES
+                + delimitedList(
+                    QUOTED_STRING_WITH_QUOTE
+                    | CaselessLiteral("NULL").setParseAction(upcaseTokens)
+                )
+                + RIGHT_PARENTHESES
+            )(
+                "is_tuple"
+            )  # e.g. (("a", "b")), See test_parts_list_in_tuple15
+        )
         + RIGHT_PARENTHESES
     )
     PART_VALUES_IN = (CaselessLiteral("IN").suppress() + PART_VALUE_LIST)("p_values_in")
@@ -515,8 +528,9 @@ class CreateParser(object):
                 | OBJECT_NAME
             )
             + RIGHT_PARENTHESES
-        )
-        | nestedExpr()
+        )("via_list")
+        # `RANGE expr` support (test_parts_range_with_expr)
+        | nestedExpr()("via_nested_expr")
     )("p_expr")
 
     SUBTYPE_LINEAR = (Optional(CaselessLiteral("LINEAR")).setParseAction(upcaseTokens))(
@@ -798,6 +812,11 @@ class CreateParser(object):
         pc.part_type = mytype
         pc.p_subtype = mysubtype
 
+        def _strip_ticks(fields: Union[str, List[str]]) -> Union[str, List[str]]:
+            if isinstance(fields, str):
+                return fields.replace("`", "")
+            return [_strip_ticks(f) for f in fields]
+
         # set fields_or_expr, full_type
         if (
             pc.part_type == models.PartitionConfig.PTYPE_LIST
@@ -811,7 +830,14 @@ class CreateParser(object):
             pc.part_defs = _process_partition_definitions(presult.part_defs)
             if not pc.p_subtype:
                 pc.full_type = pc.part_type
+                pc.via_nested_expr = (
+                    "via_nested_expr" in presult and "via_list" not in presult
+                )
                 pc.fields_or_expr = presult.p_expr.asList()
+
+                if pc.via_nested_expr:
+                    # strip backticks e.g. to_days(`date`) -> [to_days, [date]]
+                    pc.fields_or_expr = _strip_ticks(pc.fields_or_expr)
             else:
                 pc.full_type = f"{pc.part_type} {pc.p_subtype}"
                 pc.fields_or_expr = presult.field_list.asList()
@@ -836,10 +862,33 @@ class CreateParser(object):
                 raise PartitionParseError(
                     f"Partition type {pc.part_type} MUST have p_hash_expr defined"
                 )
-            pc.fields_or_expr = hexpr.asList()
+            pc.fields_or_expr = _strip_ticks(hexpr.asList())
         else:
             # unreachable since we checked for all part_types earlier.
             raise PartitionParseError(f"Unknown partition type {pc.part_type}")
+
+        # We avoid escaping fields/expr in partitions with backticks since
+        # its tricky to distinguish between a list of columns and an expression
+        # e.g. unix_timestamp(ts) - ts could be escaped but unix_ts cannot.
+        # Our parser will strip out backticks wherever possible. For nestedExpr
+        # usecases, this is done via _strip_ticks instead.
+        def _has_backticks(fields: Union[str, List[str]]) -> bool:
+            if isinstance(fields, list):
+                return any(_has_backticks(f) for f in fields)
+            return "`" in fields if isinstance(fields, str) else False
+
+        if _has_backticks(pc.fields_or_expr):
+            raise PartitionParseError(
+                f"field_or_expr cannot have backticks {pc.fields_or_expr}"
+            )
+
+        if len(pc.part_defs) > 0 and any(
+            pd.pdef_name.upper() == "NULL" for pd in pc.part_defs
+        ):
+            # We will disallow this even if raw sql passed in as e.g.
+            # PARTITION `null` VALUES IN ...
+            raise PartitionParseError("Partition names may not be literal `null`")
+
         return pc
 
 
@@ -863,9 +912,15 @@ def _process_partition_definitions(
             if val_tmp:
                 unique_attrs.add(attrname)
                 val_as_list = val_tmp.asList()
-                if isinstance(val_as_list, list) and len(val_as_list) > 0:
+                is_tuple = "is_tuple" in val_tmp[0]
+                if (
+                    isinstance(val_as_list, list)
+                    and len(val_as_list) > 0
+                    and not is_tuple
+                ):
                     # MAXVALUE would show up as ['MAXVALUE'] and (1,2,3) as
                     # [['1', '2', '3']] so normalize to ['1', '2', '3'] and MAXVALUE
+                    # But not if a tuple of values e.g. ((1, 2, 3))
                     val_as_list = val_as_list[0]
                 entry = models.PartitionDefinitionEntry(
                     pdef_name=name,
@@ -873,6 +928,7 @@ def _process_partition_definitions(
                     pdef_value_list=val_as_list,
                     pdef_comment=item.get("pdef_comment"),
                     pdef_engine=item.get("pdef_engine") or "INNODB",
+                    is_tuple=is_tuple,
                 )
                 unique_engines.add(entry.pdef_engine)
                 res.append(entry)

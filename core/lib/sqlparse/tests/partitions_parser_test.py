@@ -84,7 +84,7 @@ PARTS_KEY_NONEMPTY = "PARTITION BY KEY(id1, `id2`) PARTITIONS 2"
 PARTS_KEY_LINEAR_ALGO = "PARTITION BY linear key ALGORITHM=2 (id)  partitions 10"
 
 # Parsing the `expr` for hash is ugly.
-PARTS_HASH = "PARTITION BY HASH (YEAR(hired)) PARTITIONS 3"
+PARTS_HASH = "PARTITION BY HASH (YEAR(`hired`)) PARTITIONS 3"
 PARTS_HASH_WITH_LINEAR = "PARTITION BY linear hash(YEAR(hired)) PARTITIONS 4"
 
 PARTS_RANGE_MANY_ENGINES = (
@@ -97,11 +97,37 @@ PARTS_RANGE_MANY_ENGINES = (
     ")"
 )
 
+PARTS_LIST_EXPR_IN = (
+    "PARTITION BY LIST (to_days(`date`)) ("
+    "PARTITION p2019_09_09 VALUES IN (737676) ENGINE = InnoDB,"
+    "PARTITION p2019_09_12 VALUES IN (737679) ENGINE = InnoDB"
+    ")"
+)
+
+PARTS_LIST_IN_TUPLE = (
+    "PARTITION BY LIST COLUMNS(ds,forecast_version) ("
+    "PARTITION `allnulls` VALUES IN ((NULL,NULL)) ENGINE = InnoDB,"
+    "PARTITION `2018-11-01_tactical_fixed_parameters` VALUES IN "
+    "(('2018-11-01','tactical_fixed_parameters')) ENGINE = InnoDB"
+    ")"
+)
+
 
 # Test parsing partitions config (alone)
 class PartitionParserTest(unittest.TestCase):
     # See https://www.internalfb.com/phabricator/paste/view/P448439189?lines=675
     # for dump of raw ParseResults
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.maxDiff = None
+
+    def regenModel(self, parts: str) -> PartitionConfig:
+        # Use this only for a parts sql generated from an already built model
+        # (no error checking here)
+        result = CreateParser.parse_partitions(parts)
+        return CreateParser.partition_to_model(result)
+
     def test_parts_range(self):
         result = CreateParser.parse_partitions(PARTS_RANGE_WITH_OPTS)
         log.error(f"test_parts_range1 Res: {result.dump()}")
@@ -133,6 +159,7 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list=["6"],
                 pdef_comment="'whatever'",
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
             PartitionDefinitionEntry(
                 pdef_name="p1",
@@ -140,6 +167,7 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list=["11"],
                 pdef_comment=None,
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
             PartitionDefinitionEntry(
                 pdef_name="p2",
@@ -147,6 +175,7 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list=["16"],
                 pdef_comment=None,
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
             PartitionDefinitionEntry(
                 pdef_name="p3",
@@ -154,6 +183,7 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list=["21"],
                 pdef_comment=None,
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
             PartitionDefinitionEntry(
                 pdef_name="p4",
@@ -161,9 +191,23 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list="MAXVALUE",
                 pdef_comment=None,
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
         ]
         self.assertEqual(entries, pc.part_defs)
+        parts = "\n".join(
+            [
+                "PARTITION BY RANGE (store_id) (",
+                "PARTITION p0 VALUES LESS THAN (6) ENGINE INNODB COMMENT 'whatever',",
+                "PARTITION p1 VALUES LESS THAN (11) ENGINE INNODB,",
+                "PARTITION p2 VALUES LESS THAN (16) ENGINE INNODB,",
+                "PARTITION p3 VALUES LESS THAN (21) ENGINE INNODB,",
+                "PARTITION p4 VALUES LESS THAN MAXVALUE ENGINE INNODB)",
+            ]
+        )
+        self.assertEqual(parts, pc.to_partial_sql())
+        # Idempotent? Model from expected sql must match model from orig input sql
+        self.assertEqual(self.regenModel(parts), pc)
 
     def test_parts_range_cols(self):
         result = CreateParser.parse_partitions(PARTS_RANGE_WITH_COLUMNS)
@@ -189,6 +233,7 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list=["'2010-02-09'"],
                 pdef_comment=None,
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
             PartitionDefinitionEntry(
                 pdef_name="pWeek_2",
@@ -196,6 +241,7 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list=["'2010-02-15'"],
                 pdef_comment=None,
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
             PartitionDefinitionEntry(
                 pdef_name="pWeek_3",
@@ -203,6 +249,7 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list=["'2010-02-22'"],
                 pdef_comment=None,
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
             PartitionDefinitionEntry(
                 pdef_name="pWeek_4",
@@ -210,9 +257,22 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list=["'2010-03-01'"],
                 pdef_comment=None,
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
         ]
         self.assertEqual(entries, pc.part_defs)
+        parts = "\n".join(
+            [
+                "PARTITION BY RANGE COLUMNS (renewal) (",
+                "PARTITION pWeek_1 VALUES LESS THAN ('2010-02-09') ENGINE INNODB,",
+                "PARTITION pWeek_2 VALUES LESS THAN ('2010-02-15') ENGINE INNODB,",
+                "PARTITION pWeek_3 VALUES LESS THAN ('2010-02-22') ENGINE INNODB,",
+                "PARTITION pWeek_4 VALUES LESS THAN ('2010-03-01') ENGINE INNODB)",
+            ]
+        )
+        self.assertEqual(parts, pc.to_partial_sql())
+        # Idempotent? Model from expected sql must match model from orig input sql
+        self.assertEqual(self.regenModel(parts), pc)
 
     def test_parts_list(self):
         result = CreateParser.parse_partitions(PARTS_LIST_IN)
@@ -239,6 +299,7 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list=["3", "5", "6", "9", "17"],
                 pdef_comment=None,
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
             PartitionDefinitionEntry(
                 pdef_name="pEast",
@@ -246,6 +307,7 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list=["1", "2", "10", "11", "19", "20"],
                 pdef_comment=None,
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
             PartitionDefinitionEntry(
                 pdef_name="pWest",
@@ -253,6 +315,7 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list=["4", "12", "13", "14", "18"],
                 pdef_comment=None,
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
             PartitionDefinitionEntry(
                 pdef_name="pCentral",
@@ -260,9 +323,23 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list=["7", "8", "15", "16"],
                 pdef_comment=None,
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
         ]
         self.assertEqual(entries, pc.part_defs)
+
+        parts = "\n".join(
+            [
+                "PARTITION BY LIST (store_id) (",
+                "PARTITION pNorth VALUES IN (3, 5, 6, 9, 17) ENGINE INNODB,",
+                "PARTITION pEast VALUES IN (1, 2, 10, 11, 19, 20) ENGINE INNODB,",
+                "PARTITION pWest VALUES IN (4, 12, 13, 14, 18) ENGINE INNODB,",
+                "PARTITION pCentral VALUES IN (7, 8, 15, 16) ENGINE INNODB)",
+            ]
+        )
+        self.assertEqual(parts, pc.to_partial_sql())
+        # Idempotent? Model from expected sql must match model from orig input sql
+        self.assertEqual(self.regenModel(parts), pc)
 
     def test_parts_list_cols(self):
         result = CreateParser.parse_partitions(PARTS_LIST_IN_WITH_COLUMNS)
@@ -291,6 +368,7 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list=["'Oskarshamn'", "'Högsby'", "'Mönsterås'"],
                 pdef_comment=None,
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
             PartitionDefinitionEntry(
                 pdef_name="pRegion_2",
@@ -298,6 +376,7 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list=["'Vimmerby'", "'Hultsfred'", "'Västervik'"],
                 pdef_comment=None,
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
             PartitionDefinitionEntry(
                 pdef_name="pRegion_3",
@@ -305,6 +384,7 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list=["'Nässjö'", "'Eksjö'", "'Vetlanda'"],
                 pdef_comment=None,
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
             PartitionDefinitionEntry(
                 pdef_name="pRegion_4",
@@ -312,9 +392,35 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list=["'Uppvidinge'", "'Alvesta'", "'Vaxjo'"],
                 pdef_comment=None,
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
         ]
         self.assertEqual(entries, pc.part_defs)
+
+        parts = "\n".join(
+            [
+                "PARTITION BY LIST COLUMNS (city) (",
+                (
+                    "PARTITION pRegion_1 VALUES IN "
+                    "('Oskarshamn', 'Högsby', 'Mönsterås') ENGINE INNODB,"
+                ),
+                (
+                    "PARTITION pRegion_2 VALUES IN "
+                    "('Vimmerby', 'Hultsfred', 'Västervik') ENGINE INNODB,"
+                ),
+                (
+                    "PARTITION pRegion_3 VALUES IN "
+                    "('Nässjö', 'Eksjö', 'Vetlanda') ENGINE INNODB,"
+                ),
+                (
+                    "PARTITION pRegion_4 VALUES IN "
+                    "('Uppvidinge', 'Alvesta', 'Vaxjo') ENGINE INNODB)"
+                ),
+            ]
+        )
+        self.assertEqual(parts, pc.to_partial_sql())
+        # Idempotent? Model from expected sql must match model from orig input sql
+        self.assertEqual(self.regenModel(parts), pc)
 
     def test_parts_key_empty(self):
         result = CreateParser.parse_partitions(PARTS_KEY_EMPTY)
@@ -330,6 +436,10 @@ class PartitionParserTest(unittest.TestCase):
         self.assertEqual(2, pc.get_num_parts())
         self.assertEqual([], pc.part_defs)
         self.assertEqual([], pc.get_fields_or_expr())
+        parts = "PARTITION BY KEY () PARTITIONS 2"
+        self.assertEqual(parts, pc.to_partial_sql())
+        # Idempotent? Model from expected sql must match model from orig input sql
+        self.assertEqual(self.regenModel(parts), pc)
 
     def test_parts_key_nonempty(self):
         result = CreateParser.parse_partitions(PARTS_KEY_NONEMPTY)
@@ -346,6 +456,10 @@ class PartitionParserTest(unittest.TestCase):
         self.assertEqual(2, pc.get_num_parts())
         self.assertEqual([], pc.part_defs)
         self.assertEqual(["id1", "id2"], pc.get_fields_or_expr())
+        parts = "PARTITION BY KEY (`id1`, `id2`) PARTITIONS 2"
+        self.assertEqual(parts, pc.to_partial_sql())
+        # Idempotent? Model from expected sql must match model from orig input sql
+        self.assertEqual(self.regenModel(parts), pc)
 
     def test_parts_hash(self):
         result = CreateParser.parse_partitions(PARTS_HASH)
@@ -355,7 +469,7 @@ class PartitionParserTest(unittest.TestCase):
         self.assertEqual("HASH", result.part_type)
         self.assertEqual("3", result.num_partitions)
         self.assertIsNone(result.get("part_defs", None))
-        self.assertEqual("[['YEAR', ['hired']]]", f"{result.p_hash_expr}")
+        self.assertEqual("[['YEAR', ['`hired`']]]", f"{result.p_hash_expr}")
 
         # models.PartitionConfig from parsed result
         pc = CreateParser.partition_to_model(result)
@@ -364,6 +478,10 @@ class PartitionParserTest(unittest.TestCase):
         self.assertEqual(3, pc.get_num_parts())
         self.assertEqual([], pc.part_defs)
         self.assertEqual([["YEAR", ["hired"]]], pc.get_fields_or_expr())
+        psql = "PARTITION BY HASH (YEAR(hired)) PARTITIONS 3"
+        self.assertEqual(psql, pc.to_partial_sql())
+        # Idempotent? Model from expected sql must match model from orig input sql
+        self.assertEqual(self.regenModel(psql), pc)
 
     def test_parts_linear_hash(self):
         result = CreateParser.parse_partitions(PARTS_HASH_WITH_LINEAR)
@@ -381,6 +499,10 @@ class PartitionParserTest(unittest.TestCase):
         self.assertEqual(4, pc.get_num_parts())
         self.assertEqual([], pc.part_defs)
         self.assertEqual([["YEAR", ["hired"]]], pc.get_fields_or_expr())
+        psql = "PARTITION BY LINEAR HASH (YEAR(hired)) PARTITIONS 4"
+        self.assertEqual(psql, pc.to_partial_sql())
+        # Idempotent? Model from expected sql must match model from orig input sql
+        self.assertEqual(self.regenModel(psql), pc)
 
     def test_parts_key_nocount(self):
         result = CreateParser.parse_partitions(PARTS_KEY_NO_PARTCOUNT)
@@ -396,6 +518,10 @@ class PartitionParserTest(unittest.TestCase):
         self.assertEqual([], pc.part_defs)
         self.assertEqual([], pc.get_fields_or_expr())
         self.assertIsNone(pc.get_algo())  # No `ALGORITHM=\d` in input
+        parts = "PARTITION BY KEY ()"
+        self.assertEqual(parts, pc.to_partial_sql())
+        # Idempotent? Model from expected sql must match model from orig input sql
+        self.assertEqual(self.regenModel(parts), pc)
 
     def test_parts_list_cols_intvals(self):
         result = CreateParser.parse_partitions(PARTS_LIST_IN_WITH_COLUMNS_INTVALS)
@@ -424,6 +550,7 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list=["1", "5", "9", "13"],
                 pdef_comment=None,
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
             PartitionDefinitionEntry(
                 pdef_name="pRegion_2",
@@ -431,6 +558,7 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list=["2", "6", "10", "14"],
                 pdef_comment=None,
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
             PartitionDefinitionEntry(
                 pdef_name="pRegion_3",
@@ -438,6 +566,7 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list=["3", "7", "11", "15"],
                 pdef_comment=None,
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
             PartitionDefinitionEntry(
                 pdef_name="pRegion_4",
@@ -445,9 +574,22 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list=["4", "8", "12", "16"],
                 pdef_comment=None,
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
         ]
         self.assertEqual(entries, pc.part_defs)
+        parts = "\n".join(
+            [
+                "PARTITION BY LIST COLUMNS (someid) (",
+                "PARTITION pRegion_1 VALUES IN (1, 5, 9, 13) ENGINE INNODB,",
+                "PARTITION pRegion_2 VALUES IN (2, 6, 10, 14) ENGINE INNODB,",
+                "PARTITION pRegion_3 VALUES IN (3, 7, 11, 15) ENGINE INNODB,",
+                "PARTITION pRegion_4 VALUES IN (4, 8, 12, 16) ENGINE INNODB)",
+            ]
+        )
+        self.assertEqual(parts, pc.to_partial_sql())
+        # Idempotent? Model from expected sql must match model from orig input sql
+        self.assertEqual(self.regenModel(parts), pc)
 
     def test_parts_key_algo(self):
         result = CreateParser.parse_partitions(PARTS_KEY_LINEAR_ALGO)
@@ -467,6 +609,10 @@ class PartitionParserTest(unittest.TestCase):
         self.assertEqual([], pc.part_defs)
         self.assertEqual(["id"], pc.get_fields_or_expr())
         self.assertEqual(pc.get_algo(), 2)
+        psql = "PARTITION BY LINEAR KEY ALGORITHM=2 (`id`) PARTITIONS 10"
+        self.assertEqual(psql, pc.to_partial_sql())
+        # Idempotent? Model from expected sql must match model from orig input sql
+        self.assertEqual(self.regenModel(psql), pc)
 
     def test_parts_equality(self):
         # Comparison of PartitionConfig inititialized from diff sql (parts only)
@@ -506,6 +652,7 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list=["1554015600"],
                 pdef_comment=None,
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
             PartitionDefinitionEntry(
                 pdef_name="p2",
@@ -513,9 +660,20 @@ class PartitionParserTest(unittest.TestCase):
                 pdef_value_list=["1558249200"],
                 pdef_comment=None,
                 pdef_engine="INNODB",
+                is_tuple=False,
             ),
         ]
         self.assertEqual(entries, pc.part_defs)
+        parts = "\n".join(
+            [
+                "PARTITION BY RANGE (UNIX_TIMESTAMP(a)) (",
+                "PARTITION p1 VALUES LESS THAN (1554015600) ENGINE INNODB,",
+                "PARTITION p2 VALUES LESS THAN (1558249200) ENGINE INNODB)",
+            ]
+        )
+        self.assertEqual(parts, pc.to_partial_sql())
+        # Idempotent? Model from expected sql must match model from orig input sql
+        self.assertEqual(self.regenModel(parts), pc)
 
     def test_parts_range_many_engines(self):
         parts = (
@@ -536,3 +694,95 @@ class PartitionParserTest(unittest.TestCase):
         with self.assertRaises(PartitionParseError):
             # There can be only on engine type
             _ = CreateParser.partition_to_model(result)
+
+    def test_parts_list_with_expr(self):
+        result = CreateParser.parse_partitions(PARTS_LIST_EXPR_IN)
+        log.error(f"test_parts_list_with_expr14 Res: {result.dump()}")
+
+        self.assertEqual("LIST", result.part_type)
+        self.assertEqual(2, len(result.part_defs))
+        self.assertEqual([["to_days", ["`date`"]]], result.p_expr.asList())
+
+        # models.PartitionConfig from parsed result
+        pc = CreateParser.partition_to_model(result)
+        log.error(f"test_parts_list_with_expr14 Model {pc}")
+        self.assertEqual("LIST", pc.get_type())
+        self.assertEqual(2, pc.get_num_parts())
+        self.assertEqual([["to_days", ["date"]]], pc.get_fields_or_expr())
+        entries = [
+            PartitionDefinitionEntry(
+                pdef_name="p2019_09_09",
+                pdef_type="p_values_in",
+                pdef_value_list=["737676"],
+                pdef_comment=None,
+                pdef_engine="INNODB",
+                is_tuple=False,
+            ),
+            PartitionDefinitionEntry(
+                pdef_name="p2019_09_12",
+                pdef_type="p_values_in",
+                pdef_value_list=["737679"],
+                pdef_comment=None,
+                pdef_engine="INNODB",
+                is_tuple=False,
+            ),
+        ]
+        self.assertEqual(entries, pc.part_defs)
+        parts = "\n".join(
+            [
+                "PARTITION BY LIST (to_days(date)) (",
+                "PARTITION p2019_09_09 VALUES IN (737676) ENGINE INNODB,",
+                "PARTITION p2019_09_12 VALUES IN (737679) ENGINE INNODB)",
+            ]
+        )
+        self.assertEqual(parts, pc.to_partial_sql())
+        # Idempotent? Model from expected sql must match model from orig input sql
+        self.assertEqual(self.regenModel(parts), pc)
+
+    def test_parts_list_in_tuple(self):
+        result = CreateParser.parse_partitions(PARTS_LIST_IN_TUPLE)
+        log.error(f"test_parts_list_in_tuple15 Res: {result.dump()}")
+
+        self.assertEqual("LIST", result.part_type)
+        self.assertEqual("COLUMNS", result.p_subtype)
+        self.assertEqual(2, len(result.part_defs))
+        self.assertEqual(["ds", "forecast_version"], result.field_list.asList())
+
+        # models.PartitionConfig from parsed result
+        pc = CreateParser.partition_to_model(result)
+        log.error(f"test_parts_list_in_tuple15 Model {pc}")
+        self.assertEqual("LIST COLUMNS", pc.get_type())
+        self.assertEqual(2, pc.get_num_parts())
+        self.assertEqual(["ds", "forecast_version"], pc.get_fields_or_expr())
+        entries = [
+            PartitionDefinitionEntry(
+                pdef_name="allnulls",
+                pdef_type="p_values_in",
+                pdef_value_list=[["NULL", "NULL"]],
+                pdef_comment=None,
+                pdef_engine="INNODB",
+                is_tuple=True,
+            ),
+            PartitionDefinitionEntry(
+                pdef_name="2018-11-01_tactical_fixed_parameters",
+                pdef_type="p_values_in",
+                pdef_value_list=[["'2018-11-01'", "'tactical_fixed_parameters'"]],
+                pdef_comment=None,
+                pdef_engine="INNODB",
+                is_tuple=True,
+            ),
+        ]
+        self.assertEqual(entries, pc.part_defs)
+        parts = "\n".join(
+            [
+                "PARTITION BY LIST COLUMNS (ds, forecast_version) (",
+                "PARTITION allnulls VALUES IN ((NULL, NULL)) ENGINE INNODB,",
+                (
+                    "PARTITION 2018-11-01_tactical_fixed_parameters VALUES IN "
+                    "(('2018-11-01', 'tactical_fixed_parameters')) ENGINE INNODB)"
+                ),
+            ]
+        )
+        self.assertEqual(parts, pc.to_partial_sql())
+        # Idempotent? Model from expected sql must match model from orig input sql
+        self.assertEqual(self.regenModel(parts), pc)

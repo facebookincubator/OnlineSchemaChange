@@ -504,6 +504,7 @@ class PartitionDefinitionEntry(NamedTuple):
     pdef_value_list: Union[List[str], str]
     pdef_comment: Optional[str]
     pdef_engine: str = "INNODB"
+    is_tuple: bool = False
 
 
 class PartitionConfig:
@@ -522,6 +523,10 @@ class PartitionConfig:
     PDEF_TYPE_VIN = "p_values_in"
     PDEF_TYPE_VLT = "p_values_less_than"
     PDEF_TYPE_ATTRIBS: List[str] = [PDEF_TYPE_VIN, PDEF_TYPE_VLT]
+    TYPE_MAP = {
+        PDEF_TYPE_VIN: "IN",
+        PDEF_TYPE_VLT: "LESS THAN",
+    }
 
     def __init__(self) -> None:
         self.part_type: Optional[str] = None  # Partition type e.g. RANGE
@@ -534,6 +539,7 @@ class PartitionConfig:
         # Partition type `KEY` alone allows specifying ALGORITHM=[1|2] e.g.
         # `PARTITION BY linear key ALGORITHM=2 (id)  partitions 10`
         self.algorithm_for_key: Optional[int] = None
+        self.via_nested_expr = False
 
     def __str__(self):
         return (
@@ -572,9 +578,66 @@ class PartitionConfig:
     def __ne__(self, other):
         return not self == other
 
+    def add_quote(self, field: str) -> str:
+        return f"`{field}`"
+
     def to_partial_sql(self):
         # Stringify info a format usable in `create table ...`
-        raise NotImplementedError("TODO PartitionConfig.to_partial_sql")
+
+        def _proc_list(vals: Union[str, List[str]]) -> str:
+            # Helper to convert expr list to an expression value-list
+            if isinstance(vals, list) and all(isinstance(v, str) for v in vals):
+                return "(" + ", ".join(vals) + ")"
+            ret = ""
+            for v in vals:
+                if isinstance(v, list):
+                    ret += _proc_list(v)
+                else:
+                    ret += v
+            return ret
+
+        output = f"PARTITION BY {self.full_type}"
+
+        if self.part_type == self.PTYPE_KEY:
+            if self.algorithm_for_key is not None:
+                output += f" ALGORITHM={self.algorithm_for_key}"
+            fields = ", ".join(self.add_quote(f) for f in self.fields_or_expr)
+            output += f" ({fields})"
+            if self.num_partitions > 1:
+                output += f" PARTITIONS {self.num_partitions}"
+            return output
+        elif self.part_type == self.PTYPE_HASH:
+            output += f" ({_proc_list(self.fields_or_expr)})"
+            if self.num_partitions > 1:
+                output += f" PARTITIONS {self.num_partitions}"
+            return output
+        elif self.part_type == self.PTYPE_RANGE or self.part_type == self.PTYPE_LIST:
+            partitions: List[str] = []
+            for pd in self.part_defs:
+                name = pd.pdef_name
+                ty = self.TYPE_MAP[pd.pdef_type]
+                expr_or_value_list = (
+                    _proc_list(pd.pdef_value_list)
+                    if isinstance(pd.pdef_value_list, list)
+                    else pd.pdef_value_list
+                )
+                eng = pd.pdef_engine
+                if pd.is_tuple:
+                    expr_or_value_list = f"({expr_or_value_list})"
+                thispart = (
+                    f"PARTITION {name} VALUES {ty} {expr_or_value_list} ENGINE {eng}"
+                )
+                comment = pd.pdef_comment
+                if comment is not None:
+                    thispart += f" COMMENT {comment}"
+                partitions.append(thispart)
+            f_or_e = _proc_list(self.fields_or_expr)
+            if self.via_nested_expr:
+                # PART_EXPR in sqlparse use nestedExpr to acquire this
+                # and strips parens so "undo" that
+                f_or_e = f"({f_or_e})"
+            output += f" {f_or_e} (\n" + ",\n".join(partitions) + ")"
+            return output
 
 
 class Table(object):
