@@ -816,7 +816,7 @@ class CopyPayloadTestCase(unittest.TestCase):
 
 
 class CopyPayloadPKFilterTestCase(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.payload = CopyPayload()
         self.table_obj_1pk = parse_create(
             " CREATE TABLE a ("
