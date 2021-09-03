@@ -27,6 +27,7 @@ class ColAlterType(BaseAlterType):
     CHANGE_COL_DEFAULT_VAL = "change_col_default_val"  # instant
     REORDER_COL = "reorder_col"  # rebuild
     ADD_COL = "add_col"  # instant
+    ADD_AUTO_INC_COL = "add_auto_inc_col"  # inplace
     DROP_COL = "drop_col"  # rebuild
     CHANGE_COL_DATA_TYPE = "change_col_data_type"  # copy
     CHANGE_NULL = "change_null"  # rebuild
@@ -56,6 +57,13 @@ class TableAlterType(BaseAlterType):
     CHANGE_TABLE_COMMENT = "change_table_comment"
     CHANGE_ENGINE = "change_engine"
     CHANGE_AUTO_INC_VAL = "change_auto_inc_val"  # inplace
+
+
+INSTANT_DDLS = {
+    ColAlterType.CHANGE_COL_DEFAULT_VAL,
+    ColAlterType.ADD_COL,
+    IndexAlterType.CHANGE_INDEX_TYPE,
+}
 
 
 class TableOptionDiff(object):
@@ -227,6 +235,8 @@ class SchemaDiff(object):
                     )
                 handled_cols.append(col.name)
                 self.add_alter_type(ColAlterType.ADD_COL)
+                if col.auto_increment:
+                    self.add_alter_type(ColAlterType.ADD_AUTO_INC_COL)
                 segments.append("ADD {} {}".format(col.to_sql(), position))
 
         # Adjust position
