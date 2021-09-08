@@ -441,7 +441,10 @@ class CreateParser(object):
         LEFT_PARENTHESES
         + (
             delimitedList(Word(nums))  # e.g. (1, 2, 3)
-            | delimitedList(QUOTED_STRING_WITH_QUOTE)  # e.g. ('a', 'b')
+            | delimitedList(
+                QUOTED_STRING_WITH_QUOTE  # e.g. ('a', 'b')
+                | CaselessLiteral("NULL").setParseAction(upcaseTokens)  # e.g. (NULL)
+            )
             | (
                 LEFT_PARENTHESES
                 + delimitedList(

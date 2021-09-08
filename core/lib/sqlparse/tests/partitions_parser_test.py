@@ -112,6 +112,12 @@ PARTS_LIST_IN_TUPLE = (
     ")"
 )
 
+PARTS_LIST_NULL = (
+    "PARTITION BY LIST COLUMNS(validation_job_id) ("
+    "PARTITION p0 VALUES IN (NULL) ENGINE = InnoDB"
+    ")"
+)
+
 
 # Test parsing partitions config (alone)
 class PartitionParserTest(unittest.TestCase):
@@ -781,6 +787,44 @@ class PartitionParserTest(unittest.TestCase):
                     "PARTITION 2018-11-01_tactical_fixed_parameters VALUES IN "
                     "(('2018-11-01', 'tactical_fixed_parameters')) ENGINE INNODB)"
                 ),
+            ]
+        )
+        self.assertEqual(parts, pc.to_partial_sql())
+        # Idempotent? Model from expected sql must match model from orig input sql
+        self.assertEqual(self.regenModel(parts), pc)
+
+    def test_parts_list_by_cols_withnull(self):
+        result = CreateParser.parse_partitions(PARTS_LIST_NULL)
+        log.error(f"test_parts_list_by_cols_withnull16 Res: {result.dump()}")
+
+        self.assertEqual("LIST", result.part_type)
+        self.assertEqual("COLUMNS", result.p_subtype)
+        self.assertEqual(1, len(result.part_defs))
+        self.assertEqual(["validation_job_id"], result.field_list.asList())
+
+        # models.PartitionConfig from parsed result
+        pc = CreateParser.partition_to_model(result)
+        log.error(f"test_parts_list_by_cols_withnull16 Model {pc}")
+        self.assertEqual("LIST COLUMNS", pc.get_type())
+        self.assertEqual(1, pc.get_num_parts())
+        self.assertEqual(["validation_job_id"], pc.get_fields_or_expr())
+
+        entries = [
+            PartitionDefinitionEntry(
+                pdef_name="p0",
+                pdef_type="p_values_in",
+                pdef_value_list=["NULL"],
+                pdef_comment=None,
+                pdef_engine="INNODB",
+                is_tuple=False,
+            ),
+        ]
+        self.assertEqual(entries, pc.part_defs)
+
+        parts = "\n".join(
+            [
+                "PARTITION BY LIST COLUMNS (validation_job_id) (",
+                "PARTITION p0 VALUES IN (NULL) ENGINE INNODB)",
             ]
         )
         self.assertEqual(parts, pc.to_partial_sql())
