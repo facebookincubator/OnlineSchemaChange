@@ -418,7 +418,7 @@ class CreateParser(object):
     # Partition section
     PARTITION = Optional(
         Combine(
-            Combine(Optional(Literal("/*!") + Word(nums))).suppress()
+            Combine(Optional(Literal("/*!") + Word(nums)))
             + CaselessLiteral("PARTITION")
             + CaselessLiteral("BY")
             + SkipTo(StringEnd()),
@@ -605,7 +605,8 @@ class CreateParser(object):
     def gen_partitions_parser(cls):
         # Init full parts matcher only on demand
         return (
-            CaselessLiteral("PARTITION")
+            Combine(Optional(Literal("/*!") + Word(nums))).suppress()
+            + CaselessLiteral("PARTITION")
             + CaselessLiteral("BY")
             + (cls.PTYPE_HASH | cls.PTYPE_KEY | cls.PTYPE_RANGE | cls.PTYPE_LIST)
             + Optional(CaselessLiteral("PARTITIONS") + Word(nums)("num_partitions"))
