@@ -614,7 +614,7 @@ class PartitionConfig:
         elif self.part_type == self.PTYPE_RANGE or self.part_type == self.PTYPE_LIST:
             partitions: List[str] = []
             for pd in self.part_defs:
-                name = pd.pdef_name
+                name = f"`{pd.pdef_name}`" if pd.pdef_name.isdigit() else pd.pdef_name
                 ty = self.TYPE_MAP[pd.pdef_type]
                 expr_or_value_list = (
                     _proc_list(pd.pdef_value_list)

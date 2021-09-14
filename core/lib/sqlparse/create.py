@@ -33,6 +33,10 @@ from pyparsing import (
     nestedExpr,
     delimitedList,
     ParseResults,
+    White,
+    replaceWith,
+    Regex,
+    OneOrMore,
 )
 
 from . import models
@@ -437,24 +441,37 @@ class CreateParser(object):
 
     # e.g 1, 2, 3
     # and 'a', 'b', 'c'
+    # and `NULL`
+    # and _binary 0x123aBc
+    HEX_VALUE = Literal("0x") + OneOrMore(Regex("[0-9a-fA-F]"))
+
     PART_VALUE_LIST = Group(
         LEFT_PARENTHESES
         + (
-            delimitedList(Word(nums))  # e.g. (1, 2, 3)
-            | delimitedList(
-                QUOTED_STRING_WITH_QUOTE  # e.g. ('a', 'b')
+            delimitedList(
+                Word(nums)  # e.g. (1, 2, 3)
+                | QUOTED_STRING_WITH_QUOTE  # e.g. ('a', 'b')
                 | CaselessLiteral("NULL").setParseAction(upcaseTokens)  # e.g. (NULL)
             )
             | (
                 LEFT_PARENTHESES
-                + delimitedList(
-                    QUOTED_STRING_WITH_QUOTE
-                    | CaselessLiteral("NULL").setParseAction(upcaseTokens)
+                + (
+                    delimitedList(
+                        QUOTED_STRING_WITH_QUOTE
+                        | CaselessLiteral("NULL").setParseAction(upcaseTokens)
+                    )
                 )
                 + RIGHT_PARENTHESES
             )(
                 "is_tuple"
             )  # e.g. (("a", "b")), See test_parts_list_in_tuple15
+            # e.g. `_binary      0xdeadbeef123`, See test_parts_list_by_cols_with_binary17
+            # turns to: `_BINARY 0xdeadbeef123`
+            | Combine(
+                CaselessLiteral("_binary").setParseAction(upcaseTokens)
+                + White(" ").setParseAction(replaceWith(" "))
+                + HEX_VALUE
+            )
         )
         + RIGHT_PARENTHESES
     )

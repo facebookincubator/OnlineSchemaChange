@@ -118,6 +118,13 @@ PARTS_LIST_NULL = (
     ")"
 )
 
+PARTS_LIST_WITH_BINARY = (
+    "PARTITION BY LIST COLUMNS(validation_job_id) ("
+    "PARTITION `332194202948` VALUES IN (_binary   0x4D58514544) ENGINE = InnoDB,"
+    "PARTITION `blah0` VALUES IN (_binary 0x4D58514545) ENGINE = InnoDB"
+    ")"
+)
+
 
 # Test parsing partitions config (alone)
 class PartitionParserTest(unittest.TestCase):
@@ -825,6 +832,53 @@ class PartitionParserTest(unittest.TestCase):
             [
                 "PARTITION BY LIST COLUMNS (validation_job_id) (",
                 "PARTITION p0 VALUES IN (NULL) ENGINE INNODB)",
+            ]
+        )
+        self.assertEqual(parts, pc.to_partial_sql())
+        # Idempotent? Model from expected sql must match model from orig input sql
+        self.assertEqual(self.regenModel(parts), pc)
+
+    def test_parts_list_by_cols_with_binary(self):
+        result = CreateParser.parse_partitions(PARTS_LIST_WITH_BINARY)
+        log.error(f"test_parts_list_by_cols_with_binary17 Res: {result.dump()}")
+
+        self.assertEqual("LIST", result.part_type)
+        self.assertEqual("COLUMNS", result.p_subtype)
+        self.assertEqual(["validation_job_id"], result.field_list.asList())
+        self.assertEqual(2, len(result.part_defs))
+
+        # models.PartitionConfig from parsed result
+        pc = CreateParser.partition_to_model(result)
+        log.error(f"test_parts_list_by_cols_with_binary17 Model {pc}")
+        self.assertEqual("LIST COLUMNS", pc.get_type())
+        self.assertEqual(2, pc.get_num_parts())
+        self.assertEqual(["validation_job_id"], pc.get_fields_or_expr())
+
+        entries = [
+            PartitionDefinitionEntry(
+                pdef_name="332194202948",  # Note: is `\d+`, so needs to be quoted in to_partial_sql()
+                pdef_type="p_values_in",
+                pdef_value_list=["_BINARY 0x4D58514544"],
+                pdef_comment=None,
+                pdef_engine="INNODB",
+                is_tuple=False,
+            ),
+            PartitionDefinitionEntry(
+                pdef_name="blah0",
+                pdef_type="p_values_in",
+                pdef_value_list=["_BINARY 0x4D58514545"],
+                pdef_comment=None,
+                pdef_engine="INNODB",
+                is_tuple=False,
+            ),
+        ]
+        self.assertEqual(entries, pc.part_defs)
+
+        parts = "\n".join(
+            [
+                "PARTITION BY LIST COLUMNS (validation_job_id) (",
+                "PARTITION `332194202948` VALUES IN (_BINARY 0x4D58514544) ENGINE INNODB,",
+                "PARTITION blah0 VALUES IN (_BINARY 0x4D58514545) ENGINE INNODB)",
             ]
         )
         self.assertEqual(parts, pc.to_partial_sql())
