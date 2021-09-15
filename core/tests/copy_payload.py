@@ -9,7 +9,7 @@ LICENSE file in the root directory of this source tree.
 
 import time
 import unittest
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 import MySQLdb
 
@@ -344,6 +344,186 @@ class CopyPayloadTestCase(unittest.TestCase):
         payload.create_copy_table()
         payload._cleanup_payload.add_drop_table_entry.assert_called_with(
             payload._current_db, payload.new_table_name, partitions
+        )
+
+    def test_sql_statement_generated_due_to_added_partitions_adds_both_partitions(
+        self,
+    ):
+        """
+        Make sure a partitioned shadow table will always be dropped by
+        partitions instead of the whole table
+        """
+
+        payload = CopyPayload()
+        table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p1 VALUES LESS THAN (1481313639) ENGINE = InnoDB, "
+            "  PARTITION p2 VALUES LESS THAN (1481400039) ENGINE = InnoDB) "
+        )
+        payload._old_table = table_obj
+        payload._new_table = table_obj
+        partitions = ["p1", "p2"]
+
+        # No difference between old and new
+        payload.query = Mock(return_value=None)
+        # No-op for create table
+        payload.execute_sql = Mock()
+
+        def partition_list_names_mock(*args, **kwargs):
+            if args[0] == "a":
+                return partitions
+            elif args[0] == payload.new_table_name:
+                return {}
+
+        def partition_value_for_name_mock(*args, **kwargs):
+            if args[1] == "p1":
+                return "1481313639"
+            if args[1] == "p2":
+                return "1481400039"
+
+        payload.get_partition_method = Mock(return_value="RANGE")
+        payload.list_partition_names = MagicMock(side_effect=partition_list_names_mock)
+        payload.partition_value_for_name = MagicMock(
+            side_effect=partition_value_for_name_mock
+        )
+        payload.rm_partition = "Override"
+        payload.partitions = partitions
+        payload.sync_table_partitions()
+        options = {
+            "ALTER TABLE `__osc_new_a` ADD PARTITION "
+            "(PARTITION p2 VALUES LESS THAN (1481400039),"
+            " PARTITION p1 VALUES LESS THAN (1481313639))",
+            "ALTER TABLE `__osc_new_a` ADD PARTITION "
+            "(PARTITION p1 VALUES LESS THAN (1481313639),"
+            " PARTITION p2 VALUES LESS THAN (1481400039))",
+        }
+
+        success = False
+        for option in options:
+            try:
+                payload.execute_sql.assert_called_with(option)
+                success = True
+            except Exception:
+                print("ignore exception {}", option)
+
+        self.assertEqual(True, success)
+
+    def test_sql_statement_generated_due_to_dropped_partitions_drops_both_partitions(
+        self,
+    ):
+        """
+        Make sure a partitioned shadow table will always be dropped by
+        partitions instead of the whole table
+        """
+
+        payload = CopyPayload()
+        table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p1 VALUES LESS THAN (1481313639) ENGINE = InnoDB, "
+            "  PARTITION p2 VALUES LESS THAN (1481400039) ENGINE = InnoDB) "
+        )
+        payload._old_table = table_obj
+        payload._new_table = table_obj
+        partitions = ["p1", "p2"]
+
+        # No difference between old and new
+        payload.query = Mock(return_value=None)
+        # No-op for create table
+        payload.execute_sql = Mock()
+
+        def partition_list_names_mock(*args, **kwargs):
+            if args[0] == "a":
+                return {}
+            elif args[0] == payload.new_table_name:
+                return partitions
+
+        def partition_value_for_name_mock(*args, **kwargs):
+            if args[1] == "p1":
+                return "1481313639"
+            if args[1] == "p2":
+                return "1481400039"
+
+        payload.get_partition_method = Mock(return_value="RANGE")
+        payload.list_partition_names = MagicMock(side_effect=partition_list_names_mock)
+        payload.partition_value_for_name = MagicMock(
+            side_effect=partition_value_for_name_mock
+        )
+        payload.rm_partition = "Override"
+        payload.partitions = partitions
+        payload.sync_table_partitions()
+        options = {
+            "ALTER TABLE `__osc_new_a` DROP PARTITION p1, p2",
+            "ALTER TABLE `__osc_new_a` DROP PARTITION p2, p1",
+        }
+
+        success = False
+        for option in options:
+            try:
+                payload.execute_sql.assert_called_with(option)
+                success = True
+            except Exception:
+                print("ignore exception {}", option)
+
+        self.assertEqual(True, success)
+
+    def test_sql_statement_generated_with_added_removed_partitions(
+        self,
+    ):
+        """
+        Make sure a partitioned shadow table will always be dropped by
+        partitions instead of the whole table
+        """
+
+        payload = CopyPayload()
+        table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p1 VALUES LESS THAN (1481313639) ENGINE = InnoDB) "
+        )
+        payload._old_table = table_obj
+        payload._new_table = table_obj
+        partitions = ["p1"]
+        oldPartitions = ["p2"]
+
+        # No difference between old and new
+        payload.query = Mock(return_value=None)
+        # No-op for create table
+        payload.execute_sql = Mock()
+
+        def partition_list_names_mock(*args, **kwargs):
+            if args[0] == "a":
+                return partitions
+            elif args[0] == payload.new_table_name:
+                return oldPartitions
+
+        def partition_value_for_name_mock(*args, **kwargs):
+            if args[1] == "p1":
+                return "1481313639"
+            if args[1] == "p2":
+                return "1481400039"
+
+        payload.get_partition_method = Mock(return_value="RANGE")
+        payload.list_partition_names = MagicMock(side_effect=partition_list_names_mock)
+        payload.partition_value_for_name = MagicMock(
+            side_effect=partition_value_for_name_mock
+        )
+        payload.rm_partition = "Override"
+        payload.partitions = partitions
+        payload.sync_table_partitions()
+        payload.execute_sql.assert_any_call(
+            "ALTER TABLE `__osc_new_a` ADD PARTITION "
+            "(PARTITION p1 VALUES LESS THAN (1481313639))"
+        )
+        payload.execute_sql.assert_called_with(
+            "ALTER TABLE `__osc_new_a` DROP PARTITION p2"
         )
 
     def test_dropped_columns(self):
