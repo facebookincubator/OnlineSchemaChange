@@ -13,9 +13,23 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import copy
+import logging
 from enum import Enum
+from typing import List
 
-from .models import is_equal, escape, TimestampColumn, EnumColumn, SetColumn
+from osc.lib.sqlparse import CreateParser
+
+from .models import (
+    is_equal,
+    escape,
+    TimestampColumn,
+    EnumColumn,
+    SetColumn,
+    PartitionDefinitionEntry,
+    PartitionConfig,
+)
+
+log: logging.Logger = logging.getLogger(__name__)
 
 
 class BaseAlterType(Enum):
@@ -59,6 +73,12 @@ class TableAlterType(BaseAlterType):
     CHANGE_AUTO_INC_VAL = "change_auto_inc_val"  # inplace
 
 
+class PartitionAlterType(BaseAlterType):
+    ADD_PARTITION = "add_partition"
+    DROP_PARTITION = "drop_partition"
+    REORGANIZE_PARTITION = "reorganize_partition"
+
+
 INSTANT_DDLS = {
     ColAlterType.CHANGE_COL_DEFAULT_VAL,
     ColAlterType.ADD_COL,
@@ -80,7 +100,9 @@ class SchemaDiff(object):
     Representing the difference between two Table object
     """
 
-    def __init__(self, left, right, ignore_partition=False):
+    def __init__(
+        self, left, right, ignore_partition=False, enable_partition_reorganization=False
+    ):
         self.left = left
         self.right = right
         self.attrs_to_check = [
@@ -94,6 +116,7 @@ class SchemaDiff(object):
         ]
         if not ignore_partition:
             self.attrs_to_check.append("partition")
+        self.enable_partition_reorganization = enable_partition_reorganization
         self._alter_types = set()
 
     def _calculate_diff(self):
@@ -406,7 +429,9 @@ class SchemaDiff(object):
                     segments.append("{}={}".format(attr, "''"))
                 elif attr == "row_format" and tbl_option_new is None:
                     segments.append("{}={}".format(attr, "default"))
-                else:
+                elif (
+                    attr != "partition" or self.enable_partition_reorganization is False
+                ):
                     segments.append("{}={}".format(attr, tbl_option_new))
 
                 # populate alter types data
@@ -422,11 +447,244 @@ class SchemaDiff(object):
                     self.add_alter_type(TableAlterType.CHANGE_TABLE_COMMENT)
                 elif attr == "engine":
                     self.add_alter_type(TableAlterType.CHANGE_ENGINE)
+                elif (
+                    attr == "partition" and self.enable_partition_reorganization is True
+                ):
+                    self.add_alter_types_for_partition_operations(segments)
 
         # we don't want to alter auto_increment value in db, just record the alter type
         if not is_equal(self.left.auto_increment, self.right.auto_increment):
             self.add_alter_type(TableAlterType.CHANGE_AUTO_INC_VAL)
         return segments
+
+    def generate_table_partition_operations(self, segments) -> None:
+        """
+        Check difference between partition configurations
+        """
+        try:
+            old_tbl_parts = CreateParser.partition_to_model(
+                CreateParser.parse_partitions(self.left.partition)
+            )
+            new_tbl_parts = CreateParser.partition_to_model(
+                CreateParser.parse_partitions(self.right.partition)
+            )
+
+            # type mismatch not supported yet
+            if old_tbl_parts.get_type() != new_tbl_parts.get_type():
+                return
+
+            parts_to_drop = []
+            parts_to_add = []
+            pdef_type = old_tbl_parts.get_type()
+
+            [
+                is_valid_alter,
+                is_reorganization,
+            ] = self.could_generate_sql_substatement_for_partition_reorganization(
+                old_tbl_parts,
+                new_tbl_parts,
+                pdef_type,
+                parts_to_drop,
+                parts_to_add,
+                segments,
+            )
+
+            if "None" in parts_to_add or "None" in parts_to_drop:
+                log.warning("MySQL claims either are not partitioned")
+                return
+
+            if not is_valid_alter:
+                log.warning("job failed - alter partition operation sanity check")
+                return
+
+            if not is_reorganization:
+                self.populate_alter_substatement_for_add_or_drop_table(
+                    parts_to_drop, parts_to_add, segments
+                )
+        except Exception:
+            log.exception("Unable to sync new table with orig table")
+
+    def could_generate_sql_substatement_for_partition_reorganization(
+        self,
+        old_tbl_parts,
+        new_tbl_parts,
+        pdef_type,
+        parts_to_drop,
+        parts_to_add,
+        segments,
+    ) -> [bool, bool]:
+        old_pname_to_pdefs_dict = {}
+        old_pvalues_to_pdefs_dict = {}
+        for pdef in old_tbl_parts.part_defs:
+            old_pname_to_pdefs_dict[pdef.pdef_name] = pdef
+            old_pvalues_to_pdefs_dict[", ".join(pdef.pdef_value_list)] = pdef
+
+        new_pname_to_pdefs_dict = {}
+        new_pvalues_to_pdefs_dict = {}
+        for pdef in new_tbl_parts.part_defs:
+            new_pname_to_pdefs_dict[pdef.pdef_name] = pdef
+            new_pvalues_to_pdefs_dict[", ".join(pdef.pdef_value_list)] = pdef
+
+        old_tbl_part_defs = old_tbl_parts.part_defs
+        new_tbl_part_defs = new_tbl_parts.part_defs
+
+        for k, v in old_pvalues_to_pdefs_dict.items():
+            if (
+                k not in new_pvalues_to_pdefs_dict.keys()
+                or v.pdef_name != new_pvalues_to_pdefs_dict[k].pdef_name
+            ):
+                parts_to_drop.append(v)
+
+        for k, v in new_pvalues_to_pdefs_dict.items():
+            if (
+                k not in old_pvalues_to_pdefs_dict.keys()
+                or v.pdef_name != old_pvalues_to_pdefs_dict[k].pdef_name
+            ):
+                parts_to_add.append(v)
+
+        if parts_to_drop and parts_to_add:
+            # check for partition reorganization since we don't allow add/drop
+            # in one alter statement
+            return self.got_reorganize_subsql_after_add_drop_partition_detection(
+                pdef_type, old_tbl_part_defs, new_tbl_part_defs, segments
+            )
+        elif parts_to_drop or parts_to_add:
+            if parts_to_drop:
+                self.add_alter_type(PartitionAlterType.DROP_PARTITION)
+            if parts_to_add:
+                self.add_alter_type(PartitionAlterType.ADD_PARTITION)
+            return [True, False]
+        return [False, False]
+
+    def got_reorganize_subsql_after_add_drop_partition_detection(
+        self,
+        pdef_type,
+        old_tbl_part_defs,
+        new_tbl_part_defs,
+        segments,
+    ) -> [bool, bool]:
+        old_part_len = len(old_tbl_part_defs) - 1
+        new_part_len = len(new_tbl_part_defs) - 1
+
+        # this verification takes place only after the checks for add/drop tables
+        # if this fails, it means the user is implicitly trying to perform multiple
+        # alter operations in a single statement which is not supported.
+        # Any reorganization should satisfy the min max constraints as well as
+        # not drop individual elements
+        if pdef_type == PartitionConfig.PTYPE_RANGE:
+            if (
+                old_tbl_part_defs[old_part_len].pdef_value_list
+                != new_tbl_part_defs[new_part_len].pdef_value_list
+            ):
+                self.add_alter_type(PartitionAlterType.ADD_PARTITION)
+                self.add_alter_type(PartitionAlterType.DROP_PARTITION)
+                return [False, False]
+
+        if pdef_type == PartitionConfig.PTYPE_LIST:
+            old_tbl_value_list = []
+            new_tbl_value_list = []
+            for i in range(old_part_len + 1):
+                old_tbl_value_list.extend(old_tbl_part_defs[i].pdef_value_list)
+            for i in range(new_part_len + 1):
+                new_tbl_value_list.extend(new_tbl_part_defs[i].pdef_value_list)
+            diff = set(old_tbl_value_list).symmetric_difference(set(new_tbl_value_list))
+            if len(diff) > 0:
+                self.add_alter_type(PartitionAlterType.ADD_PARTITION)
+                self.add_alter_type(PartitionAlterType.DROP_PARTITION)
+                return [False, False]
+
+        # There is a valid split/merge at this point, so identify the partitions
+        # involved
+        old_tbl_start_index = 0
+        new_tbl_start_index = 0
+        j = 0
+        for i in range(0, old_part_len + 1):
+            if j <= new_part_len and (
+                old_tbl_part_defs[i].pdef_name != new_tbl_part_defs[j].pdef_name
+                or old_tbl_part_defs[i].pdef_value_list
+                != new_tbl_part_defs[j].pdef_value_list
+            ):
+                old_tbl_start_index = i
+                new_tbl_start_index = j
+                break
+            j = j + 1
+
+        old_tbl_end_index = old_part_len
+        new_tbl_end_index = new_part_len
+        rj = new_part_len
+        for ri in reversed(range(old_part_len + 1)):
+            if rj >= 0 and (
+                old_tbl_part_defs[ri].pdef_name != new_tbl_part_defs[rj].pdef_name
+                or old_tbl_part_defs[ri].pdef_value_list
+                != new_tbl_part_defs[rj].pdef_value_list
+            ):
+                old_tbl_end_index = ri
+                new_tbl_end_index = rj
+                break
+            rj = rj - 1
+
+        source_partitions_reorganized = []
+        for ni in range(old_tbl_start_index, old_tbl_end_index + 1):
+            source_partitions_reorganized.append(old_tbl_part_defs[ni].pdef_name)
+
+        source_partitions_reorganized_sql = (", ").join(source_partitions_reorganized)
+
+        target_partitions_reorganized = []
+        for ni in range(new_tbl_start_index, new_tbl_end_index + 1):
+            partition = new_tbl_part_defs[ni]
+            target_partitions_reorganized.append(
+                "PARTITION {} VALUES {} ({})".format(
+                    partition.pdef_name,
+                    self.partition_definition_type(partition.pdef_type),
+                    ", ".join(partition.pdef_value_list),
+                )
+            )
+
+        target_partitions_reorganized_sql = (", ").join(target_partitions_reorganized)
+
+        sub_alter_sql = "REORGANIZE PARTITION {} INTO ({})".format(
+            source_partitions_reorganized_sql, target_partitions_reorganized_sql
+        )
+
+        self.add_alter_type(PartitionAlterType.REORGANIZE_PARTITION)
+        segments.append(sub_alter_sql)
+
+        return [True, True]
+
+    def populate_alter_substatement_for_add_or_drop_table(
+        self,
+        parts_to_drop: PartitionConfig,
+        parts_to_add: PartitionConfig,
+        segments,
+    ) -> None:
+        if parts_to_add and parts_to_drop:
+            return
+
+        if parts_to_add:
+            add_parts = []
+            for partition in parts_to_add:
+                add_parts.append(
+                    "PARTITION {} VALUES {} ({})".format(
+                        partition.pdef_name,
+                        self.partition_definition_type(partition.pdef_type),
+                        ", ".join(partition.pdef_value_list),
+                    )
+                )
+            segments.append("ADD PARTITION (" + ", ".join(add_parts) + ")")
+        elif parts_to_drop:
+            dropped_parts = []
+            for partition in parts_to_drop:
+                dropped_parts.append("{}".format(partition.pdef_name))
+            segments.append("DROP PARTITION " + ", ".join(dropped_parts))
+
+    def partition_definition_type(self, def_type):
+        return PartitionConfig.TYPE_MAP[def_type]
+
+    def add_alter_types_for_partition_operations(self, segments):
+        """
+        Generate the table attribute partition section for ALTER TABLE statement
+        """
+        self.generate_table_partition_operations(segments)
 
     def to_sql(self):
         """
