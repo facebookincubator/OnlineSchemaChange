@@ -422,6 +422,138 @@ class HelpersTest(unittest.TestCase):
 
         self.assertEqual(True, success)
 
+    def test_sql_statement_to_add_partitions_adds_diff_partitions_with_hash(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY HASH (time_updated) "
+            " PARTITIONS 12"
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY HASH (time_updated) "
+            " PARTITIONS 18"
+        )
+
+        options = {"ALTER TABLE `a` ADD PARTITION PARTITIONS 6"}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_add_partitions_adds_diff_partitions_with_key(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY KEY (time_updated) "
+            " PARTITIONS 12"
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY KEY (time_updated) "
+            " PARTITIONS 18"
+        )
+
+        options = {"ALTER TABLE `a` ADD PARTITION PARTITIONS 6"}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_drop_partitions_drops_diff_partitions_with_hash(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY HASH (time_updated) "
+            " PARTITIONS 12"
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY HASH (time_updated) "
+            " PARTITIONS 10"
+        )
+
+        options = {"ALTER TABLE `a` COALESCE PARTITION 2"}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_no_sql_statement_when_diff_partitions_is_0_with_hash(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY HASH (time_updated) "
+            " PARTITIONS 12"
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY HASH (time_updated) "
+            " PARTITIONS 12"
+        )
+
+        options = {None}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_no_sql_statement_when_diff_partitions_is_0_with_key(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY KEY (time_updated) "
+            " PARTITIONS 12"
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY KEY (time_updated) "
+            " PARTITIONS 12"
+        )
+
+        options = {None}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_drop_partitions_drops_diff_partitions_with_key(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY KEY (time_updated) "
+            " PARTITIONS 12"
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY KEY (time_updated) "
+            " PARTITIONS 10"
+        )
+
+        options = {"ALTER TABLE `a` COALESCE PARTITION 2"}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
     def test_sql_statement_to_add_partitions_adds_both_partitions_with_range(
         self,
     ):

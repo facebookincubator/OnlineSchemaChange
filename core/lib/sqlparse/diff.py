@@ -25,7 +25,6 @@ from .models import (
     TimestampColumn,
     EnumColumn,
     SetColumn,
-    PartitionDefinitionEntry,
     PartitionConfig,
 )
 
@@ -473,9 +472,18 @@ class SchemaDiff(object):
             if old_tbl_parts.get_type() != new_tbl_parts.get_type():
                 return
 
+            pdef_type = old_tbl_parts.get_type()
+            if (
+                pdef_type == PartitionConfig.PTYPE_HASH
+                or pdef_type == PartitionConfig.PTYPE_KEY
+            ):
+                self.populate_alter_substatement_for_add_or_drop_table_for_hash_or_key(
+                    old_tbl_parts.num_partitions, new_tbl_parts.num_partitions, segments
+                )
+                return
+
             parts_to_drop = []
             parts_to_add = []
-            pdef_type = old_tbl_parts.get_type()
 
             [
                 is_valid_alter,
@@ -498,7 +506,7 @@ class SchemaDiff(object):
                 return
 
             if not is_reorganization:
-                self.populate_alter_substatement_for_add_or_drop_table(
+                self.populate_alter_substatement_for_add_or_drop_table_for_range_or_list(
                     parts_to_drop, parts_to_add, segments
                 )
         except Exception:
@@ -651,7 +659,7 @@ class SchemaDiff(object):
 
         return [True, True]
 
-    def populate_alter_substatement_for_add_or_drop_table(
+    def populate_alter_substatement_for_add_or_drop_table_for_range_or_list(
         self,
         parts_to_drop: PartitionConfig,
         parts_to_add: PartitionConfig,
@@ -676,6 +684,29 @@ class SchemaDiff(object):
             for partition in parts_to_drop:
                 dropped_parts.append("{}".format(partition.pdef_name))
             segments.append("DROP PARTITION " + ", ".join(dropped_parts))
+
+    def populate_alter_substatement_for_add_or_drop_table_for_hash_or_key(
+        self,
+        old_partition_count,
+        new_partition_count,
+        segments,
+    ) -> None:
+        if old_partition_count == new_partition_count:
+            return
+
+        if old_partition_count < new_partition_count:
+            self.add_alter_type(PartitionAlterType.ADD_PARTITION)
+            segments.append(
+                "ADD PARTITION PARTITIONS {}".format(
+                    new_partition_count - old_partition_count
+                )
+            )
+            return
+
+        self.add_alter_type(PartitionAlterType.DROP_PARTITION)
+        segments.append(
+            "COALESCE PARTITION {}".format(old_partition_count - new_partition_count)
+        )
 
     def partition_definition_type(self, def_type):
         return PartitionConfig.TYPE_MAP[def_type]
