@@ -884,3 +884,23 @@ class PartitionParserTest(unittest.TestCase):
         self.assertEqual(parts, pc.to_partial_sql())
         # Idempotent? Model from expected sql must match model from orig input sql
         self.assertEqual(self.regenModel(parts), pc)
+
+    def test_parts_key_throw_error_on_invalid_partition_prefixes(self):
+        for invalid_prefix in ["-", "a", "*"]:
+            parts = ("PARTITION BY KEY () PARTITIONS {}1").format(invalid_prefix)
+            result = CreateParser.parse_partitions(parts)
+            log.info("obtained %s", result)
+            self.assertEqual("KEY", result.part_type)
+
+            with self.assertRaises(PartitionParseError):
+                CreateParser.partition_to_model(result)
+
+    def test_parts_hash_throw_error_on_invalid_partition_prefixes(self):
+        for invalid_prefix in ["-", "a", "*"]:
+            parts = ("PARTITION BY HASH () PARTITIONS {}1").format(invalid_prefix)
+            result = CreateParser.parse_partitions(parts)
+            log.info("obtained %s", result)
+            self.assertEqual("HASH", result.part_type)
+
+            with self.assertRaises(PartitionParseError):
+                CreateParser.partition_to_model(result)

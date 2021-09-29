@@ -621,12 +621,19 @@ class CreateParser(object):
     @classmethod
     def gen_partitions_parser(cls):
         # Init full parts matcher only on demand
+        # invalid_partition_prefix - used to detect any invalid prefix
+        # attached to the number of partitions. The prefix is used
+        # later on to flag invalid schemas.
         return (
             Combine(Optional(Literal("/*!") + Word(nums))).suppress()
             + CaselessLiteral("PARTITION")
             + CaselessLiteral("BY")
             + (cls.PTYPE_HASH | cls.PTYPE_KEY | cls.PTYPE_RANGE | cls.PTYPE_LIST)
-            + Optional(CaselessLiteral("PARTITIONS") + Word(nums)("num_partitions"))
+            + Optional(
+                CaselessLiteral("PARTITIONS")
+                + Optional(Combine(Regex("[^0-9]")))("invalid_partition_prefix")
+                + Word(nums)("num_partitions")
+            )
             + Optional(
                 cls.LEFT_PARENTHESES
                 + cls.PART_DEFS("part_defs")
@@ -837,6 +844,12 @@ class CreateParser(object):
             if isinstance(fields, str):
                 return fields.replace("`", "")
             return [_strip_ticks(f) for f in fields]
+
+        if presult.get("invalid_partition_prefix"):
+            raise PartitionParseError(
+                f"Partition type {pc.part_type} cannot "
+                "have invalid partition number prefix defined"
+            )
 
         # set fields_or_expr, full_type
         if (
