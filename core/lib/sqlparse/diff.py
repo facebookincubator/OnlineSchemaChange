@@ -76,6 +76,10 @@ class PartitionAlterType(BaseAlterType):
     ADD_PARTITION = "add_partition"
     DROP_PARTITION = "drop_partition"
     REORGANIZE_PARTITION = "reorganize_partition"
+    ADD_PARTITIONING = "add_partitioning"
+    REMOVE_PARTITIONING = "remove_partitioning"
+    CHANGE_PARTITIONING = "change_partitioning"
+    INVALID_PARTITIONING = "invalid_partitioning"
 
 
 INSTANT_DDLS = {
@@ -428,9 +432,9 @@ class SchemaDiff(object):
                     segments.append("{}={}".format(attr, "''"))
                 elif attr == "row_format" and tbl_option_new is None:
                     segments.append("{}={}".format(attr, "default"))
-                elif (
-                    attr != "partition" or self.enable_partition_reorganization is False
-                ):
+                elif attr == "partition" and self.enable_partition_reorganization:
+                    self.generate_table_partition_operations(tbl_option_new, segments)
+                else:
                     segments.append("{}={}".format(attr, tbl_option_new))
 
                 # populate alter types data
@@ -446,30 +450,44 @@ class SchemaDiff(object):
                     self.add_alter_type(TableAlterType.CHANGE_TABLE_COMMENT)
                 elif attr == "engine":
                     self.add_alter_type(TableAlterType.CHANGE_ENGINE)
-                elif (
-                    attr == "partition" and self.enable_partition_reorganization is True
-                ):
-                    self.add_alter_types_for_partition_operations(segments)
 
         # we don't want to alter auto_increment value in db, just record the alter type
         if not is_equal(self.left.auto_increment, self.right.auto_increment):
             self.add_alter_type(TableAlterType.CHANGE_AUTO_INC_VAL)
         return segments
 
-    def generate_table_partition_operations(self, segments) -> None:
+    def generate_table_partition_operations(
+        self, partition_attr_value, segments
+    ) -> None:
         """
         Check difference between partition configurations
         """
         try:
-            old_tbl_parts = CreateParser.partition_to_model(
-                CreateParser.parse_partitions(self.left.partition)
-            )
-            new_tbl_parts = CreateParser.partition_to_model(
-                CreateParser.parse_partitions(self.right.partition)
-            )
+            old_tbl_parts = PartitionConfig()
+            new_tbl_parts = PartitionConfig()
+            if self.left.partition:
+                old_tbl_parts = CreateParser.partition_to_model(
+                    CreateParser.parse_partitions(self.left.partition)
+                )
+            if self.right.partition:
+                new_tbl_parts = CreateParser.partition_to_model(
+                    CreateParser.parse_partitions(self.right.partition)
+                )
 
-            # type mismatch not supported yet
-            if old_tbl_parts.get_type() != new_tbl_parts.get_type():
+            # Check for partitioning type change
+            # The case of partition to no partition is
+            # not handled here.
+            if (
+                partition_attr_value
+                and old_tbl_parts.get_type() != new_tbl_parts.get_type()
+            ):
+                if not old_tbl_parts.get_type():
+                    self.add_alter_type(PartitionAlterType.ADD_PARTITIONING)
+                else:
+                    self.add_alter_type(PartitionAlterType.CHANGE_PARTITIONING)
+                segments.append(
+                    "{}".format(partition_attr_value.lstrip(" ").rstrip(" "))
+                )
                 return
 
             pdef_type = old_tbl_parts.get_type()
@@ -478,7 +496,10 @@ class SchemaDiff(object):
                 or pdef_type == PartitionConfig.PTYPE_KEY
             ):
                 self.populate_alter_substatement_for_add_or_drop_table_for_hash_or_key(
-                    old_tbl_parts.num_partitions, new_tbl_parts.num_partitions, segments
+                    old_tbl_parts.num_partitions,
+                    new_tbl_parts.num_partitions,
+                    partition_attr_value,
+                    segments,
                 )
                 return
 
@@ -497,17 +518,13 @@ class SchemaDiff(object):
                 segments,
             )
 
-            if "None" in parts_to_add or "None" in parts_to_drop:
-                log.warning("MySQL claims either are not partitioned")
-                return
-
             if not is_valid_alter:
                 log.warning("job failed - alter partition operation sanity check")
                 return
 
             if not is_reorganization:
                 self.populate_alter_substatement_for_add_or_drop_table_for_range_or_list(
-                    parts_to_drop, parts_to_add, segments
+                    parts_to_drop, parts_to_add, partition_attr_value, segments
                 )
         except Exception:
             log.exception("Unable to sync new table with orig table")
@@ -571,8 +588,8 @@ class SchemaDiff(object):
         new_tbl_part_defs,
         segments,
     ) -> [bool, bool]:
-        old_part_len = len(old_tbl_part_defs) - 1
-        new_part_len = len(new_tbl_part_defs) - 1
+        old_tbl_end_index = len(old_tbl_part_defs) - 1
+        new_tbl_end_index = len(new_tbl_part_defs) - 1
 
         # this verification takes place only after the checks for add/drop tables
         # if this fails, it means the user is implicitly trying to perform multiple
@@ -581,8 +598,8 @@ class SchemaDiff(object):
         # not drop individual elements
         if pdef_type == PartitionConfig.PTYPE_RANGE:
             if (
-                old_tbl_part_defs[old_part_len].pdef_value_list
-                != new_tbl_part_defs[new_part_len].pdef_value_list
+                old_tbl_part_defs[old_tbl_end_index].pdef_value_list
+                != new_tbl_part_defs[new_tbl_end_index].pdef_value_list
             ):
                 self.add_alter_type(PartitionAlterType.ADD_PARTITION)
                 self.add_alter_type(PartitionAlterType.DROP_PARTITION)
@@ -591,9 +608,9 @@ class SchemaDiff(object):
         if pdef_type == PartitionConfig.PTYPE_LIST:
             old_tbl_value_list = []
             new_tbl_value_list = []
-            for i in range(old_part_len + 1):
+            for i in range(old_tbl_end_index + 1):
                 old_tbl_value_list.extend(old_tbl_part_defs[i].pdef_value_list)
-            for i in range(new_part_len + 1):
+            for i in range(new_tbl_end_index + 1):
                 new_tbl_value_list.extend(new_tbl_part_defs[i].pdef_value_list)
             diff = set(old_tbl_value_list).symmetric_difference(set(new_tbl_value_list))
             if len(diff) > 0:
@@ -606,8 +623,8 @@ class SchemaDiff(object):
         old_tbl_start_index = 0
         new_tbl_start_index = 0
         j = 0
-        for i in range(0, old_part_len + 1):
-            if j <= new_part_len and (
+        for i in range(0, old_tbl_end_index + 1):
+            if j <= new_tbl_end_index and (
                 old_tbl_part_defs[i].pdef_name != new_tbl_part_defs[j].pdef_name
                 or old_tbl_part_defs[i].pdef_value_list
                 != new_tbl_part_defs[j].pdef_value_list
@@ -617,10 +634,8 @@ class SchemaDiff(object):
                 break
             j = j + 1
 
-        old_tbl_end_index = old_part_len
-        new_tbl_end_index = new_part_len
-        rj = new_part_len
-        for ri in reversed(range(old_part_len + 1)):
+        rj = new_tbl_end_index
+        for ri in reversed(range(old_tbl_end_index + 1)):
             if rj >= 0 and (
                 old_tbl_part_defs[ri].pdef_name != new_tbl_part_defs[rj].pdef_name
                 or old_tbl_part_defs[ri].pdef_value_list
@@ -663,6 +678,7 @@ class SchemaDiff(object):
         self,
         parts_to_drop: PartitionConfig,
         parts_to_add: PartitionConfig,
+        partition_attr_value,
         segments,
     ) -> None:
         if parts_to_add and parts_to_drop:
@@ -680,15 +696,23 @@ class SchemaDiff(object):
                 )
             segments.append("ADD PARTITION (" + ", ".join(add_parts) + ")")
         elif parts_to_drop:
-            dropped_parts = []
-            for partition in parts_to_drop:
-                dropped_parts.append("{}".format(partition.pdef_name))
-            segments.append("DROP PARTITION " + ", ".join(dropped_parts))
+            # When we reach here, we cannot have a partition clause mentioned
+            # for list/range without associated partitions as the partition model
+            # should have flagged earlier.
+            if not partition_attr_value:
+                self.add_alter_type(PartitionAlterType.REMOVE_PARTITIONING)
+                segments.append("REMOVE PARTITIONING")
+            else:
+                dropped_parts = []
+                for partition in parts_to_drop:
+                    dropped_parts.append("{}".format(partition.pdef_name))
+                segments.append("DROP PARTITION " + ", ".join(dropped_parts))
 
     def populate_alter_substatement_for_add_or_drop_table_for_hash_or_key(
         self,
         old_partition_count,
         new_partition_count,
+        partition_attr_value,
         segments,
     ) -> None:
         if old_partition_count == new_partition_count:
@@ -703,6 +727,16 @@ class SchemaDiff(object):
             )
             return
 
+        if not partition_attr_value:
+            self.add_alter_type(PartitionAlterType.REMOVE_PARTITIONING)
+            segments.append("REMOVE PARTITIONING")
+            return
+
+        if new_partition_count == 0:
+            # Cannot remove all partitions, use DROP TABLE instead
+            self.add_alter_type(PartitionAlterType.INVALID_PARTITIONING)
+            return
+
         self.add_alter_type(PartitionAlterType.DROP_PARTITION)
         segments.append(
             "COALESCE PARTITION {}".format(old_partition_count - new_partition_count)
@@ -710,12 +744,6 @@ class SchemaDiff(object):
 
     def partition_definition_type(self, def_type):
         return PartitionConfig.TYPE_MAP[def_type]
-
-    def add_alter_types_for_partition_operations(self, segments):
-        """
-        Generate the table attribute partition section for ALTER TABLE statement
-        """
-        self.generate_table_partition_operations(segments)
 
     def to_sql(self):
         """
