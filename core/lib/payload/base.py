@@ -411,7 +411,7 @@ class Payload(object):
         Stop sql_thread for such operations as create trigger and swap table
         """
         if self.is_sql_thread_running():
-            log.warning("Stopping slave sql thread.")
+            log.warning("Stopping secondary sql thread.")
             self.execute_sql(sql.stop_slave_sql)
             self.is_slave_stopped_by_me = True
 
@@ -420,7 +420,7 @@ class Payload(object):
         Start the sql_thread if we are the one stopped it
         """
         if self.is_slave_stopped_by_me:
-            log.warning("Starting slave sql thread stopped by OSC.")
+            log.warning("Starting secondary sql thread stopped by OSC.")
             self.execute_sql(sql.start_slave_sql)
             self.is_slave_stopped_by_me = False
 
