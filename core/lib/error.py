@@ -325,6 +325,11 @@ class OSCError(Exception):
                 "deployment method for this"
             ),
         },
+        "CREATE_TRIGGER_ERROR": {
+            "code": 153,
+            "desc": ("Error when creating triggers, msg: {msg}"),
+        },
+        # reserved for special internal errors
         "ASSERTION_ERROR": {
             "code": 249,
             "desc": ("Assertion error. \n" "Expected: {expected}\n" "Got     : {got}"),

@@ -1553,13 +1553,22 @@ class CopyPayload(Payload):
         if not self.is_high_pri_ddl_supported:
             self.lock_tables(tables=[self.table_name])
 
-        # Because we've already hold the WRITE LOCK on the table, it's now safe
-        # to deal with operations that require metadata lock
-        self.create_insert_trigger()
-        self.create_delete_trigger()
-        self.create_update_trigger()
+        try:
+            log.info("Creating triggers")
+            # Because we've already hold the WRITE LOCK on the table, it's now safe
+            # to deal with operations that require metadata lock
+            self.create_insert_trigger()
+            self.create_delete_trigger()
+            self.create_update_trigger()
+        except Exception as e:
+            if not self.is_high_pri_ddl_supported:
+                self.unlock_tables()
+            self.start_slave_sql()
+            log.error("Failed to execute sql for creating triggers")
+            raise OSCError("CREATE_TRIGGER_ERROR", {"msg": str(e)})
 
-        self.unlock_tables()
+        if not self.is_high_pri_ddl_supported:
+            self.unlock_tables()
         self.start_slave_sql()
 
     def disable_ttl_for_myrocks(self):

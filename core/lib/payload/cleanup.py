@@ -68,13 +68,14 @@ class CleanupPayload(Payload):
         self.get_mysql_settings()
         self.init_mysql_version()
         self.set_no_binlog()
+        self.stop_slave_sql()
 
         # Stop sql thread to avoid MDL lock contention and blocking reads before
         # running DDLs. Will use high_pri_ddl instead if it's supported
         if self.is_high_pri_ddl_supported:
-            if self.is_sql_thread_running():
-                self.is_slave_stopped_by_me = True
             self.enable_priority_ddl()
+        else:
+            self.lock_tables(tables=[self.table_name])
 
         self.execute_sql("USE `{}`".format(escape(db)))
         current_db = db
@@ -100,25 +101,20 @@ class CleanupPayload(Payload):
             except Exception as e:
                 cleanupError = True
                 error = e
-            finally:
-                # cleanup all the queries no matter they are executed or not
-                # to prevent them from being executed again in the next run
-                self.sqls_to_execute = []
-                # If sql_thread was killed as a result of high_pri_ddl we need to
-                # revive it
-                if (
-                    self.is_high_pri_ddl_supported
-                    and self.is_slave_stopped_by_me
-                    and not self.is_sql_thread_running()
-                ):
-                    log.info("Resuming sql_thread as it was killed by high_pri_ddl")
-                    self.start_slave_sql()
-                    self.is_slave_stopped_by_me = True
             if cleanupError:
+                self.sqls_to_execute = []
+                if not self.is_high_pri_ddl_supported:
+                    self.unlock_tables()
+                self.start_slave_sql()
                 log.error("Failed to execute sql for cleanup")
                 raise OSCError(
                     "CLEANUP_EXECUTION_ERROR", {"sql": stmt, "msg": str(error)}
                 )
+
+        if not self.is_high_pri_ddl_supported:
+            self.unlock_tables()
+        self.sqls_to_execute = []
+        self.start_slave_sql()
 
     def add_file_entry(self, filepath):
         log.debug("Cleanup file entry added: {}".format(filepath))
