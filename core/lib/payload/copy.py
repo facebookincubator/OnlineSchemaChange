@@ -1208,6 +1208,7 @@ class CopyPayload(Payload):
         tmp_sql_obj.name = self.new_table_name
         if self.rm_partition:
             tmp_sql_obj.partition = self._old_table.partition
+            tmp_sql_obj.partition_config = self._old_table.partition_config
         tmp_table_ddl = tmp_sql_obj.to_sql()
         log.info("Creating copy table using: {}".format(tmp_table_ddl))
         self.execute_sql(tmp_table_ddl)
@@ -1249,6 +1250,7 @@ class CopyPayload(Payload):
             # Ignore partition difference, since there will be no implicit
             # conversion here
             obj_after.partition = self._new_table.partition
+            obj_after.partition_config = self._new_table.partition_config
             if self.mysql_version.is_mysql8:
                 # Pre-populate to avoid collation difference, because 8.0 will
                 # always show collate using the server default when a charset is
