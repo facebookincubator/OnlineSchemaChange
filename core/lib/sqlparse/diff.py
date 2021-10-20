@@ -103,9 +103,7 @@ class SchemaDiff(object):
     Representing the difference between two Table object
     """
 
-    def __init__(
-        self, left, right, ignore_partition=False, enable_partition_reorganization=False
-    ):
+    def __init__(self, left, right, ignore_partition=False):
         self.left = left
         self.right = right
         self.attrs_to_check = [
@@ -117,9 +115,9 @@ class SchemaDiff(object):
             "name",
             "row_format",
         ]
+        self.ignore_partition = ignore_partition
         if not ignore_partition:
             self.attrs_to_check.append("partition")
-        self.enable_partition_reorganization = enable_partition_reorganization
         self._alter_types = set()
 
     def _calculate_diff(self):
@@ -432,7 +430,7 @@ class SchemaDiff(object):
                     segments.append("{}={}".format(attr, "''"))
                 elif attr == "row_format" and tbl_option_new is None:
                     segments.append("{}={}".format(attr, "default"))
-                elif attr == "partition" and self.enable_partition_reorganization:
+                elif attr == "partition" and self.ignore_partition is False:
                     self.generate_table_partition_operations(tbl_option_new, segments)
                 else:
                     segments.append("{}={}".format(attr, tbl_option_new))
@@ -519,6 +517,7 @@ class SchemaDiff(object):
             )
 
             if not is_valid_alter:
+                self.add_alter_type(PartitionAlterType.INVALID_PARTITIONING)
                 log.warning("job failed - alter partition operation sanity check")
                 return
 
@@ -527,6 +526,7 @@ class SchemaDiff(object):
                     parts_to_drop, parts_to_add, partition_attr_value, segments
                 )
         except Exception:
+            self.add_alter_type(PartitionAlterType.INVALID_PARTITIONING)
             log.exception("Unable to sync new table with orig table")
 
     def could_generate_sql_substatement_for_partition_reorganization(
@@ -540,15 +540,21 @@ class SchemaDiff(object):
     ) -> [bool, bool]:
         old_pname_to_pdefs_dict = {}
         old_pvalues_to_pdefs_dict = {}
+        old_pnames = []
         for pdef in old_tbl_parts.part_defs:
+            old_pnames.append(pdef.pdef_name)
             old_pname_to_pdefs_dict[pdef.pdef_name] = pdef
-            old_pvalues_to_pdefs_dict[", ".join(pdef.pdef_value_list)] = pdef
+            value_list = self.get_value_list(pdef.pdef_value_list)
+            old_pvalues_to_pdefs_dict[value_list] = pdef
 
         new_pname_to_pdefs_dict = {}
         new_pvalues_to_pdefs_dict = {}
+        new_pnames = []
         for pdef in new_tbl_parts.part_defs:
+            new_pnames.append(pdef.pdef_name)
             new_pname_to_pdefs_dict[pdef.pdef_name] = pdef
-            new_pvalues_to_pdefs_dict[", ".join(pdef.pdef_value_list)] = pdef
+            value_list = self.get_value_list(pdef.pdef_value_list)
+            new_pvalues_to_pdefs_dict[value_list] = pdef
 
         old_tbl_part_defs = old_tbl_parts.part_defs
         new_tbl_part_defs = new_tbl_parts.part_defs
@@ -560,12 +566,21 @@ class SchemaDiff(object):
             ):
                 parts_to_drop.append(v)
 
-        for k, v in new_pvalues_to_pdefs_dict.items():
+        max_value_added = False
+        # Ensuring "MAXVALUE" to be the last of the list, if present since sorting can alter the order
+        for k, v in sorted(new_pvalues_to_pdefs_dict.items(), key=lambda item: item[0]):
             if (
                 k not in old_pvalues_to_pdefs_dict.keys()
                 or v.pdef_name != old_pvalues_to_pdefs_dict[k].pdef_name
             ):
-                parts_to_add.append(v)
+                if k != "MAXVALUE":
+                    parts_to_add.append(v)
+                else:
+                    max_value_added = True
+                    max_value_entry = v
+
+        if max_value_added:
+            parts_to_add.append(max_value_entry)
 
         if parts_to_drop and parts_to_add:
             # check for partition reorganization since we don't allow add/drop
@@ -595,31 +610,29 @@ class SchemaDiff(object):
         # if this fails, it means the user is implicitly trying to perform multiple
         # alter operations in a single statement which is not supported.
         # Any reorganization should satisfy the min max constraints as well as
-        # not drop individual elements
+        # not drop individual elements.
         if pdef_type == PartitionConfig.PTYPE_RANGE:
-            if (
-                old_tbl_part_defs[old_tbl_end_index].pdef_value_list
-                != new_tbl_part_defs[new_tbl_end_index].pdef_value_list
+            # the new range max should be higher or equal to the old range max
+            # dateime/integers should be handled
+            # MAXVALUE is extracted as a string in PartitionModel, hence need to handle
+            # it separately
+
+            if not isinstance(
+                new_tbl_part_defs[new_tbl_end_index].pdef_value_list, str
+            ) and (
+                isinstance(old_tbl_part_defs[old_tbl_end_index].pdef_value_list, str)
+                or (
+                    self.old_range_is_higher_than_new_range(
+                        old_tbl_part_defs[old_tbl_end_index].pdef_value_list[0],
+                        new_tbl_part_defs[new_tbl_end_index].pdef_value_list[0],
+                    )
+                )
             ):
-                self.add_alter_type(PartitionAlterType.ADD_PARTITION)
-                self.add_alter_type(PartitionAlterType.DROP_PARTITION)
                 return [False, False]
 
-        if pdef_type == PartitionConfig.PTYPE_LIST:
-            old_tbl_value_list = []
-            new_tbl_value_list = []
-            for i in range(old_tbl_end_index + 1):
-                old_tbl_value_list.extend(old_tbl_part_defs[i].pdef_value_list)
-            for i in range(new_tbl_end_index + 1):
-                new_tbl_value_list.extend(new_tbl_part_defs[i].pdef_value_list)
-            diff = set(old_tbl_value_list).symmetric_difference(set(new_tbl_value_list))
-            if len(diff) > 0:
-                self.add_alter_type(PartitionAlterType.ADD_PARTITION)
-                self.add_alter_type(PartitionAlterType.DROP_PARTITION)
-                return [False, False]
-
-        # There is a valid split/merge at this point, so identify the partitions
-        # involved
+        # The preliminiary check for split/merge is done at this point
+        # For list we are good to go and form a reorganize statement
+        # but range needs to satisfy the inner strict range limits
         old_tbl_start_index = 0
         new_tbl_start_index = 0
         j = 0
@@ -646,6 +659,15 @@ class SchemaDiff(object):
                 break
             rj = rj - 1
 
+        # the range value before the end should match exactly
+        if pdef_type == PartitionConfig.PTYPE_RANGE:
+            if ri >= 0 and ri < len(old_tbl_part_defs) - 1:
+                if (
+                    old_tbl_part_defs[ri].pdef_value_list
+                    != new_tbl_part_defs[rj].pdef_value_list
+                ):
+                    return [False, False]
+
         source_partitions_reorganized = []
         for ni in range(old_tbl_start_index, old_tbl_end_index + 1):
             source_partitions_reorganized.append(old_tbl_part_defs[ni].pdef_name)
@@ -655,11 +677,12 @@ class SchemaDiff(object):
         target_partitions_reorganized = []
         for ni in range(new_tbl_start_index, new_tbl_end_index + 1):
             partition = new_tbl_part_defs[ni]
+            value_list = self.get_value_list(partition.pdef_value_list)
             target_partitions_reorganized.append(
                 "PARTITION {} VALUES {} ({})".format(
                     partition.pdef_name,
                     self.partition_definition_type(partition.pdef_type),
-                    ", ".join(partition.pdef_value_list),
+                    value_list,
                 )
             )
 
@@ -674,6 +697,16 @@ class SchemaDiff(object):
 
         return [True, True]
 
+    def get_value_list(self, pdef_value_list):
+        if isinstance(pdef_value_list, str):
+            value_list = pdef_value_list
+        else:
+            value_list = ", ".join(pdef_value_list)
+        return value_list
+
+    def old_range_is_higher_than_new_range(self, left_range, right_range) -> bool:
+        return left_range > right_range
+
     def populate_alter_substatement_for_add_or_drop_table_for_range_or_list(
         self,
         parts_to_drop: PartitionConfig,
@@ -687,11 +720,12 @@ class SchemaDiff(object):
         if parts_to_add:
             add_parts = []
             for partition in parts_to_add:
+                value_list = self.get_value_list(partition.pdef_value_list)
                 add_parts.append(
                     "PARTITION {} VALUES {} ({})".format(
                         partition.pdef_name,
                         self.partition_definition_type(partition.pdef_type),
-                        ", ".join(partition.pdef_value_list),
+                        value_list,
                     )
                 )
             segments.append("ADD PARTITION (" + ", ".join(add_parts) + ")")
@@ -744,6 +778,12 @@ class SchemaDiff(object):
 
     def partition_definition_type(self, def_type):
         return PartitionConfig.TYPE_MAP[def_type]
+
+    def valid_partitioning_alter(self, type):
+        return (
+            isinstance(type, PartitionAlterType)
+            and type != PartitionAlterType.INVALID_PARTITIONING
+        )
 
     def to_sql(self):
         """

@@ -445,6 +445,12 @@ class CreateParser(object):
     # and _binary 0x123aBc
     HEX_VALUE = Literal("0x") + OneOrMore(Regex("[0-9a-fA-F]"))
 
+    day = Word(nums)
+    month = Word(nums)
+    year = Word(nums)
+    dateday = Combine(year + "-" + month + "-" + day)
+    to_days = Combine("to_days('" + dateday + "')")
+
     PART_VALUE_LIST = Group(
         LEFT_PARENTHESES
         + (
@@ -452,6 +458,7 @@ class CreateParser(object):
                 Word(nums)  # e.g. (1, 2, 3)
                 | QUOTED_STRING_WITH_QUOTE  # e.g. ('a', 'b')
                 | CaselessLiteral("NULL").setParseAction(upcaseTokens)  # e.g. (NULL)
+                | to_days  # e.g. to_days('2010-11-07')
             )
             | (
                 LEFT_PARENTHESES

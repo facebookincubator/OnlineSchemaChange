@@ -20,6 +20,7 @@ from .diff import (
     need_default_ts_bootstrap,
     ColAlterType,
     INSTANT_DDLS,
+    PartitionAlterType,
 )
 from .models import is_equal, Column, TableIndex, Table
 
