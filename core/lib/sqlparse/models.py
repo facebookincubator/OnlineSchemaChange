@@ -72,12 +72,7 @@ class IndexColumn(object):
     def __eq__(self, other):
         if self.name != other.name:
             return False
-        if self.length is not None:
-            if other.length is None:
-                return False
-            elif self.length != other.length:
-                return False
-        return True
+        return self.length == other.length
 
     def __ne__(self, other):
         return not self == other
