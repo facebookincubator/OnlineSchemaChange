@@ -175,6 +175,7 @@ class CreateParser(object):
         | CaselessLiteral("LONGBLOB")
         | CaselessLiteral("BOOLEAN")
         | CaselessLiteral("BOOL")
+        | CaselessLiteral("JSON")
     )("column_type")
     OPTIONAL_COL_LEN = Optional(COL_LEN)
     BINARY = Optional(CaselessLiteral("BINARY"))("binary")
@@ -732,6 +733,8 @@ class CreateParser(object):
 
             column.name = column_def.column_name
             column.column_type = column_def.column_type
+            if column.column_type == "JSON":
+                table.has_80_features = True
 
             # We need to check whether each column property exist in the
             # create table string, because not specifying a "COMMENT" is

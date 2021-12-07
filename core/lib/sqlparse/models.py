@@ -657,6 +657,7 @@ class Table(object):
         self.partition = None  # Partitions as a string
         self.constraint = None
         self.partition_config: Optional[PartitionConfig] = None
+        self.has_80_features = False
 
     def __str__(self):
         table_str = ""

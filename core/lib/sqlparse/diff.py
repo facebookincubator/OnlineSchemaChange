@@ -82,6 +82,10 @@ class PartitionAlterType(BaseAlterType):
     INVALID_PARTITIONING = "invalid_partitioning"
 
 
+class NewMysql80FeatureAlterType(BaseAlterType):
+    JSON = "json"
+
+
 INSTANT_DDLS = {
     ColAlterType.CHANGE_COL_DEFAULT_VAL,
     ColAlterType.ADD_COL,
@@ -259,6 +263,8 @@ class SchemaDiff(object):
                     )
                 handled_cols.append(col.name)
                 self.add_alter_type(ColAlterType.ADD_COL)
+                if col.column_type == "JSON":
+                    self.add_alter_type(NewMysql80FeatureAlterType.JSON)
                 if col.auto_increment:
                     self.add_alter_type(ColAlterType.ADD_AUTO_INC_COL)
                 segments.append("ADD {} {}".format(col.to_sql(), position))

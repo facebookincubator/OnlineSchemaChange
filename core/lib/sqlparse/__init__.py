@@ -18,9 +18,9 @@ from .diff import (
     SchemaDiff,
     get_type_conv_columns,
     need_default_ts_bootstrap,
-    ColAlterType,
     INSTANT_DDLS,
     PartitionAlterType,
+    NewMysql80FeatureAlterType,
 )
 from .models import is_equal, Column, TableIndex, Table
 
@@ -38,5 +38,7 @@ __all__ = [
     "CreateParser",
     "PartitionParseError",
     "ColAlterType",
+    "PartitionAlterType",
+    "NewMysql80FeatureAlterType",
     "INSTANT_DDLS",
 ]
