@@ -124,6 +124,11 @@ class SchemaDiff(object):
             self.attrs_to_check.append("partition")
         self._alter_types = set()
 
+    def get_dropped_cols(self):
+        return [
+            col for col in self.left.column_list if col not in self.right.column_list
+        ]
+
     def _calculate_diff(self):
         diffs = {
             "removed": [],
@@ -137,10 +142,9 @@ class SchemaDiff(object):
         # Shallow copy should be enough here
         col_left_copy = copy.copy(self.left.column_list)
         col_right_copy = copy.copy(self.right.column_list)
-        for col in self.left.column_list:
-            if col not in self.right.column_list:
-                diffs["removed"].append(col)
-                col_left_copy.remove(col)
+        for col in self.get_dropped_cols():
+            diffs["removed"].append(col)
+            col_left_copy.remove(col)
 
         for col in self.right.column_list:
             if col not in self.left.column_list:
