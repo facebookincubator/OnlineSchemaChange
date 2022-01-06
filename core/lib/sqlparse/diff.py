@@ -60,6 +60,7 @@ class IndexAlterType(BaseAlterType):
     ADD_INDEX = "add_index"  # inplace
     DROP_INDEX = "drop_index"  # inplace, metadata only
     CHANGE_PK = "change_pk"  # copy
+    BECOME_UNIQUE_INDEX = "become_unique_index"
 
 
 class TableAlterType(BaseAlterType):
@@ -406,6 +407,12 @@ class SchemaDiff(object):
     def _update_index_attrs_changes(self, idx_name):
         old_indexes = {idx.name: idx for idx in self.left.indexes}
         new_indexes = {idx.name: idx for idx in self.right.indexes}
+        if (
+            idx_name not in old_indexes
+            and idx_name in new_indexes
+            and new_indexes[idx_name].is_unique
+        ):
+            self.add_alter_type(IndexAlterType.BECOME_UNIQUE_INDEX)
         if not (idx_name in old_indexes and idx_name in new_indexes):
             return
         attrs = ["key_block_size", "comment", "is_unique", "key_type", "using"]
@@ -419,6 +426,11 @@ class SchemaDiff(object):
                 elif attr == "comment":
                     self.add_alter_type(IndexAlterType.CHANGE_INDEX_COMMENT)
                 elif attr == "is_unique":
+                    if (
+                        new_indexes[idx_name].is_unique
+                        and not old_indexes[idx_name].is_unique
+                    ):
+                        self.add_alter_type(IndexAlterType.BECOME_UNIQUE_INDEX)
                     self.add_alter_type(IndexAlterType.CHANGE_UNIQUE_CONSTRAINT)
                 elif attr == "key_type":
                     self.add_alter_type(IndexAlterType.CHANGE_KEY_TYPE)

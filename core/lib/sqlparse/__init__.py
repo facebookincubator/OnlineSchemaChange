@@ -18,6 +18,7 @@ from .diff import (
     SchemaDiff,
     get_type_conv_columns,
     need_default_ts_bootstrap,
+    IndexAlterType,
     INSTANT_DDLS,
     PartitionAlterType,
     NewMysql80FeatureAlterType,
@@ -41,4 +42,5 @@ __all__ = [
     "PartitionAlterType",
     "NewMysql80FeatureAlterType",
     "INSTANT_DDLS",
+    "IndexAlterType",
 ]
