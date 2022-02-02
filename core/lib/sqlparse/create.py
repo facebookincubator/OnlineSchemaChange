@@ -279,6 +279,7 @@ class CreateParser(object):
     DOCUMENT_PATH = Combine(
         COLUMN_NAME_WITH_QUOTE + ZeroOrMore(DOT + COLUMN_NAME_WITH_QUOTE)
     )
+    INDEX_ORDER = (CaselessLiteral("ASC") | CaselessLiteral("DESC"))("index_order")
     IDX_COL = (
         Group(
             DOCUMENT_PATH
@@ -286,7 +287,13 @@ class CreateParser(object):
             + (CaselessLiteral("INT") | CaselessLiteral("STRING"))
             + Optional(COL_LEN, default="")
         )
-    ) | (Group(COLUMN_NAME + Optional(COL_LEN, default="")))
+    ) | (
+        Group(
+            COLUMN_NAME
+            + Optional(COL_LEN, default="")
+            + Optional(INDEX_ORDER, default="ASC")
+        )
+    )
 
     # Primary key section
     COL_NAME_LIST = Group(IDX_COL + ZeroOrMore(COMMA + IDX_COL))
@@ -781,9 +788,12 @@ class CreateParser(object):
                 raise ParseError("Multiple primary keys defined")
             table.primary_key.name = "PRIMARY"
             for col in result.pri_list:
-                for name, length in col:
+                for name, length, order in col:
                     idx_col = models.IndexColumn()
                     idx_col.name = name
+                    idx_col.order = order
+                    if order.upper() == "DESC":
+                        table.has_80_features = True
                     if length:
                         idx_col.length = length
                     table.primary_key.column_list.append(idx_col)
@@ -816,9 +826,12 @@ class CreateParser(object):
                                 idx_col.length = length
                             idx.column_list.append(idx_col)
                         else:
-                            (name, length) = col_def
+                            (name, length, order) = col_def
                             idx_col = models.IndexColumn()
                             idx_col.name = name
+                            idx_col.order = order
+                            if order.upper() == "DESC":
+                                table.has_80_features = True
                             if length:
                                 idx_col.length = length
                             idx.column_list.append(idx_col)

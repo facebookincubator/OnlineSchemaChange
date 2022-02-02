@@ -20,6 +20,57 @@ class SQLParserTest(unittest.TestCase):
         self.assertEqual(len(tbl.column_list), 1)
         self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
+    def test_json_column(self):
+        sql = "Create table foo\n" "( column1 json )"
+        tbl = parse_create(sql)
+        self.assertTrue(tbl.has_80_features)
+        self.assertEqual(len(tbl.column_list), 1)
+        self.assertEqual(tbl.column_list[0].column_type, "JSON")
+        self.assertEqual(tbl, parse_create(tbl.to_sql()))
+
+    def test_desc_index(self):
+        sql = """
+        CREATE TABLE `test_table_1` (
+        `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+        `a` int DEFAULT NULL,
+        `t` char(1) NOT NULL DEFAULT 't',
+        PRIMARY KEY (`id` DESC),
+        KEY `t_index` (`t`),
+        KEY `a_index` (`a` ASC),
+        KEY `a_index_desc` (`a` DESC),
+        KEY `a_t_composite_index` (`a` ASC, `t` DESC)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+        tbl = parse_create(sql)
+        self.assertTrue(tbl.has_80_features)
+        for idx in tbl.indexes:
+            if idx.name == "t_index":
+                self.assertEqual(len(idx.column_list), 1)
+                self.assertEqual(idx.column_list[0].name, "t")
+                self.assertEqual(idx.column_list[0].order, "ASC")
+            elif idx.name == "a_index":
+                self.assertEqual(len(idx.column_list), 1)
+                self.assertEqual(idx.column_list[0].name, "a")
+                self.assertEqual(idx.column_list[0].order, "ASC")
+            elif idx.name == "a_index_desc":
+                self.assertEqual(len(idx.column_list), 1)
+                self.assertEqual(idx.column_list[0].name, "a")
+                self.assertEqual(idx.column_list[0].order, "DESC")
+            elif idx.name == "a_t_composite_index":
+                self.assertEqual(len(idx.column_list), 2)
+                for col in idx.column_list:
+                    if col.name == "a":
+                        self.assertEqual(col.order, "ASC")
+                    elif col.name == "t":
+                        self.assertEqual(col.order, "DESC")
+                    else:
+                        raise Exception("Wrong column name")
+            else:
+                raise Exception("Wrong index name")
+        self.assertEqual(len(tbl.primary_key.column_list), 1)
+        self.assertEqual(tbl.primary_key.column_list[0].order, "DESC")
+        self.assertEqual(tbl, parse_create(tbl.to_sql()))
+
     def test_table_name_quoted_with_backtick(self):
         sql = "Create table `foo`\n" "( column1 int )"
         tbl = parse_create(sql)

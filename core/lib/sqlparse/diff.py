@@ -85,6 +85,7 @@ class PartitionAlterType(BaseAlterType):
 
 class NewMysql80FeatureAlterType(BaseAlterType):
     JSON = "json"
+    DESC_INDEX = "desc_index"
 
 
 INSTANT_DDLS = {
@@ -388,6 +389,7 @@ class SchemaDiff(object):
                 segments.append("ADD {}".format(idx.to_sql()))
                 self.add_alter_type(IndexAlterType.ADD_INDEX)
                 self._update_index_attrs_changes(idx.name)
+                self._update_desc_index_type(idx.column_list)
 
         if self.left.primary_key and not self.right.primary_key:
             segments.append("DROP PRIMARY KEY")
@@ -397,12 +399,19 @@ class SchemaDiff(object):
         ):
             segments.append("ADD {}".format(self.right.primary_key.to_sql()))
             self.add_alter_type(IndexAlterType.CHANGE_PK)
+            self._update_desc_index_type(self.right.primary_key.column_list)
         elif self.left.primary_key != self.right.primary_key:
             segments.append("DROP PRIMARY KEY")
             segments.append("ADD {}".format(self.right.primary_key.to_sql()))
             self.add_alter_type(IndexAlterType.CHANGE_PK)
+            self._update_desc_index_type(self.right.primary_key.column_list)
 
         return segments
+
+    def _update_desc_index_type(self, cols) -> None:
+        for col in cols:
+            if col.order == "DESC":
+                self.add_alter_type(NewMysql80FeatureAlterType.DESC_INDEX)
 
     def _update_index_attrs_changes(self, idx_name):
         old_indexes = {idx.name: idx for idx in self.left.indexes}

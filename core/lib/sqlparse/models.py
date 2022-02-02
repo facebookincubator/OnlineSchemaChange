@@ -55,33 +55,42 @@ def is_equal(left, right):
 class IndexColumn(object):
     """
     A column definition inside index section.
-    This is different from a table column definition, because only `name` and
-    `length` is required for a index column definition
+    This is different from a table column definition, because only `name`,
+    `length`, `order` are required for a index column definition
     """
 
     def __init__(self):
         self.name = None
         self.length = None
+        self.order = "ASC"
 
     def __str__(self):
+        str_repr = ""
         if self.length is not None:
-            return "{}({})".format(self.name, self.length)
+            str_repr = "{}({})".format(self.name, self.length)
         else:
-            return "{}".format(self.name)
+            str_repr = "{}".format(self.name)
+        if self.order != "ASC":
+            str_repr += " DESC"
+        return str_repr
 
     def __eq__(self, other):
         if self.name != other.name:
             return False
-        return self.length == other.length
+        return self.length == other.length and self.order == other.order
 
     def __ne__(self, other):
         return not self == other
 
     def to_sql(self):
+        sql_str = ""
         if self.length is not None:
-            return "`{}`({})".format(escape(self.name), self.length)
+            sql_str = "`{}`({})".format(escape(self.name), self.length)
         else:
-            return "`{}`".format(escape(self.name))
+            sql_str = "`{}`".format(escape(self.name))
+        if self.order != "ASC":
+            sql_str += " DESC"
+        return sql_str
 
 
 class DocStoreIndexColumn(object):
