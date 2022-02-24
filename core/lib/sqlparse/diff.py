@@ -15,7 +15,6 @@ from __future__ import unicode_literals
 import copy
 import logging
 from enum import Enum
-from typing import List
 
 from osc.lib.sqlparse import CreateParser
 
@@ -127,8 +126,15 @@ class SchemaDiff(object):
         self._alter_types = set()
 
     def get_dropped_cols(self):
+        new_column_names = [col.name for col in self.right.column_list]
         return [
-            col for col in self.left.column_list if col not in self.right.column_list
+            col for col in self.left.column_list if col.name not in new_column_names
+        ]
+
+    def get_added_cols(self):
+        old_column_names = [col.name for col in self.left.column_list]
+        return [
+            col for col in self.right.column_list if col.name not in old_column_names
         ]
 
     def _calculate_diff(self):
@@ -144,14 +150,26 @@ class SchemaDiff(object):
         # Shallow copy should be enough here
         col_left_copy = copy.copy(self.left.column_list)
         col_right_copy = copy.copy(self.right.column_list)
+        col_left_dict = {col.name: col for col in col_left_copy}
+        col_right_dict = {col.name: col for col in col_right_copy}
         for col in self.get_dropped_cols():
             diffs["removed"].append(col)
             col_left_copy.remove(col)
 
-        for col in self.right.column_list:
-            if col not in self.left.column_list:
-                diffs["added"].append(col)
-                col_right_copy.remove(col)
+        for col in self.get_added_cols():
+            diffs["added"].append(col)
+            col_right_copy.remove(col)
+
+        column_changes = []
+        for col in set(col_left_dict.keys()) & set(col_right_dict.keys()):
+            if col_left_dict[col] != col_right_dict[col]:
+                column_changes.append(
+                    f"Previous column: {col_left_dict[col]}, "
+                    f"desired column: {col_right_dict[col]}"
+                )
+        if column_changes:
+            diffs["msgs"].append("Column attrs changes detected:")
+            diffs["msgs"].append("\n".join(column_changes))
 
         # Two tables have different col order
         if sorted(col_left_copy, key=lambda col: col.name) == sorted(

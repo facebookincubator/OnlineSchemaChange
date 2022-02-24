@@ -76,9 +76,9 @@ class SQLParserTest(unittest.TestCase):
         tbl_1 = parse_create(sql1)
         tbl_2 = parse_create(sql2)
         tbl_diff = SchemaDiff(tbl_1, tbl_2)
-        # A modified column will be treated as a combination of remove and add
-        self.assertEqual(len(tbl_diff.diffs()["removed"]), 1)
-        self.assertEqual(len(tbl_diff.diffs()["added"]), 1)
+        # A modified column will not be treated as a combination of remove and add
+        self.assertEqual(len(tbl_diff.diffs()["removed"]), 0)
+        self.assertEqual(len(tbl_diff.diffs()["added"]), 0)
 
     def test_column_default_changed(self):
         sql1 = "Create table foo " "( column1 int default 0)"
@@ -86,11 +86,9 @@ class SQLParserTest(unittest.TestCase):
         tbl_1 = parse_create(sql1)
         tbl_2 = parse_create(sql2)
         tbl_diff = SchemaDiff(tbl_1, tbl_2)
-        # A modified column will be treated as a combination of remove and add
-        self.assertEqual(len(tbl_diff.diffs()["removed"]), 1)
-        self.assertEqual(len(tbl_diff.diffs()["added"]), 1)
-        self.assertEqual(tbl_diff.diffs()["removed"][0].default, "0")
-        self.assertEqual(tbl_diff.diffs()["added"][0].default, "1")
+        # A modified column will not be treated as a combination of remove and add
+        self.assertEqual(len(tbl_diff.diffs()["removed"]), 0)
+        self.assertEqual(len(tbl_diff.diffs()["added"]), 0)
 
     def test_index_added(self):
         sql1 = "Create table foo " "( column1 int default 0)"
