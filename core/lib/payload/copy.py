@@ -1094,6 +1094,25 @@ class CopyPayload(Payload):
         self.make_chunk_size_odd()
         self.check_disk_size()
         self.ts_bootstrap_check()
+        self.drop_columns_check()
+
+    def drop_columns_check(self):
+        # We only allow dropping columns with the flag --alow-drop-column.
+        if self.dropped_column_name_list:
+            if self.allow_drop_column:
+                for diff_column in self.dropped_column_name_list:
+                    log.warning(
+                        "Column `{}` is missing in the new schema, "
+                        "but --alow-drop-column is specified. Will "
+                        "drop this column.".format(diff_column)
+                    )
+            else:
+                missing_columns = ", ".join(self.dropped_column_name_list)
+                raise OSCError("MISSING_COLUMN", {"column": missing_columns})
+            # We don't allow dropping columns from current primary key
+            for col in self._pk_for_filter:
+                if col in self.dropped_column_name_list:
+                    raise OSCError("PRI_COL_DROPPED", {"pri_col": col})
 
     def add_drop_table_entry(self, table_name):
         """
@@ -1212,34 +1231,10 @@ class CopyPayload(Payload):
         tmp_table_ddl = tmp_sql_obj.to_sql()
         log.info("Creating copy table using: {}".format(tmp_table_ddl))
         self.execute_sql(tmp_table_ddl)
-        table_diff = self.query(
-            sql.column_diff,
-            (
-                self._current_db,
-                self.new_table_name,
-                self.table_name,
-                self._current_db,
-            ),
-        )
         self.partitions[self.new_table_name] = self.fetch_partitions(
             self.new_table_name
         )
         self.add_drop_table_entry(self.new_table_name)
-        if table_diff:
-            if self.allow_drop_column:
-                for diff_column in table_diff:
-                    log.warning(
-                        "Column `{}` is missing in the new schema, "
-                        "but --alow-drop-column is specified. Will "
-                        "drop this column.".format(diff_column["COLUMN_NAME"])
-                    )
-            else:
-                missing_columns = ", ".join(col["COLUMN_NAME"] for col in table_diff)
-                raise OSCError("MISSING_COLUMN", {"column": missing_columns})
-            # We don't allow dropping columns from current primary key
-            for col in self._pk_for_filter:
-                if col in self.dropped_column_name_list:
-                    raise OSCError("PRI_COL_DROPPED", {"pri_col": col})
 
         # Check whether the schema is consistent after execution to avoid
         # any implicit conversion
@@ -2917,8 +2912,8 @@ class CopyPayload(Payload):
                 return
             self.unblock_no_pk_creation()
             self.pre_osc_check()
-            self.create_copy_table()
             self.create_delta_table()
+            self.create_copy_table()
             self.create_triggers()
             self.start_snapshot()
             self.select_table_into_outfile()
