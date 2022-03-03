@@ -1138,3 +1138,14 @@ class CopyPayloadPKFilterTestCase(unittest.TestCase):
         self.assertEquals(self.payload._pk_for_filter, ["id1", "id2"])
         self.assertFalse(self.payload.is_full_table_dump)
         self.assertTrue(self.payload.validate_post_alter_pk())
+
+    def test_use_sql_wsenv(self):
+        with self.assertRaises(OSCError):
+            self.payload = CopyPayload(use_sql_wsenv=True)
+
+        self.payload = CopyPayload(use_sql_wsenv=True, outfile_dir="/a/b/c/")
+
+        with self.assertRaises(OSCError):
+            self.payload = CopyPayload(
+                use_sql_wsenv=True, outfile_dir="a/b/c", skip_disk_space_check=False
+            )

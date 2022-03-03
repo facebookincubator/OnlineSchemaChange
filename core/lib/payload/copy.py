@@ -117,7 +117,6 @@ class CopyPayload(Payload):
         self.free_space_reserved_percent = kwargs.get(
             "free_space_reserved_percent", constant.DEFAULT_RESERVED_SPACE_PERCENT
         )
-        self.chunk_size = kwargs.get("chunk_size", constant.CHUNK_BYTES)
         self.long_trx_time = kwargs.get("long_trx_time", constant.LONG_TRX_TIME)
         self.max_running_before_ddl = kwargs.get(
             "max_running_before_ddl", constant.MAX_RUNNING_BEFORE_DDL
@@ -151,7 +150,6 @@ class CopyPayload(Payload):
         self.skip_delta_checksum = kwargs.get("skip_delta_checksum", False)
         self.skip_named_lock = kwargs.get("skip_named_lock", False)
         self.skip_affected_rows_check = kwargs.get("skip_affected_rows_check", False)
-        self.skip_disk_space_check = kwargs.get("skip_disk_space_check", False)
         self.where = kwargs.get("where", None)
         self.session_overrides_str = kwargs.get("session_overrides", "")
         self.fail_for_implicit_conv = kwargs.get("fail_for_implicit_conv", False)
@@ -166,6 +164,23 @@ class CopyPayload(Payload):
         self.replay_max_changes = kwargs.get(
             "replay_max_changes", constant.MAX_REPLAY_CHANGES
         )
+
+        self.use_sql_wsenv = kwargs.get("use_sql_wsenv", False)
+        if self.use_sql_wsenv:
+            # by default, wsenv requires to use big chunk
+            self.chunk_size = kwargs.get("chunk_size", constant.WSENV_CHUNK_BYTES)
+            # by default, wsenv doesn't use local disk
+            self.skip_disk_space_check = kwargs.get("skip_disk_space_check", True)
+            # skip local disk space check when using wsenv
+            if not self.skip_disk_space_check:
+                raise OSCError("SKIP_DISK_SPACE_CHECK_VALUE_INCOMPATIBLE_WSENV")
+
+            # require outfile_dir not empty
+            if not self.outfile_dir:
+                raise OSCError("OUTFILE_DIR_NOT_SPECIFIED_WSENV")
+        else:
+            self.chunk_size = kwargs.get("chunk_size", constant.CHUNK_BYTES)
+            self.skip_disk_space_check = kwargs.get("skip_disk_space_check", False)
 
     @property
     def current_db(self):
@@ -545,6 +560,7 @@ class CopyPayload(Payload):
         self.set_sql_mode()
         self.enable_priority_ddl()
         self.skip_cache_fill_for_myrocks()
+        self.enable_sql_wsenv()
         self.override_session_vars()
         self.get_osc_lock()
 
@@ -828,6 +844,25 @@ class CopyPayload(Payload):
                 },
             )
 
+    def check_disk_free_space_reserved(self):
+        """
+        Check if we have enough free space left during dump data
+        """
+        if self.skip_disk_space_check:
+            return True
+        disk_partition_size = util.disk_partition_size(self.outfile_dir)
+        free_disk_space = util.disk_partition_free(self.outfile_dir)
+        free_space_factor = self.free_space_reserved_percent / 100
+        free_space_reserved = disk_partition_size * free_space_factor
+        if free_disk_space < free_space_reserved:
+            raise OSCError(
+                "NOT_ENOUGH_SPACE",
+                {
+                    "need": util.readable_size(free_space_reserved),
+                    "avail": util.readable_size(free_disk_space),
+                },
+            )
+
     def validate_post_alter_pk(self):
         """
         As we force (primary) when replaying changes, we have to make sure
@@ -929,6 +964,12 @@ class CopyPayload(Payload):
             # outfile to avoid zero division
             if not self.select_chunk_size:
                 self.select_chunk_size = 1
+            log.info(
+                "TABLE contains {} rows, table_avg_row_len: {} bytes,"
+                "chunk_size: {} bytes, ".format(
+                    result[0]["TABLE_ROWS"], tbl_avg_length, self.chunk_size
+                )
+            )
             log.info("Outfile will contain {} rows each".format(self.select_chunk_size))
             self.eta_chunks = max(
                 int(result[0]["TABLE_ROWS"] / self.select_chunk_size), 1
@@ -1686,7 +1727,6 @@ class CopyPayload(Payload):
         affected_rows = 1
         use_where = False
         printed_chunk = 0
-        disk_partition_size = util.disk_partition_size(self.outfile_dir)
         while affected_rows:
             self.outfile_suffix_end = outfile_suffix
             outfile = "{}.{}".format(self.outfile, outfile_suffix)
@@ -1696,17 +1736,7 @@ class CopyPayload(Payload):
                 self.refresh_range_start()
                 use_where = True
                 outfile_suffix += 1
-            free_disk_space = util.disk_partition_free(self.outfile_dir)
-            free_space_factor = self.free_space_reserved_percent / 100
-            free_space_reserved = disk_partition_size * free_space_factor
-            if free_disk_space < free_space_reserved:
-                raise OSCError(
-                    "NOT_ENOUGH_SPACE",
-                    {
-                        "need": util.readable_size(free_space_reserved),
-                        "avail": util.readable_size(free_disk_space),
-                    },
-                )
+            self.check_disk_free_space_reserved()
             progress_pct = int((float(outfile_suffix) / self.eta_chunks) * 100)
             progress_chunk = int(progress_pct / 10)
             if progress_chunk > printed_chunk and self.eta_chunks > 10:
@@ -1741,7 +1771,7 @@ class CopyPayload(Payload):
         self.execute_sql(sql_string, (filepath,))
         # Delete the outfile once we have the data in new table to free
         # up space as soon as possible
-        if self.rm_file(filepath):
+        if not self.use_sql_wsenv and self.rm_file(filepath):
             util.sync_dir(self.outfile_dir)
             self._cleanup_payload.remove_file_entry(filepath)
 

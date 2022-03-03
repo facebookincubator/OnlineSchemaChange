@@ -316,6 +316,10 @@ class Payload(object):
         if self.is_high_pri_ddl_supported:
             self.execute_sql(sql.set_session_variable("high_priority_ddl"), (1,))
 
+    def enable_sql_wsenv(self):
+        if self.use_sql_wsenv:
+            self.execute_sql(sql.set_session_variable("enable_sql_wsenv"), (1,))
+
     def query_variable(self, var_name, scope):
         """
         Query system variable and return its value.
