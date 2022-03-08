@@ -32,6 +32,127 @@ class CopyPayloadTestCase(unittest.TestCase):
         payload.range_end_vars_array = ["@ID"]
         return payload
 
+    def test_init_table_obj_populate_charset_collation(self):
+        payload = CopyPayload()
+        payload.table_exists = Mock(return_value=True)
+        payload.fetch_table_schema = Mock(
+            return_value=parse_create(
+                """
+                CREATE TABLE a (
+                ID varchar(32) NOT NULL
+                ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+                """
+            )
+        )
+        payload.fetch_partitions = Mock(return_value=None)
+        payload._new_table = parse_create(
+            """
+            CREATE TABLE a (
+            ID varchar(32) NOT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_bin
+            """
+        )
+        payload.get_default_collations = Mock(return_value={"latin1": "latin1_bin"})
+        payload.get_collations = Mock(return_value={"latin1_bin": "latin1"})
+        payload.init_table_obj()
+
+        explicit_obj = parse_create(
+            """
+            CREATE TABLE a (
+            ID varchar(32) CHARACTER SET latin1 COLLATE latin1_bin NOT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_bin
+            """
+        )
+        self.assertEqual(payload._old_table, payload._new_table)
+        self.assertEqual(payload._old_table, explicit_obj)
+
+        # if the charset is not explicit, we won't populate that
+        payload._new_table = parse_create(
+            """
+            CREATE TABLE a (
+            ID varchar(32) NOT NULL
+            ) ENGINE=InnoDB COLLATE=latin1_bin
+            """
+        )
+        payload.init_table_obj()
+        self.assertNotEqual(payload._old_table, payload._new_table)
+
+    def test_populate_charset_collation(self):
+        payload = CopyPayload()
+        payload.get_default_collations = Mock(return_value={"latin1": "latin1_bin"})
+        payload.get_collations = Mock(return_value={"latin1_bin": "latin1"})
+        obj1 = parse_create(
+            """
+            CREATE TABLE a (
+            ID varchar(32) NOT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+            """
+        )
+        payload.populate_charset_collation(obj1)
+        self.assertEqual(obj1.collate, "latin1_bin")
+        self.assertEqual(len(obj1.column_list), 1)
+        self.assertEqual(obj1.column_list[0].charset, "latin1")
+        self.assertEqual(obj1.column_list[0].collate, "latin1_bin")
+
+        payload.get_default_collations = Mock(
+            return_value={"latin1": "latin1_bin", "utf8mb4": "utf8mb4_general_ci"}
+        )
+        payload.get_collations = Mock(
+            return_value={"latin1_bin": "latin1", "utf8mb4_general_ci": "utf8mb4"}
+        )
+        obj2 = parse_create(
+            """
+            CREATE TABLE a (
+            ID varchar(32) COLLATE utf8mb4_general_ci NOT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+            """
+        )
+        payload.populate_charset_collation(obj2)
+        self.assertEqual(obj2.collate, "latin1_bin")
+        self.assertEqual(len(obj2.column_list), 1)
+        self.assertEqual(obj2.column_list[0].charset, "utf8mb4")
+        self.assertEqual(obj2.column_list[0].collate, "utf8mb4_general_ci")
+
+        # would not populate table charset if it's absent
+        obj3 = parse_create(
+            """
+            CREATE TABLE a (
+            ID varchar(32) COLLATE utf8mb4_general_ci NOT NULL
+            ) ENGINE=InnoDB COLLATE=latin1_bin
+            """
+        )
+        payload.populate_charset_collation(obj3)
+        self.assertEqual(obj3.charset, None)
+
+    def test_create_copy_table_populate_charset_collation(self):
+        payload = CopyPayload()
+        payload._new_table = parse_create(
+            """
+            CREATE TABLE a (
+            ID varchar(32) CHARACTER SET latin1 COLLATE latin1_bin NOT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_bin
+            """
+        )
+        payload._old_table = payload._new_table
+        payload.fail_for_implicit_conv = True
+        payload.rm_partition = False
+        payload.mysql_version = Mock(is_mysql8=False)
+        payload.execute_sql = Mock()
+        payload.fetch_partitions = Mock(return_value=None)
+        payload.add_drop_table_entry = Mock()
+        payload.fetch_table_schema = Mock(
+            return_value=parse_create(
+                """
+            CREATE TABLE a (
+            ID varchar(32) NOT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+            """
+            )
+        )
+        payload.get_default_collations = Mock(return_value={"latin1": "latin1_bin"})
+        payload.get_collations = Mock(return_value={"latin1_bin": "latin1"})
+        payload.create_copy_table()
+
     def test_checksum_running_with_proper_idx(self):
         payload = CopyPayload()
         payload._new_table = Mock(indexes=[])
@@ -894,10 +1015,8 @@ class CopyPayloadTestCase(unittest.TestCase):
         default_collate = "latin1_swedish_ci"
         payload.get_default_collations = Mock(return_value={"latin1": default_collate})
         payload.get_collations = Mock(return_value={default_collate: "latin1"})
-        payload.populate_charset_collation_for_80()
-
-        # Collation should not be populated only if charset is provided
-        self.assertEqual(payload._new_table.collate, None)
+        payload.populate_charset_collation(payload._new_table)
+        self.assertEqual(payload._new_table.collate, "latin1_swedish_ci")
 
     def test_auto_table_charset_population(self):
         payload = self.payload_setup()
@@ -910,10 +1029,10 @@ class CopyPayloadTestCase(unittest.TestCase):
         default_collate = "latin1_swedish_ci"
         payload.get_default_collations = Mock(return_value={"latin1": default_collate})
         payload.get_collations = Mock(return_value={default_collate: "latin1"})
-        payload.populate_charset_collation_for_80()
+        payload.populate_charset_collation(payload._new_table)
 
-        # charset should be populated if collate is provided
-        self.assertEqual(payload._new_table.charset, "latin1")
+        # charset should not be populated if only collate is provided
+        self.assertEqual(payload._new_table.charset, None)
 
     def test_auto_removal_of_using_hash(self):
         payload = self.payload_setup()

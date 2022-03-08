@@ -641,6 +641,9 @@ class CopyPayload(Payload):
         # back to a smaller value after OSC
         if self._old_table.auto_increment:
             self._new_table.auto_increment = self._old_table.auto_increment
+        # Populate both old and new tables with explicit charset/collate
+        self.populate_charset_collation(self._old_table)
+        self.populate_charset_collation(self._new_table)
 
     def cleanup_with_force(self):
         """
@@ -1194,61 +1197,42 @@ class CopyPayload(Payload):
             charset_collations["utf8mb4"] = utf8_override[0]["Value"]
         return charset_collations
 
-    def populate_charset_collation_for_80(self):
-        """
-        Populate charset/collation for column and table if one of them is missing.
-        Doing this handle the auto charset/collation population behaviour in 8.0
-        """
+    def populate_charset_collation(self, schema_obj):
         default_collations = self.get_default_collations()
         collation_charsets = self.get_collations()
-        for column in self._new_table.column_list:
-            if column.charset is not None and column.collate is None:
-                default_collate = default_collations.get(column.charset)
-                if default_collate:
-                    column.collate = default_collate
-                    log.warning(
-                        "Overriding collation to be {} for column {} "
-                        "for schema comparison".format(column.collate, column.name)
-                    )
-            # Similar case where collation is specified without charset
-            if column.charset is None and column.collate is not None:
-                charset = collation_charsets.get(column.collate)
-                if charset:
-                    column.charset = charset
-                    log.warning(
-                        "Overriding charset to be {} for column {} "
-                        "for schema comparison".format(column.charset, column.name)
-                    )
+        if schema_obj.charset is not None and schema_obj.collate is None:
+            schema_obj.collate = default_collations.get(schema_obj.charset, None)
+        if schema_obj.charset is None and schema_obj.collate is not None:
+            # Shouldn't reach here, since every schema should have default charset,
+            # otherwise linting will error out. Leave the logic here just in case.
+            # In this case, we would not populate the charset because we actually
+            # want the user to explicit write the charset in the desired schema.
+            # In db, charset is always populated(explicit) by default.
+            schema_obj.charset = None
 
-        # Take care of table property
-        if self._new_table.charset == "utf8mb4" and self._new_table.collate is None:
-            default_collate = default_collations.get(self._new_table.charset)
-            if default_collate:
-                self._new_table.collate = default_collate
-                log.warning(
-                    "Overriding collation to be {} for table for schema comparison".format(
-                        self._new_table.collate
-                    )
-                )
-                text_types = {"CHAR", "VARCHAR", "TEXT", "MEDIUMTEXT", "LONGTEXT"}
-                for column in self._new_table.column_list:
-                    if column.column_type in text_types and column.collate is None:
-                        log.warning(
-                            "Overriding collation to be {} for {} for schema comparison".format(
-                                self._new_table.collate, column.name
-                            )
-                        )
-                        column.collate = default_collate
-
-        if self._new_table.charset is None and self._new_table.collate is not None:
-            charset = collation_charsets.get(self._new_table.collate)
-            if charset:
-                self._new_table.charset = charset
-                log.warning(
-                    "Overriding charset to be {} for table for schema comparison".format(
-                        self._new_table.charset
-                    )
-                )
+        # make column charset & collate explicit
+        # follow https://dev.mysql.com/doc/refman/8.0/en/charset-column.html
+        text_types = {"CHAR", "VARCHAR", "TEXT", "MEDIUMTEXT", "LONGTEXT", "ENUM"}
+        for column in schema_obj.column_list:
+            if column.column_type in text_types:
+                # Check collate first to guarantee the column uses table collate
+                # if column charset is absent. If checking charset first and column
+                # collate is absent, it will use table charset and get default
+                # collate from the database, which does not work for tables with
+                # non default collate settings
+                if column.collate is None:
+                    if column.charset and default_collations.get(column.charset, None):
+                        column.collate = default_collations[column.charset]
+                    else:
+                        column.collate = schema_obj.collate
+                if column.charset is None:
+                    if column.collate and collation_charsets.get(column.collate, None):
+                        column.charset = collation_charsets[column.collate]
+                    else:
+                        # shouldn't reach here, unless charset_to_collate
+                        # or collate_to_charset doesn't have the mapped value
+                        column.charset = schema_obj.charset
+        return schema_obj
 
     def remove_using_hash_for_80(self):
         """
@@ -1287,12 +1271,8 @@ class CopyPayload(Payload):
             # conversion here
             obj_after.partition = self._new_table.partition
             obj_after.partition_config = self._new_table.partition_config
+            self.populate_charset_collation(obj_after)
             if self.mysql_version.is_mysql8:
-                # Pre-populate to avoid collation difference, because 8.0 will
-                # always show collate using the server default when a charset is
-                # defined for text column
-                self.populate_charset_collation_for_80()
-
                 # Remove 'USING HASH' in keys on 8.0, when present in 5.6, as 8.0
                 # removes it by default
                 self.remove_using_hash_for_80()
