@@ -14,11 +14,7 @@ import logging
 
 import MySQLdb
 
-from .. import constant
-from .. import db as db_lib
-from .. import hook
-from .. import sql
-from .. import util
+from .. import constant, db as db_lib, hook, sql, util
 from ..error import OSCError
 from ..mysql_version import MySQLVersion
 from ..sqlparse import parse_create, ParseError

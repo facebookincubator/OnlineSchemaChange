@@ -14,9 +14,7 @@ import time
 
 import MySQLdb
 
-from .. import constant
-from .. import sql
-from .. import util
+from .. import constant, sql, util
 from ..error import OSCError
 from ..sql import escape
 from .base import Payload

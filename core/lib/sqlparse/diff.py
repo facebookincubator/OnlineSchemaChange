@@ -7,10 +7,7 @@ LICENSE file in the root directory of this source tree.
 """
 
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import copy
 import logging
@@ -19,12 +16,12 @@ from enum import Enum
 from osc.lib.sqlparse import CreateParser
 
 from .models import (
-    is_equal,
-    escape,
-    TimestampColumn,
     EnumColumn,
-    SetColumn,
+    escape,
+    is_equal,
     PartitionConfig,
+    SetColumn,
+    TimestampColumn,
 )
 
 log: logging.Logger = logging.getLogger(__name__)

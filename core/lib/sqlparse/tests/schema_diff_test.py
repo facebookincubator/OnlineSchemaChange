@@ -10,10 +10,10 @@ LICENSE file in the root directory of this source tree.
 import unittest
 
 from ...sqlparse import (
-    parse_create,
-    SchemaDiff,
     get_type_conv_columns,
     need_default_ts_bootstrap,
+    parse_create,
+    SchemaDiff,
 )
 
 

@@ -11,8 +11,7 @@ import codecs
 import logging
 import os
 
-from ..lib import util
-from ..lib import constant
+from ..lib import constant, util
 from ..lib.error import OSCError
 from ..lib.payload.copy import CopyPayload
 from .base import CommandBase

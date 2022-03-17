@@ -22,11 +22,11 @@ from .. import constant, sql, util
 from ..error import OSCError
 from ..hook import wrap_hook
 from ..sqlparse import (
+    is_equal,
+    need_default_ts_bootstrap,
     parse_create,
     ParseError,
-    is_equal,
     SchemaDiff,
-    need_default_ts_bootstrap,
 )
 from .base import Payload
 from .cleanup import CleanupPayload
