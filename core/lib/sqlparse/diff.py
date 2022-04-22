@@ -66,7 +66,6 @@ class TableAlterType(BaseAlterType):
     CHANGE_TABLE_COLLATE = "change_table_collate"
     CHANGE_TABLE_COMMENT = "change_table_comment"
     CHANGE_ENGINE = "change_engine"
-    CHANGE_AUTO_INC_VAL = "change_auto_inc_val"  # inplace
 
 
 class PartitionAlterType(BaseAlterType):
@@ -495,9 +494,6 @@ class SchemaDiff(object):
                 elif attr == "engine":
                     self.add_alter_type(TableAlterType.CHANGE_ENGINE)
 
-        # we don't want to alter auto_increment value in db, just record the alter type
-        if not is_equal(self.left.auto_increment, self.right.auto_increment):
-            self.add_alter_type(TableAlterType.CHANGE_AUTO_INC_VAL)
         return segments
 
     def generate_table_partition_operations(
