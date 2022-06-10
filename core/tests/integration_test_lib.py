@@ -64,7 +64,7 @@ def gen_test_cases(
                     get_conn_func=get_conn,
                     ddl_file_list=ddl_list,
                     hook_map=hook_map,
-                    **param_dict
+                    **param_dict,
                 )
                 payload.run()
             except error.OSCError as e:
