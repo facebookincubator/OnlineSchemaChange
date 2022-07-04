@@ -10,10 +10,10 @@ LICENSE file in the root directory of this source tree.
 import unittest
 
 from ...sqlparse import (
-    parse_create,
-    SchemaDiff,
     get_type_conv_columns,
     need_default_ts_bootstrap,
+    parse_create,
+    SchemaDiff,
 )
 
 
@@ -76,9 +76,9 @@ class SQLParserTest(unittest.TestCase):
         tbl_1 = parse_create(sql1)
         tbl_2 = parse_create(sql2)
         tbl_diff = SchemaDiff(tbl_1, tbl_2)
-        # A modified column will be treated as a combination of remove and add
-        self.assertEqual(len(tbl_diff.diffs()["removed"]), 1)
-        self.assertEqual(len(tbl_diff.diffs()["added"]), 1)
+        # A modified column will not be treated as a combination of remove and add
+        self.assertEqual(len(tbl_diff.diffs()["removed"]), 0)
+        self.assertEqual(len(tbl_diff.diffs()["added"]), 0)
 
     def test_column_default_changed(self):
         sql1 = "Create table foo " "( column1 int default 0)"
@@ -86,11 +86,9 @@ class SQLParserTest(unittest.TestCase):
         tbl_1 = parse_create(sql1)
         tbl_2 = parse_create(sql2)
         tbl_diff = SchemaDiff(tbl_1, tbl_2)
-        # A modified column will be treated as a combination of remove and add
-        self.assertEqual(len(tbl_diff.diffs()["removed"]), 1)
-        self.assertEqual(len(tbl_diff.diffs()["added"]), 1)
-        self.assertEqual(tbl_diff.diffs()["removed"][0].default, "0")
-        self.assertEqual(tbl_diff.diffs()["added"][0].default, "1")
+        # A modified column will not be treated as a combination of remove and add
+        self.assertEqual(len(tbl_diff.diffs()["removed"]), 0)
+        self.assertEqual(len(tbl_diff.diffs()["added"]), 0)
 
     def test_index_added(self):
         sql1 = "Create table foo " "( column1 int default 0)"
@@ -397,3 +395,1485 @@ class HelpersTest(unittest.TestCase):
         obj1 = parse_create(sql1)
         obj2 = parse_create(sql2)
         self.assertTrue(need_default_ts_bootstrap(obj1, obj2))
+
+    def sql_statement_partitions_helper(
+        self,
+        old_table_obj,
+        new_table_obj,
+        resultOptions,
+    ):
+        success = False
+        for option in resultOptions:
+            try:
+                self.assertEqual(
+                    option,
+                    SchemaDiff(
+                        old_table_obj,
+                        new_table_obj,
+                        ignore_partition=False,
+                    ).to_sql(),
+                )
+                success = True
+            except Exception:
+                print("ignore exception for {}", option)
+
+        self.assertEqual(True, success)
+
+    def test_sql_statement_to_add_partitions_adds_diff_partitions_with_hash(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY HASH (time_updated) "
+            " PARTITIONS 12"
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY HASH (time_updated) "
+            " PARTITIONS 18"
+        )
+
+        options = {"ALTER TABLE `a` ADD PARTITION PARTITIONS 6"}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_add_partitions_adds_diff_partitions_with_key(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY KEY (time_updated) "
+            " PARTITIONS 12"
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY KEY (time_updated) "
+            " PARTITIONS 18"
+        )
+
+        options = {"ALTER TABLE `a` ADD PARTITION PARTITIONS 6"}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_drop_partitions_drops_diff_partitions_with_hash(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY HASH (time_updated) "
+            " PARTITIONS 12"
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY HASH (time_updated) "
+            " PARTITIONS 10"
+        )
+
+        options = {"ALTER TABLE `a` COALESCE PARTITION 2"}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_no_sql_statement_when_diff_partitions_is_0_with_hash(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY HASH (time_updated) "
+            " PARTITIONS 12"
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY HASH (time_updated) "
+            " PARTITIONS 12"
+        )
+
+        options = {None}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_no_sql_statement_when_diff_partitions_is_0_with_key(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY KEY (time_updated) "
+            " PARTITIONS 12"
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY KEY (time_updated) "
+            " PARTITIONS 12"
+        )
+
+        options = {None}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_drop_partitions_drops_diff_partitions_with_key(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY KEY (time_updated) "
+            " PARTITIONS 12"
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY KEY (time_updated) "
+            " PARTITIONS 10"
+        )
+
+        options = {"ALTER TABLE `a` COALESCE PARTITION 2"}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_add_partitions_adds_both_partitions_with_range(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES LESS THAN (1481313639) ENGINE = InnoDB, "
+            "  PARTITION p2 VALUES LESS THAN (1481400039) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` ADD PARTITION "
+            "(PARTITION p1 VALUES LESS THAN (1481313639),"
+            " PARTITION p2 VALUES LESS THAN (1481400039))",
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_add_partitions_adds_both_partitions_with_range_with_maxvalue(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES LESS THAN (1481313639) ENGINE = InnoDB, "
+            "  PARTITION p2 VALUES LESS THAN MAXVALUE ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` ADD PARTITION "
+            "(PARTITION p1 VALUES LESS THAN (1481313639),"
+            " PARTITION p2 VALUES LESS THAN (MAXVALUE))",
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_add_partitions_adds_both_partitions_with_range_with_maxvalue_and_to_days(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "time_updated datetime NOT NULL primary key) "
+            " PARTITION BY RANGE (to_days(time_updated)) "
+            "(PARTITION p0 VALUES LESS THAN (to_days('2010-11-07')) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "time_updated datetime NOT NULL primary key) "
+            " PARTITION BY RANGE (TO_DAYS(time_updated)) "
+            "(PARTITION p0 VALUES LESS THAN (to_days('2010-11-07')) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES LESS THAN (to_days('2014-11-07')) ENGINE = InnoDB, "
+            "  PARTITION p2 VALUES LESS THAN MAXVALUE ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` ADD PARTITION "
+            "(PARTITION p1 VALUES LESS THAN (to_days('2014-11-07')), "
+            "PARTITION p2 VALUES LESS THAN (MAXVALUE))",
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_add_partitions_adds_both_partitions_with_list_with_maxvalue_and_to_days(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "time_updated datetime NOT NULL primary key) "
+            " PARTITION BY LIST (to_days(time_updated)) "
+            "(PARTITION p0 VALUES IN (to_days('2010-11-07')) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "time_updated datetime NOT NULL primary key) "
+            " PARTITION BY LIST (TO_DAYS(time_updated)) "
+            "(PARTITION p0 VALUES IN (to_days('2010-11-07')) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES IN (to_days('2014-11-07')) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` ADD PARTITION "
+            "(PARTITION p1 VALUES IN (to_days('2014-11-07')))"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_add_partitions_adds_both_partitions_with_range_with_maxvalue_and_timestamp(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "time_updated datetime NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            "(PARTITION p0 VALUES LESS THAN ('2010-11-07') ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "time_updated datetime NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            "(PARTITION p0 VALUES LESS THAN ('2010-11-07') ENGINE = InnoDB, "
+            " PARTITION p1 VALUES LESS THAN ('2014-11-07') ENGINE = InnoDB, "
+            "  PARTITION p2 VALUES LESS THAN MAXVALUE ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` ADD PARTITION "
+            "(PARTITION p1 VALUES LESS THAN ('2014-11-07'), "
+            "PARTITION p2 VALUES LESS THAN (MAXVALUE))",
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_add_partitions_adds_both_partitions_with_comma_list(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p0 VALUES IN (1481313630, 1481313631) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p0 VALUES IN (1481313630, 1481313631) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES IN (1481313639, 1481313640) ENGINE = InnoDB, "
+            "  PARTITION p2 VALUES IN (1481400039, 1481400040) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` ADD PARTITION "
+            "(PARTITION p1 VALUES IN (1481313639, 1481313640),"
+            " PARTITION p2 VALUES IN (1481400039, 1481400040))",
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_add_partitions_adds_both_partitions_with_an_element_list(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES IN (1481313639) ENGINE = InnoDB, "
+            "  PARTITION p2 VALUES IN (1481400039) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` ADD PARTITION "
+            "(PARTITION p1 VALUES IN (1481313639),"
+            " PARTITION p2 VALUES IN (1481400039))",
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_add_partitions_succeeds_with_add_and_drop_partitions_case_1(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p3 VALUES IN (1481313630) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES IN (1481313639) ENGINE = InnoDB, "
+            "  PARTITION p2 VALUES IN (1481400039) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` REORGANIZE PARTITION p0 INTO "
+            "(PARTITION p3 VALUES IN (1481313630), "
+            "PARTITION p1 VALUES IN (1481313639), "
+            "PARTITION p2 VALUES IN (1481400039))"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_add_partitions_succeeds_with_add_and_drop_partitions_case_2(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB, "
+            " PARTITION n0 VALUES IN (1481313640) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES IN (1481313639) ENGINE = InnoDB, "
+            "  PARTITION p2 VALUES IN (1481400039) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` REORGANIZE PARTITION n0 INTO "
+            "(PARTITION p1 VALUES IN (1481313639), "
+            "PARTITION p2 VALUES IN (1481400039))"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_add_partitions_succeeds_with_add_and_drop_partitions_case_3(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p3 VALUES IN (1481313630) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES IN (1481313639) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` REORGANIZE PARTITION p0 INTO "
+            "(PARTITION p3 VALUES IN (1481313630), "
+            "PARTITION p1 VALUES IN (1481313639))"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_add_partitions_succeeds_with_add_and_drop_partitions_case_4(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES IN (1481313639) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p3 VALUES IN (1481313630) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` REORGANIZE PARTITION p0, p1 INTO "
+            "(PARTITION p3 VALUES IN (1481313630))",
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_with_dropped_partitions_drops_both_partitions_in_range(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES LESS THAN (1481313639) ENGINE = InnoDB, "
+            "  PARTITION p2 VALUES LESS THAN (1481400039) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB) "
+        )
+        options = {
+            "ALTER TABLE `a` DROP PARTITION p1, p2",
+            "ALTER TABLE `a` DROP PARTITION p2, p1",
+        }
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_with_dropped_partitions_drops_both_partitions_in_list(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES IN (1481313639) ENGINE = InnoDB, "
+            "  PARTITION p2 VALUES IN (1481400039) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB) "
+        )
+        options = {
+            "ALTER TABLE `a` DROP PARTITION p1, p2",
+            "ALTER TABLE `a` DROP PARTITION p2, p1",
+        }
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_reorganize_partitions_splits_a_partition_case1(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p0 VALUES IN (1481313630, 1481313625) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p0 VALUES IN (1481313625) ENGINE = InnoDB, "
+            " PARTITION p2 VALUES IN (1481313630) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` REORGANIZE PARTITION p0 INTO "
+            "(PARTITION p0 VALUES IN (1481313625),"
+            " PARTITION p2 VALUES IN (1481313630))"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_reorganize_partitions_splits_a_partition_case2(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p1 VALUES LESS THAN (1481313625) ENGINE = InnoDB, "
+            " PARTITION p2 VALUES LESS THAN (1481313630) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` REORGANIZE PARTITION p0 INTO "
+            "(PARTITION p1 VALUES LESS THAN (1481313625),"
+            " PARTITION p2 VALUES LESS THAN (1481313630))"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_reorganize_partition_list_splits_a_partition_case3(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p0 VALUES IN (1481313622) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES IN (1481313630) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p1 VALUES IN (1481313622) ENGINE = InnoDB, "
+            " PARTITION p2 VALUES IN (1481313630) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` REORGANIZE PARTITION p0, p1 INTO "
+            "(PARTITION p1 VALUES IN (1481313622),"
+            " PARTITION p2 VALUES IN (1481313630))"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_reorganize_partition_range_splits_a_partition_case3(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313622) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES LESS THAN (1481313630) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p1 VALUES LESS THAN (1481313620) ENGINE = InnoDB, "
+            " PARTITION p2 VALUES LESS THAN (1481313630) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` REORGANIZE PARTITION p0, p1 INTO "
+            "(PARTITION p1 VALUES LESS THAN (1481313620),"
+            " PARTITION p2 VALUES LESS THAN (1481313630))"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_reorganize_partition_list_merges_a_partition_with_existing_values(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p0 VALUES IN (1481313622) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES IN (1481313630) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p1 VALUES IN (1481313622, 1481313630) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` REORGANIZE PARTITION p0, p1 INTO "
+            "(PARTITION p1 VALUES IN (1481313622, 1481313630))"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_reorganize_partition_range_merges_a_partition_case1(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313622) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES LESS THAN (1481313630) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` REORGANIZE PARTITION p0, p1 INTO "
+            "(PARTITION p0 VALUES LESS THAN (1481313630))"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_reorganize_partition_range_merges_partition_case3(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313622) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES LESS THAN (1481313630) ENGINE = InnoDB, "
+            " PARTITION p2 VALUES LESS THAN (1481313631) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB, "
+            " PARTITION p3 VALUES LESS THAN MAXVALUE ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` REORGANIZE PARTITION p0, p1, p2 INTO "
+            "(PARTITION p0 VALUES LESS THAN (1481313630), "
+            "PARTITION p3 VALUES LESS THAN (MAXVALUE))"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_reorganize_partition_range_merges_partition_case2(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313622) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES LESS THAN (1481313630) ENGINE = InnoDB, "
+            " PARTITION p2 VALUES LESS THAN (1481313631) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB, "
+            " PARTITION p3 VALUES LESS THAN (1481313631) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` REORGANIZE PARTITION p0, p1, p2 INTO "
+            "(PARTITION p0 VALUES LESS THAN (1481313630), "
+            "PARTITION p3 VALUES LESS THAN (1481313631))"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_reorganize_partition_range_does_not_merge_partition_when_inner_range_is_inequal(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313622) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES LESS THAN (1481313625) ENGINE = InnoDB, "
+            " PARTITION p2 VALUES LESS THAN (1481313630) ENGINE = InnoDB, "
+            " PARTITION p3 VALUES LESS THAN (1481313631) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313622) ENGINE = InnoDB, "
+            " PARTITION p2 VALUES LESS THAN (1481313628) ENGINE = InnoDB, "
+            " PARTITION p3 VALUES LESS THAN (1481313631) ENGINE = InnoDB) "
+        )
+
+        options = {None}
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_reorganize_partition_range_does_not_merge_partition_when_last_range_is_smaller(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313622) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES LESS THAN (1481313625) ENGINE = InnoDB, "
+            " PARTITION p2 VALUES LESS THAN (1481313630) ENGINE = InnoDB, "
+            " PARTITION p3 VALUES LESS THAN (1481313631) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313622) ENGINE = InnoDB, "
+            " PARTITION p2 VALUES LESS THAN (1481313628) ENGINE = InnoDB, "
+            " PARTITION p3 VALUES LESS THAN (1481313630) ENGINE = InnoDB) "
+        )
+
+        options = {None}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_reorganize_partition_range_does_not_merge_partition_when_inbetween_range_is_smaller(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313622) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES LESS THAN (1481313625) ENGINE = InnoDB, "
+            " PARTITION p2 VALUES LESS THAN (1481313628) ENGINE = InnoDB, "
+            " PARTITION p3 VALUES LESS THAN (1481313631) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313622) ENGINE = InnoDB, "
+            " PARTITION p2 VALUES LESS THAN (1481313629) ENGINE = InnoDB, "
+            " PARTITION p3 VALUES LESS THAN (1481313631) ENGINE = InnoDB) "
+        )
+
+        options = {None}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_reorganize_partition_list_merges_a_partition_with_additional_values(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p0 VALUES IN (1481313622) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES IN (1481313630) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p1 VALUES IN (1481313622, 1481313630, 1481313631) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` REORGANIZE PARTITION p0, p1 INTO "
+            "(PARTITION p1 VALUES IN (1481313622, 1481313630, 1481313631))"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_reorganize_partition_range_merges_a_partition_case4(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313622) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES LESS THAN (1481313623) ENGINE = InnoDB, "
+            " PARTITION p2 VALUES LESS THAN (1481313630) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313622) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES LESS THAN (1481313631) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` REORGANIZE PARTITION p1, p2 INTO "
+            "(PARTITION p1 VALUES LESS THAN (1481313631))"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_reorganize_partition_list_reshuffles_a_partition(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p0 VALUES IN (1481313622) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES IN (1481313630) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p1 VALUES IN (1481313622) ENGINE = InnoDB, "
+            " PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` REORGANIZE PARTITION p0, p1 INTO "
+            "(PARTITION p1 VALUES IN (1481313622), "
+            "PARTITION p0 VALUES IN (1481313630))"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_reorganize_partition_range_reshuffles_partitions(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313622) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES LESS THAN (1481313630) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY RANGE (time_updated) "
+            " (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES LESS THAN (1481313635) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` REORGANIZE PARTITION p0, p1 INTO "
+            "(PARTITION p0 VALUES LESS THAN (1481313630), "
+            "PARTITION p1 VALUES LESS THAN (1481313635))"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_with_dropped_and_renamed_partitions_is_valid_in_list(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES IN (1481313639) ENGINE = InnoDB, "
+            "  PARTITION p2 VALUES IN (1481400039) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p3 VALUES IN (1481313630) ENGINE = InnoDB) "
+        )
+        options = {
+            "ALTER TABLE `a` REORGANIZE PARTITION p0, p1, p2 INTO "
+            "(PARTITION p3 VALUES IN (1481313630))",
+        }
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_change_partition_type_from_hash_to_range(
+        self,
+    ):
+        """
+        Make sure a partitioned shadow table will always be dropped by
+        partitions instead of the whole table
+        """
+
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            " PARTITION BY HASH (time_updated) "
+            " PARTITIONS 12"
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            "PARTITION BY RANGE (time_updated) "
+            "(PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` PARTITION BY RANGE (time_updated) (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB)"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_change_partition_type_from_key_to_range(
+        self,
+    ):
+        """
+        Make sure a partitioned shadow table will always be dropped by
+        partitions instead of the whole table
+        """
+
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            " PARTITION BY KEY (time_updated) "
+            " PARTITIONS 12"
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            "PARTITION BY RANGE (time_updated) "
+            "(PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` PARTITION BY RANGE (time_updated) (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB)"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_change_partition_type_from_list_to_range(
+        self,
+    ):
+        """
+        Make sure a partitioned shadow table will always be dropped by
+        partitions instead of the whole table
+        """
+
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            " PARTITION BY LIST (time_updated) "
+            " (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB, "
+            " PARTITION p1 VALUES IN (1481313639) ENGINE = InnoDB, "
+            "  PARTITION p2 VALUES IN (1481400039) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            "PARTITION BY RANGE (time_updated) "
+            "(PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` PARTITION BY RANGE (time_updated) (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB)"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_change_partition_type_from_range_to_list(
+        self,
+    ):
+        """
+        Make sure a partitioned shadow table will always be dropped by
+        partitions instead of the whole table
+        """
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            "PARTITION BY RANGE (time_updated) "
+            "(PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            "PARTITION BY LIST (time_updated) "
+            "(PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` PARTITION BY LIST (time_updated) (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB)"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_change_partition_type_from_hash_to_list(
+        self,
+    ):
+        """
+        Make sure a partitioned shadow table will always be dropped by
+        partitions instead of the whole table
+        """
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            " PARTITION BY HASH (time_updated) "
+            " PARTITIONS 12"
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            "PARTITION BY LIST (time_updated) "
+            "(PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` PARTITION BY LIST (time_updated) (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB)"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_change_partition_type_from_key_to_list(
+        self,
+    ):
+        """
+        Make sure a partitioned shadow table will always be dropped by
+        partitions instead of the whole table
+        """
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            " PARTITION BY KEY (time_updated) "
+            " PARTITIONS 12"
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            "PARTITION BY LIST (time_updated) "
+            "(PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` PARTITION BY LIST (time_updated) (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB)"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_change_partition_type_from_list_to_key(
+        self,
+    ):
+        """
+        Make sure a partitioned shadow table will always be dropped by
+        partitions instead of the whole table
+        """
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            "PARTITION BY LIST (time_updated) "
+            "(PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            "PARTITION BY KEY (time_updated) "
+            "PARTITIONS 12"
+        )
+
+        options = {"ALTER TABLE `a` PARTITION BY KEY (time_updated) PARTITIONS 12"}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_change_partition_type_from_list_to_hash(
+        self,
+    ):
+        """
+        Make sure a partitioned shadow table will always be dropped by
+        partitions instead of the whole table
+        """
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            "PARTITION BY LIST (time_updated) "
+            "(PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            "PARTITION BY HASH (time_updated) "
+            "PARTITIONS 12"
+        )
+
+        options = {"ALTER TABLE `a` PARTITION BY HASH (time_updated) PARTITIONS 12"}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_change_partition_type_from_hash_to_key(
+        self,
+    ):
+        """
+        Make sure a partitioned shadow table will always be dropped by
+        partitions instead of the whole table
+        """
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            "PARTITION BY HASH (time_updated) "
+            "PARTITIONS 12"
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            "PARTITION BY KEY (time_updated) "
+            "PARTITIONS 12"
+        )
+
+        options = {"ALTER TABLE `a` PARTITION BY KEY (time_updated) PARTITIONS 12"}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_change_partition_type_from_key_to_hash(
+        self,
+    ):
+        """
+        Make sure a partitioned shadow table will always be dropped by
+        partitions instead of the whole table
+        """
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            "PARTITION BY KEY (time_updated) "
+            "PARTITIONS 12"
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            "PARTITION BY HASH (time_updated) "
+            "PARTITIONS 12"
+        )
+
+        options = {"ALTER TABLE `a` PARTITION BY HASH (time_updated) PARTITIONS 12"}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_change_partition_type_from_range_to_key(
+        self,
+    ):
+        """
+        Make sure a partitioned shadow table will always be dropped by
+        partitions instead of the whole table
+        """
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            "PARTITION BY RANGE (time_updated) "
+            "(PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            "PARTITION BY KEY (time_updated) "
+            "PARTITIONS 12"
+        )
+
+        options = {"ALTER TABLE `a` PARTITION BY KEY (time_updated) PARTITIONS 12"}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_change_partition_type_from_range_to_hash(
+        self,
+    ):
+        """
+        Make sure a partitioned shadow table will always be dropped by
+        partitions instead of the whole table
+        """
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            "PARTITION BY RANGE (time_updated) "
+            "(PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int primary key, "
+            "`time_updated` bigint(20) unsigned NOT NULL) "
+            "PARTITION BY HASH (time_updated) "
+            "PARTITIONS 12"
+        )
+
+        options = {"ALTER TABLE `a` PARTITION BY HASH (time_updated) PARTITIONS 12"}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_change_partition_type_from_none_to_hash(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            "PARTITION BY HASH (time_updated) "
+            "PARTITIONS 12"
+        )
+
+        options = {"ALTER TABLE `a` PARTITION BY HASH (time_updated) PARTITIONS 12"}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_change_partition_type_from_none_to_key(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            "PARTITION BY KEY (time_updated) "
+            "PARTITIONS 12"
+        )
+
+        options = {"ALTER TABLE `a` PARTITION BY KEY (time_updated) PARTITIONS 12"}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_change_partition_type_from_none_to_range(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            "PARTITION BY RANGE (time_updated) "
+            "(PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` PARTITION BY RANGE (time_updated) (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB)"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_change_partition_type_from_none_to_list(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            "PARTITION BY LIST (time_updated) "
+            "(PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB) "
+        )
+
+        options = {
+            "ALTER TABLE `a` PARTITION BY LIST (time_updated) (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB)"
+        }
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_change_partition_type_from_hash_to_none(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            "PARTITION BY HASH (time_updated) "
+            "PARTITIONS 12"
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+        )
+
+        options = {"ALTER TABLE `a` REMOVE PARTITIONING"}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_change_partition_type_from_key_to_none(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            "PARTITION BY KEY (time_updated) "
+            "PARTITIONS 12"
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+        )
+
+        options = {"ALTER TABLE `a` REMOVE PARTITIONING"}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_change_partition_type_from_hash_to_zero_partitions(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            "PARTITION BY HASH (time_updated) "
+            "PARTITIONS 12"
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            "PARTITION BY HASH (time_updated) "
+            "PARTITIONS 0"
+        )
+
+        options = {None}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_change_partition_type_from_key_to_zero_partitions(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            "PARTITION BY KEY (time_updated) "
+            "PARTITIONS 12"
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            "PARTITION BY KEY (time_updated) "
+            "PARTITIONS 0"
+        )
+
+        options = {None}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_change_partition_type_from_list_to_none(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            "PARTITION BY LIST (time_updated) "
+            "(PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+        )
+
+        options = {"ALTER TABLE `a` REMOVE PARTITIONING"}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_sql_statement_to_change_partition_type_from_range_to_none(
+        self,
+    ):
+        old_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+            "PARTITION BY RANGE (time_updated) "
+            "(PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB) "
+        )
+        new_table_obj = parse_create(
+            " CREATE TABLE a "
+            "( ID int, "
+            "`time_updated` bigint(20) unsigned NOT NULL primary key) "
+        )
+
+        options = {"ALTER TABLE `a` REMOVE PARTITIONING"}
+
+        self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)

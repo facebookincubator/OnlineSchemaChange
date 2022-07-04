@@ -325,6 +325,11 @@ class OSCError(Exception):
                 "deployment method for this"
             ),
         },
+        "CREATE_TRIGGER_ERROR": {
+            "code": 153,
+            "desc": ("Error when creating triggers, msg: {msg}"),
+        },
+        # reserved for special internal errors
         "ASSERTION_ERROR": {
             "code": 249,
             "desc": ("Assertion error. \n" "Expected: {expected}\n" "Got     : {got}"),
@@ -351,6 +356,14 @@ class OSCError(Exception):
         "GENERIC_MYSQL_ERROR": {
             "code": 254,
             "desc": ('MySQL Error during stage "{stage}": [{errnum}] {errmsg}'),
+        },
+        "OUTFILE_DIR_NOT_SPECIFIED_WSENV": {
+            "code": 255,
+            "desc": ("--outfile-dir must be specified when using wsenv"),
+        },
+        "SKIP_DISK_SPACE_CHECK_VALUE_INCOMPATIBLE_WSENV": {
+            "code": 256,
+            "desc": ("-skip-disk-space-check must be true when using wsenv"),
         },
     }
 

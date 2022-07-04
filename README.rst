@@ -1,6 +1,10 @@
 OnlineSchemaChange
 ==================
 
+.. image:: https://img.shields.io/badge/Support-Ukraine-FFD500?style=flat&labelColor=005BBB
+   :alt: Support Ukraine - Help Provide Humanitarian Aid to Ukraine.
+   :target: https://opensource.fb.com/support-ukraine
+
 OnlineSchemaChange is a tool for making schema changes for MySQL tables
 in a non-blocking way
 

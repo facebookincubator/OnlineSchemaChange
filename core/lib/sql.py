@@ -71,18 +71,6 @@ table_avg_row_len = (
     "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s"
 )
 
-column_diff = (
-    " SELECT c1.COLUMN_NAME "
-    " FROM information_schema.COLUMNS c1 "
-    " LEFT JOIN ("
-    "   SELECT * FROM information_schema.COLUMNS "
-    "   WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s"
-    " ) c2 ON c1.COLUMN_NAME = c2.COLUMN_NAME "
-    " WHERE c1.TABLE_NAME = %s AND "
-    "   c1.TABLE_SCHEMA = %s AND "
-    "   c2.COLUMN_NAME IS NULL"
-)
-
 partition_method = (
     "SELECT MIN(PARTITION_METHOD) pm "
     "FROM information_schema.PARTITIONS "

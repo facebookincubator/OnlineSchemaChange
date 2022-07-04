@@ -7,19 +7,20 @@ LICENSE file in the root directory of this source tree.
 """
 
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
+from __future__ import absolute_import, division, print_function, unicode_literals
 
-from .create import parse_create, ParseError, CreateParser
+from .create import CreateParser, parse_create, ParseError, PartitionParseError
 from .diff import (
     ColAlterType,
-    SchemaDiff,
     get_type_conv_columns,
+    IndexAlterType,
+    INSTANT_DDLS,
     need_default_ts_bootstrap,
+    NewMysql80FeatureAlterType,
+    PartitionAlterType,
+    SchemaDiff,
 )
-from .models import is_equal, Column, TableIndex, Table
+from .models import Column, is_equal, Table, TableIndex
 
 __all__ = [
     "parse_create",
@@ -33,4 +34,10 @@ __all__ = [
     "TableIndex",
     "Table",
     "CreateParser",
+    "PartitionParseError",
+    "ColAlterType",
+    "PartitionAlterType",
+    "NewMysql80FeatureAlterType",
+    "INSTANT_DDLS",
+    "IndexAlterType",
 ]

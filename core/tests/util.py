@@ -9,7 +9,7 @@ LICENSE file in the root directory of this source tree.
 
 import unittest
 
-from ..lib.util import RangeChain, dirname_for_db
+from ..lib.util import dirname_for_db, RangeChain
 
 
 class RangeChainTest(unittest.TestCase):

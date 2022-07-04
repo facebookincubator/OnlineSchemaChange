@@ -18,12 +18,12 @@ from ..lib.payload.direct import DirectPayload
 
 
 class BasePayloadTestCase(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self._payload.ddl_file_list = ["ddl_file1.sql", "ddl_file2.sql"]
 
 
 class DirectPayloadDeadMySQL(BasePayloadTestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         db_lib.MySQLSocketConnection = MagicMock(
             side_effect=MySQLdb.OperationalError(2013, "mock unconnectable")
         )
@@ -40,7 +40,7 @@ class DirectPayloadDeadMySQL(BasePayloadTestCase):
 
 
 class DirectPayloadSQLFailed(BasePayloadTestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         db_lib.MySQLSocketConnection.query = MagicMock(
             side_effect=MySQLdb.OperationalError(2013, "transaction failed")
         )

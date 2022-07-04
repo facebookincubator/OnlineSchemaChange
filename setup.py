@@ -11,7 +11,7 @@ import logging
 import sys
 
 import pkg_resources
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 install_requires = [
     "pyparsing",

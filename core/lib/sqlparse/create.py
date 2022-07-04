@@ -7,30 +7,33 @@ LICENSE file in the root directory of this source tree.
 """
 
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
+from typing import List, Set, Union
 
 from pyparsing import (
-    Word,
-    Literal,
-    Optional,
-    nums,
-    Group,
-    CaselessLiteral,
     alphanums,
-    ZeroOrMore,
-    QuotedString,
+    CaselessLiteral,
     Combine,
+    delimitedList,
+    Group,
+    Literal,
+    nestedExpr,
+    nums,
+    OneOrMore,
+    Optional,
     ParseException,
+    ParseResults,
+    QuotedString,
+    Regex,
+    replaceWith,
     SkipTo,
     StringEnd,
     upcaseTokens,
-    nestedExpr,
-    delimitedList,
+    White,
+    Word,
+    ZeroOrMore,
 )
 
 from . import models
@@ -38,7 +41,7 @@ from . import models
 log = logging.getLogger(__name__)
 
 
-__all__ = ["parse_create", "ParseError"]
+__all__ = ["parse_create", "ParseError", "PartitionParseError"]
 
 
 class ParseError(Exception):
@@ -49,6 +52,10 @@ class ParseError(Exception):
 
     def __str__(self):
         return "Line: {}, Column: {}\n {}".format(self._line, self._column, self._msg)
+
+
+class PartitionParseError(Exception):
+    pass
 
 
 class CreateParser(object):
@@ -165,6 +172,7 @@ class CreateParser(object):
         | CaselessLiteral("LONGBLOB")
         | CaselessLiteral("BOOLEAN")
         | CaselessLiteral("BOOL")
+        | CaselessLiteral("JSON")
     )("column_type")
     OPTIONAL_COL_LEN = Optional(COL_LEN)
     BINARY = Optional(CaselessLiteral("BINARY"))("binary")
@@ -268,6 +276,7 @@ class CreateParser(object):
     DOCUMENT_PATH = Combine(
         COLUMN_NAME_WITH_QUOTE + ZeroOrMore(DOT + COLUMN_NAME_WITH_QUOTE)
     )
+    INDEX_ORDER = (CaselessLiteral("ASC") | CaselessLiteral("DESC"))("index_order")
     IDX_COL = (
         Group(
             DOCUMENT_PATH
@@ -275,7 +284,13 @@ class CreateParser(object):
             + (CaselessLiteral("INT") | CaselessLiteral("STRING"))
             + Optional(COL_LEN, default="")
         )
-    ) | (Group(COLUMN_NAME + Optional(COL_LEN, default="")))
+    ) | (
+        Group(
+            COLUMN_NAME
+            + Optional(COL_LEN, default="")
+            + Optional(INDEX_ORDER, default="ASC")
+        )
+    )
 
     # Primary key section
     COL_NAME_LIST = Group(IDX_COL + ZeroOrMore(COMMA + IDX_COL))
@@ -431,9 +446,45 @@ class CreateParser(object):
 
     # e.g 1, 2, 3
     # and 'a', 'b', 'c'
+    # and `NULL`
+    # and _binary 0x123aBc
+    HEX_VALUE = Literal("0x") + OneOrMore(Regex("[0-9a-fA-F]"))
+
+    day = Word(nums)
+    month = Word(nums)
+    year = Word(nums)
+    dateday = Combine(year + "-" + month + "-" + day)
+    to_days = Combine("to_days('" + dateday + "')")
+
     PART_VALUE_LIST = Group(
         LEFT_PARENTHESES
-        + (delimitedList(Word(nums)) | delimitedList(QUOTED_STRING_WITH_QUOTE))
+        + (
+            delimitedList(
+                Word(nums)  # e.g. (1, 2, 3)
+                | QUOTED_STRING_WITH_QUOTE  # e.g. ('a', 'b')
+                | CaselessLiteral("NULL").setParseAction(upcaseTokens)  # e.g. (NULL)
+                | to_days  # e.g. to_days('2010-11-07')
+            )
+            | (
+                LEFT_PARENTHESES
+                + (
+                    delimitedList(
+                        QUOTED_STRING_WITH_QUOTE
+                        | CaselessLiteral("NULL").setParseAction(upcaseTokens)
+                    )
+                )
+                + RIGHT_PARENTHESES
+            )(
+                "is_tuple"
+            )  # e.g. (("a", "b")), See test_parts_list_in_tuple15
+            # e.g. `_binary      0xdeadbeef123`, See test_parts_list_by_cols_with_binary17
+            # turns to: `_BINARY 0xdeadbeef123`
+            | Combine(
+                CaselessLiteral("_binary").setParseAction(upcaseTokens)
+                + White(" ").setParseAction(replaceWith(" "))
+                + HEX_VALUE
+            )
+        )
         + RIGHT_PARENTHESES
     )
     PART_VALUES_IN = (CaselessLiteral("IN").suppress() + PART_VALUE_LIST)("p_values_in")
@@ -454,10 +505,18 @@ class CreateParser(object):
     # Options for partition definitions - engine/comments only for now.
     # DO NOT re-use QUOTED_STRING_WITH_QUOTE for these -
     # *seems* to trigger a pyparsing bug?
-    P_ENGINE = QuotedString(
-        quoteChar="'", escQuote="''", escChar="\\", unquoteResults=False
-    ) | QuotedString(
-        quoteChar='"', escQuote='""', escChar="\\", multiline=True, unquoteResults=False
+    P_ENGINE = (
+        QuotedString(quoteChar="'", escQuote="''", escChar="\\", unquoteResults=True)
+        | QuotedString(
+            quoteChar='"',
+            escQuote='""',
+            escChar="\\",
+            multiline=False,
+            unquoteResults=True,
+        )
+        | CaselessLiteral("innodb")
+        | CaselessLiteral("ndb")
+        | CaselessLiteral("rocksdb")
     )
 
     P_COMMENT = QuotedString(
@@ -490,17 +549,21 @@ class CreateParser(object):
         )
     )
 
-    # No fancy expressions yet, just a list of cols for now.
+    # No fancy expressions yet, just a list of cols OR something nested in ()
     PART_EXPR = (
-        LEFT_PARENTHESES
-        + delimitedList(
-            QuotedString(
-                quoteChar="`", escQuote="``", escChar="\\", unquoteResults=True
+        (
+            LEFT_PARENTHESES
+            + delimitedList(
+                QuotedString(
+                    quoteChar="`", escQuote="``", escChar="\\", unquoteResults=True
+                )
+                | OBJECT_NAME
             )
-            | OBJECT_NAME
-        )("p_expr")
-        + RIGHT_PARENTHESES
-    )
+            + RIGHT_PARENTHESES
+        )("via_list")
+        # `RANGE expr` support (test_parts_range_with_expr)
+        | nestedExpr()("via_nested_expr")
+    )("p_expr")
 
     SUBTYPE_LINEAR = (Optional(CaselessLiteral("LINEAR")).setParseAction(upcaseTokens))(
         "p_subtype"
@@ -570,11 +633,19 @@ class CreateParser(object):
     @classmethod
     def gen_partitions_parser(cls):
         # Init full parts matcher only on demand
+        # invalid_partition_prefix - used to detect any invalid prefix
+        # attached to the number of partitions. The prefix is used
+        # later on to flag invalid schemas.
         return (
-            CaselessLiteral("PARTITION")
+            Combine(Optional(Literal("/*!") + Word(nums))).suppress()
+            + CaselessLiteral("PARTITION")
             + CaselessLiteral("BY")
             + (cls.PTYPE_HASH | cls.PTYPE_KEY | cls.PTYPE_RANGE | cls.PTYPE_LIST)
-            + Optional(CaselessLiteral("PARTITIONS") + Word(nums)("num_partitions"))
+            + Optional(
+                CaselessLiteral("PARTITIONS")
+                + Optional(Combine(Regex("[^0-9]")))("invalid_partition_prefix")
+                + Word(nums)("num_partitions")
+            )
             + Optional(
                 cls.LEFT_PARENTHESES
                 + cls.PART_DEFS("part_defs")
@@ -589,7 +660,7 @@ class CreateParser(object):
         return cls._partitions_parser
 
     @classmethod
-    def parse_partitions(cls, parts):
+    def parse_partitions(cls, parts) -> ParseResults:
         try:
             return cls.get_partitions_parser().parseString(parts)
         except ParseException as e:
@@ -628,6 +699,19 @@ class CreateParser(object):
             # pyparsing will convert newline into two after parsing. So we
             # need to dedup here
             table.partition = result.partition.replace("\n\n", "\n")
+            try:
+                presult = cls.parse_partitions(table.partition)
+                table.partition_config = cls.partition_to_model(presult)
+            except ParseException as e:
+                raise ParseError(
+                    f"Failed to parse partitions config, unsupported syntax {e},"
+                    f" line: {e.line} col {e.column}"
+                )
+            except PartitionParseError as mpe:
+                raise ParseError(
+                    f"Failed to init model from partitions config: {mpe}, "
+                    f"ParseResult: {presult.dump()}\nRaw: {table.partition}"
+                )
         if "constraint" in result:
             table.constraint = result.constraint
         for column_def in result.column_list:
@@ -653,6 +737,8 @@ class CreateParser(object):
 
             column.name = column_def.column_name
             column.column_type = column_def.column_type
+            if column.column_type == "JSON":
+                table.has_80_features = True
 
             # We need to check whether each column property exist in the
             # create table string, because not specifying a "COMMENT" is
@@ -699,9 +785,12 @@ class CreateParser(object):
                 raise ParseError("Multiple primary keys defined")
             table.primary_key.name = "PRIMARY"
             for col in result.pri_list:
-                for name, length in col:
+                for name, length, order in col:
                     idx_col = models.IndexColumn()
                     idx_col.name = name
+                    idx_col.order = order
+                    if order.upper() == "DESC":
+                        table.has_80_features = True
                     if length:
                         idx_col.length = length
                     table.primary_key.column_list.append(idx_col)
@@ -734,15 +823,183 @@ class CreateParser(object):
                                 idx_col.length = length
                             idx.column_list.append(idx_col)
                         else:
-                            (name, length) = col_def
+                            (name, length, order) = col_def
                             idx_col = models.IndexColumn()
                             idx_col.name = name
+                            idx_col.order = order
+                            if order.upper() == "DESC":
+                                table.has_80_features = True
                             if length:
                                 idx_col.length = length
                             idx.column_list.append(idx_col)
                 table.indexes.append(idx)
         return table
 
+    @classmethod
+    def partition_to_model(cls, presult: ParseResults) -> models.PartitionConfig:
+        # Convert ParseResults from parsing a partitions config into a
+        # model. This can throw a PartitionParseError
+        mytype = presult.get("part_type", None)
+        mysubtype = presult.get("p_subtype", None)
+
+        if (
+            (not mytype and not mysubtype)
+            or mytype not in models.PartitionConfig.KNOWN_PARTITION_TYPES
+            or (
+                mysubtype is not None
+                and mysubtype not in models.PartitionConfig.KNOWN_PARTITION_SUBTYPES
+            )
+        ):
+            raise PartitionParseError(
+                "partition_to_model Cannot init mode.PartitionConfig: "
+                f"type {mytype} subtype {mysubtype}"
+            )
+
+        pc = models.PartitionConfig()
+
+        pc.part_type = mytype
+        pc.p_subtype = mysubtype
+
+        def _strip_ticks(fields: Union[str, List[str]]) -> Union[str, List[str]]:
+            if isinstance(fields, str):
+                return fields.replace("`", "")
+            return [_strip_ticks(f) for f in fields]
+
+        if presult.get("invalid_partition_prefix"):
+            raise PartitionParseError(
+                f"Partition type {pc.part_type} cannot "
+                "have invalid partition number prefix defined"
+            )
+
+        # set fields_or_expr, full_type
+        if (
+            pc.part_type == models.PartitionConfig.PTYPE_LIST
+            or pc.part_type == models.PartitionConfig.PTYPE_RANGE
+        ):
+            pc.num_partitions = len(presult.get("part_defs", []))
+            if pc.num_partitions == 0:
+                raise PartitionParseError(
+                    f"Partition type {pc.part_type} MUST have partitions defined"
+                )
+            pc.part_defs = _process_partition_definitions(presult.part_defs)
+            if not pc.p_subtype:
+                pc.full_type = pc.part_type
+                pc.via_nested_expr = (
+                    "via_nested_expr" in presult and "via_list" not in presult
+                )
+                pc.fields_or_expr = presult.p_expr.asList()
+
+                if pc.via_nested_expr:
+                    # strip backticks e.g. to_days(`date`) -> [to_days, [date]]
+                    pc.fields_or_expr = _strip_ticks(pc.fields_or_expr)
+            else:
+                pc.full_type = f"{pc.part_type} {pc.p_subtype}"
+                pc.fields_or_expr = presult.field_list.asList()
+        elif pc.part_type == models.PartitionConfig.PTYPE_KEY:
+            pc.full_type = (
+                pc.part_type if not pc.p_subtype else f"{pc.p_subtype} {pc.part_type}"
+            )
+            pc.num_partitions = int(presult.get("num_partitions", 1))
+            fl = presult.get("field_list", None)
+            pc.fields_or_expr = fl.asList() if fl else []
+            # This is the only place p_algo is valid. algorithm_for_key
+            algo_result = presult.get("p_algo")
+            if algo_result and len(algo_result.asList()) > 0:
+                pc.algorithm_for_key = int(algo_result.asList()[0])
+        elif pc.part_type == models.PartitionConfig.PTYPE_HASH:
+            pc.full_type = (
+                pc.part_type if not pc.p_subtype else f"{pc.p_subtype} {pc.part_type}"
+            )
+            pc.num_partitions = int(presult.get("num_partitions", 1))
+            hexpr = presult.get("p_hash_expr", None)
+            if not hexpr:
+                raise PartitionParseError(
+                    f"Partition type {pc.part_type} MUST have p_hash_expr defined"
+                )
+            pc.fields_or_expr = _strip_ticks(hexpr.asList())
+        else:
+            # unreachable since we checked for all part_types earlier.
+            raise PartitionParseError(f"Unknown partition type {pc.part_type}")
+
+        # We avoid escaping fields/expr in partitions with backticks since
+        # its tricky to distinguish between a list of columns and an expression
+        # e.g. unix_timestamp(ts) - ts could be escaped but unix_ts cannot.
+        # Our parser will strip out backticks wherever possible. For nestedExpr
+        # usecases, this is done via _strip_ticks instead.
+        def _has_backticks(fields: Union[str, List[str]]) -> bool:
+            if isinstance(fields, list):
+                return any(_has_backticks(f) for f in fields)
+            return "`" in fields if isinstance(fields, str) else False
+
+        if _has_backticks(pc.fields_or_expr):
+            raise PartitionParseError(
+                f"field_or_expr cannot have backticks {pc.fields_or_expr}"
+            )
+
+        if len(pc.part_defs) > 0 and any(
+            pd.pdef_name.upper() == "NULL" for pd in pc.part_defs
+        ):
+            # We will disallow this even if raw sql passed in as e.g.
+            # PARTITION `null` VALUES IN ...
+            raise PartitionParseError("Partition names may not be literal `null`")
+
+        return pc
+
 
 def parse_create(sql):
     return CreateParser.parse(sql)
+
+
+def _process_partition_definitions(
+    partdefs: List[ParseResults],
+) -> List[models.PartitionDefinitionEntry]:
+    # Populates partition definitions, applicable only for RANGE/LIST types
+    res: List[models.PartitionDefinitionEntry] = []
+    unique_attrs: Set[str] = set()
+    unique_engines: Set[str] = set()
+    for item in partdefs:
+        name = item.get("part_name", None)
+        if not name:
+            raise PartitionParseError(f"Missing `part_name` in {item}")
+        for attrname in models.PartitionConfig.PDEF_TYPE_ATTRIBS:
+            val_tmp = item.get(attrname, None)
+            if val_tmp:
+                unique_attrs.add(attrname)
+                val_as_list = val_tmp.asList()
+                is_tuple = "is_tuple" in val_tmp[0]
+                if (
+                    isinstance(val_as_list, list)
+                    and len(val_as_list) > 0
+                    and not is_tuple
+                ):
+                    # MAXVALUE would show up as ['MAXVALUE'] and (1,2,3) as
+                    # [['1', '2', '3']] so normalize to ['1', '2', '3'] and MAXVALUE
+                    # But not if a tuple of values e.g. ((1, 2, 3))
+                    val_as_list = val_as_list[0]
+                entry = models.PartitionDefinitionEntry(
+                    pdef_name=name,
+                    pdef_type=attrname,
+                    pdef_value_list=val_as_list,
+                    pdef_comment=item.get("pdef_comment"),
+                    pdef_engine=item.get("pdef_engine") or "INNODB",
+                    is_tuple=is_tuple,
+                )
+                unique_engines.add(entry.pdef_engine)
+                res.append(entry)
+                break
+        else:
+            # did not explicitly break? implies we had neither in/lessthan attribs
+            raise PartitionParseError(f"Missing `part_name` in {item}")
+    if len(res) == 0:
+        raise PartitionParseError("Empty partition definitions")
+    if len(unique_attrs) > 1:
+        # Partition defs MUST be all LESS THAN <OR> all IN. Not a mix.
+        raise PartitionParseError("Partitions cannot be a mix of LESS THAN / IN types")
+    if len(unique_engines) > 1:
+        # All partitions must use same engine.
+        # Its upto linter (not us) to verify that the engine used by partitions and
+        # the table match.
+        raise PartitionParseError(
+            f"Partitions cannot use a mix of ENGINE values {unique_engines}"
+        )
+    return res

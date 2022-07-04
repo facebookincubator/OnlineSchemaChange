@@ -20,6 +20,57 @@ class SQLParserTest(unittest.TestCase):
         self.assertEqual(len(tbl.column_list), 1)
         self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
+    def test_json_column(self):
+        sql = "Create table foo\n" "( column1 json )"
+        tbl = parse_create(sql)
+        self.assertTrue(tbl.has_80_features)
+        self.assertEqual(len(tbl.column_list), 1)
+        self.assertEqual(tbl.column_list[0].column_type, "JSON")
+        self.assertEqual(tbl, parse_create(tbl.to_sql()))
+
+    def test_desc_index(self):
+        sql = """
+        CREATE TABLE `test_table_1` (
+        `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+        `a` int DEFAULT NULL,
+        `t` char(1) NOT NULL DEFAULT 't',
+        PRIMARY KEY (`id` DESC),
+        KEY `t_index` (`t`),
+        KEY `a_index` (`a` ASC),
+        KEY `a_index_desc` (`a` DESC),
+        KEY `a_t_composite_index` (`a` ASC, `t` DESC)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+        tbl = parse_create(sql)
+        self.assertTrue(tbl.has_80_features)
+        for idx in tbl.indexes:
+            if idx.name == "t_index":
+                self.assertEqual(len(idx.column_list), 1)
+                self.assertEqual(idx.column_list[0].name, "t")
+                self.assertEqual(idx.column_list[0].order, "ASC")
+            elif idx.name == "a_index":
+                self.assertEqual(len(idx.column_list), 1)
+                self.assertEqual(idx.column_list[0].name, "a")
+                self.assertEqual(idx.column_list[0].order, "ASC")
+            elif idx.name == "a_index_desc":
+                self.assertEqual(len(idx.column_list), 1)
+                self.assertEqual(idx.column_list[0].name, "a")
+                self.assertEqual(idx.column_list[0].order, "DESC")
+            elif idx.name == "a_t_composite_index":
+                self.assertEqual(len(idx.column_list), 2)
+                for col in idx.column_list:
+                    if col.name == "a":
+                        self.assertEqual(col.order, "ASC")
+                    elif col.name == "t":
+                        self.assertEqual(col.order, "DESC")
+                    else:
+                        raise Exception("Wrong column name")
+            else:
+                raise Exception("Wrong index name")
+        self.assertEqual(len(tbl.primary_key.column_list), 1)
+        self.assertEqual(tbl.primary_key.column_list[0].order, "DESC")
+        self.assertEqual(tbl, parse_create(tbl.to_sql()))
+
     def test_table_name_quoted_with_backtick(self):
         sql = "Create table `foo`\n" "( column1 int )"
         tbl = parse_create(sql)
@@ -862,3 +913,73 @@ class ModelTableTestCase(unittest.TestCase):
             ")"
         )
         self.assertEqual(parse_create(sql1), parse_create(sql2))
+
+    def test_partitions_basic(self):
+        # See partitions_parser_test.py for elaborate tests, this
+        # just tests that CreateParser can invoke parse_partitions/partition_to_model
+
+        sql = (
+            "CREATE TABLE `t9` ("
+            "`id` int(11) NOT NULL,"
+            "`blob` varbinary(40000) DEFAULT NULL,"
+            "`identity` varbinary(256) DEFAULT NULL,"
+            "`object_id` varbinary(256) DEFAULT NULL,"
+            "`created_at` bigint(20) DEFAULT NULL,"
+            "PRIMARY KEY (`id`),"
+            "KEY `identity` (`identity`),"
+            "KEY `object_id` (`object_id`),"
+            "KEY `created_at` (`created_at`)"
+            ") ENGINE=InnoDB DEFAULT CHARSET=latin1"
+            "/*!50100 PARTITION BY RANGE (id) ("
+            "PARTITION p0 VALUES LESS THAN (6) ENGINE = 'innodb' COMMENT 'whatever',"
+            "PARTITION p1 VALUES LESS THAN (11),"
+            "PARTITION p2 VALUES LESS THAN (16),"
+            "PARTITION p3 VALUES LESS THAN (21),"
+            "PARTITION p4 VALUES LESS THAN maxvalue"
+            ") */"
+        )
+
+        schema_obj = parse_create(sql)
+        self.assertIsNotNone(schema_obj.partition)
+        self.assertIsNotNone(schema_obj.partition_config)
+        pc = schema_obj.partition_config  # models.PartitionConfig
+        self.assertEqual("RANGE", pc.get_type())
+        self.assertEqual(5, pc.get_num_parts())
+        self.assertEqual(["id"], pc.get_fields_or_expr())
+
+    def test_partitions_failure(self):
+        # Table schema is OK but partitions config is broken
+        sql = (
+            "CREATE TABLE `t9` ("
+            "`id` int(11) NOT NULL,"
+            "`blob` varbinary(40000) DEFAULT NULL,"
+            "`identity` varbinary(256) DEFAULT NULL,"
+            "`object_id` varbinary(256) DEFAULT NULL,"
+            "`created_at` bigint(20) DEFAULT NULL,"
+            "PRIMARY KEY (`id`),"
+            "KEY `identity` (`identity`),"
+            "KEY `object_id` (`object_id`),"
+            "KEY `created_at` (`created_at`)"
+            ") ENGINE=InnoDB DEFAULT CHARSET=latin1"
+            # Note: No partitions defs while RANGE needs them.
+            "/*!50100 PARTITION BY RANGE (id) */"
+        )
+        with self.assertRaises(ParseError):
+            _ = parse_create(sql)
+
+    def test_partitions_notpresent(self):
+        # No partition config in DDL
+        sql = (
+            "CREATE TABLE `t9` ("
+            "`id` int(11) NOT NULL,"
+            "`blob` varbinary(40000) DEFAULT NULL,"
+            "`identity` varbinary(256) DEFAULT NULL,"
+            "`object_id` varbinary(256) DEFAULT NULL,"
+            "`created_at` bigint(20) DEFAULT NULL,"
+            "PRIMARY KEY (`id`)"
+            ") ENGINE=InnoDB DEFAULT CHARSET=latin1"
+        )
+
+        schema_obj = parse_create(sql)
+        self.assertIsNone(schema_obj.partition)
+        self.assertIsNone(schema_obj.partition_config)

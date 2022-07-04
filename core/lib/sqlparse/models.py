@@ -7,13 +7,14 @@ LICENSE file in the root directory of this source tree.
 """
 
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
+import logging
 import re
+from typing import List, NamedTuple, Optional, Set, Union
+
+log = logging.getLogger(__name__)
 
 
 def escape(keyword):
@@ -51,38 +52,42 @@ def is_equal(left, right):
 class IndexColumn(object):
     """
     A column definition inside index section.
-    This is different from a table column definition, because only `name` and
-    `length` is required for a index column definition
+    This is different from a table column definition, because only `name`,
+    `length`, `order` are required for a index column definition
     """
 
     def __init__(self):
         self.name = None
         self.length = None
+        self.order = "ASC"
 
     def __str__(self):
+        str_repr = ""
         if self.length is not None:
-            return "{}({})".format(self.name, self.length)
+            str_repr = "{}({})".format(self.name, self.length)
         else:
-            return "{}".format(self.name)
+            str_repr = "{}".format(self.name)
+        if self.order != "ASC":
+            str_repr += " DESC"
+        return str_repr
 
     def __eq__(self, other):
         if self.name != other.name:
             return False
-        if self.length is not None:
-            if other.length is None:
-                return False
-            elif self.length != other.length:
-                return False
-        return True
+        return self.length == other.length and self.order == other.order
 
     def __ne__(self, other):
         return not self == other
 
     def to_sql(self):
+        sql_str = ""
         if self.length is not None:
-            return "`{}`({})".format(escape(self.name), self.length)
+            sql_str = "`{}`({})".format(escape(self.name), self.length)
         else:
-            return "`{}`".format(escape(self.name))
+            sql_str = "`{}`".format(escape(self.name))
+        if self.order != "ASC":
+            sql_str += " DESC"
+        return sql_str
 
 
 class DocStoreIndexColumn(object):
@@ -494,11 +499,146 @@ class EnumColumn(Column):
         return " ".join(column_segment)
 
 
+class PartitionDefinitionEntry(NamedTuple):
+    pdef_name: str
+    pdef_type: str
+    pdef_value_list: Union[List[str], str]
+    pdef_comment: Optional[str]
+    pdef_engine: str = "INNODB"
+    is_tuple: bool = False
+
+
 class PartitionConfig:
-    # TODO
-    def __init(self):
-        self.p_type = None  # Partition type e.g. RANGE
-        self.p_subtype = None  # e.g. LINEAR / COLUMNS
+    # Partitions config for a table
+    PTYPE_RANGE = "RANGE"
+    PTYPE_LIST = "LIST"
+    PTYPE_HASH = "HASH"
+    PTYPE_KEY = "KEY"
+
+    SUBTYPE_L = "LINEAR"
+    SUBTYPE_C = "COLUMNS"
+
+    KNOWN_PARTITION_TYPES: Set[str] = {PTYPE_LIST, PTYPE_HASH, PTYPE_KEY, PTYPE_RANGE}
+    KNOWN_PARTITION_SUBTYPES: Set[str] = {SUBTYPE_L, SUBTYPE_C}
+
+    PDEF_TYPE_VIN = "p_values_in"
+    PDEF_TYPE_VLT = "p_values_less_than"
+    PDEF_TYPE_ATTRIBS: List[str] = [PDEF_TYPE_VIN, PDEF_TYPE_VLT]
+    TYPE_MAP = {
+        PDEF_TYPE_VIN: "IN",
+        PDEF_TYPE_VLT: "LESS THAN",
+    }
+
+    def __init__(self) -> None:
+        self.part_type: Optional[str] = None  # Partition type e.g. RANGE
+        self.p_subtype: Optional[str] = None  # e.g. LINEAR / COLUMNS
+        self.num_partitions: int = 0
+        self.fields_or_expr: Optional[Union[str, List[str]]] = None
+
+        self.part_defs: List[PartitionDefinitionEntry] = []
+        self.full_type: str = ""
+        # Partition type `KEY` alone allows specifying ALGORITHM=[1|2] e.g.
+        # `PARTITION BY linear key ALGORITHM=2 (id)  partitions 10`
+        self.algorithm_for_key: Optional[int] = None
+        self.via_nested_expr = False
+
+    def __str__(self):
+        return (
+            f"{self.__class__.__name__}: |"
+            f"type={self.full_type}|"
+            f"fields_or_expr={self.fields_or_expr}|"
+            f"defs={self.part_defs}|numparts={self.num_partitions}"
+        )
+
+    def get_type(self) -> Optional[str]:
+        return self.full_type
+
+    def get_num_parts(self) -> int:
+        return self.num_partitions
+
+    def get_fields_or_expr(self) -> Optional[Union[str, List[str]]]:
+        return self.fields_or_expr
+
+    def get_algo(self) -> Optional[int]:
+        return self.algorithm_for_key if self.part_type == self.PTYPE_KEY else None
+
+    def __eq__(self, other):
+        for attr in (
+            "part_type",
+            "p_subtype",
+            "num_partitions",
+            "fields_or_expr",
+            "full_type",
+            "algorithm_for_key",
+        ):
+            if not is_equal(getattr(self, attr), getattr(other, attr)):
+                return False
+
+        return self.part_defs == other.part_defs
+
+    def __ne__(self, other):
+        return not self == other
+
+    def add_quote(self, field: str) -> str:
+        return f"`{field}`"
+
+    def to_partial_sql(self):
+        # Stringify info a format usable in `create table ...`
+
+        def _proc_list(vals: Union[str, List[str]]) -> str:
+            # Helper to convert expr list to an expression value-list
+            if isinstance(vals, list) and all(isinstance(v, str) for v in vals):
+                return "(" + ", ".join(vals) + ")"
+            ret = ""
+            for v in vals:
+                if isinstance(v, list):
+                    ret += _proc_list(v)
+                else:
+                    ret += v
+            return ret
+
+        output = f"PARTITION BY {self.full_type}"
+
+        if self.part_type == self.PTYPE_KEY:
+            if self.algorithm_for_key is not None:
+                output += f" ALGORITHM={self.algorithm_for_key}"
+            fields = ", ".join(self.add_quote(f) for f in self.fields_or_expr)
+            output += f" ({fields})"
+            if self.num_partitions > 1:
+                output += f" PARTITIONS {self.num_partitions}"
+            return output
+        elif self.part_type == self.PTYPE_HASH:
+            output += f" ({_proc_list(self.fields_or_expr)})"
+            if self.num_partitions > 1:
+                output += f" PARTITIONS {self.num_partitions}"
+            return output
+        elif self.part_type == self.PTYPE_RANGE or self.part_type == self.PTYPE_LIST:
+            partitions: List[str] = []
+            for pd in self.part_defs:
+                name = f"`{pd.pdef_name}`" if pd.pdef_name.isdigit() else pd.pdef_name
+                ty = self.TYPE_MAP[pd.pdef_type]
+                expr_or_value_list = (
+                    _proc_list(pd.pdef_value_list)
+                    if isinstance(pd.pdef_value_list, list)
+                    else pd.pdef_value_list
+                )
+                eng = pd.pdef_engine
+                if pd.is_tuple:
+                    expr_or_value_list = f"({expr_or_value_list})"
+                thispart = (
+                    f"PARTITION {name} VALUES {ty} {expr_or_value_list} ENGINE {eng}"
+                )
+                comment = pd.pdef_comment
+                if comment is not None:
+                    thispart += f" COMMENT {comment}"
+                partitions.append(thispart)
+            f_or_e = _proc_list(self.fields_or_expr)
+            if self.via_nested_expr:
+                # PART_EXPR in sqlparse use nestedExpr to acquire this
+                # and strips parens so "undo" that
+                f_or_e = f"({f_or_e})"
+            output += f" {f_or_e} (\n" + ",\n".join(partitions) + ")"
+            return output
 
 
 class Table(object):
@@ -520,8 +660,10 @@ class Table(object):
         self.column_list = []
         self.primary_key = TableIndex(name="PRIMARY", is_unique=True)
         self.indexes = []
-        self.partition = None
+        self.partition = None  # Partitions as a string
         self.constraint = None
+        self.partition_config: Optional[PartitionConfig] = None
+        self.has_80_features = False
 
     def __str__(self):
         table_str = ""
@@ -555,7 +697,8 @@ class Table(object):
             "row_format",
             "key_block_size",
             "comment",
-            "partition",
+            # "partition",
+            "partition_config",
         ):
             if not is_equal(getattr(self, attr), getattr(other, attr)):
                 return False

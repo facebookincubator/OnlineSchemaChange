@@ -14,11 +14,7 @@ import logging
 
 import MySQLdb
 
-from .. import constant
-from .. import db as db_lib
-from .. import hook
-from .. import sql
-from .. import util
+from .. import constant, db as db_lib, hook, sql, util
 from ..error import OSCError
 from ..mysql_version import MySQLVersion
 from ..sqlparse import parse_create, ParseError
@@ -316,6 +312,10 @@ class Payload(object):
         if self.is_high_pri_ddl_supported:
             self.execute_sql(sql.set_session_variable("high_priority_ddl"), (1,))
 
+    def enable_sql_wsenv(self):
+        if self.use_sql_wsenv:
+            self.execute_sql(sql.set_session_variable("enable_sql_wsenv"), (1,))
+
     def query_variable(self, var_name, scope):
         """
         Query system variable and return its value.
@@ -411,7 +411,7 @@ class Payload(object):
         Stop sql_thread for such operations as create trigger and swap table
         """
         if self.is_sql_thread_running():
-            log.warning("Stopping slave sql thread.")
+            log.warning("Stopping secondary sql thread.")
             self.execute_sql(sql.stop_slave_sql)
             self.is_slave_stopped_by_me = True
 
@@ -420,7 +420,7 @@ class Payload(object):
         Start the sql_thread if we are the one stopped it
         """
         if self.is_slave_stopped_by_me:
-            log.warning("Starting slave sql thread stopped by OSC.")
+            log.warning("Starting secondary sql thread stopped by OSC.")
             self.execute_sql(sql.start_slave_sql)
             self.is_slave_stopped_by_me = False
 

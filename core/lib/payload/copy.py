@@ -22,11 +22,11 @@ from .. import constant, sql, util
 from ..error import OSCError
 from ..hook import wrap_hook
 from ..sqlparse import (
+    is_equal,
+    need_default_ts_bootstrap,
     parse_create,
     ParseError,
-    is_equal,
     SchemaDiff,
-    need_default_ts_bootstrap,
 )
 from .base import Payload
 from .cleanup import CleanupPayload
@@ -117,7 +117,6 @@ class CopyPayload(Payload):
         self.free_space_reserved_percent = kwargs.get(
             "free_space_reserved_percent", constant.DEFAULT_RESERVED_SPACE_PERCENT
         )
-        self.chunk_size = kwargs.get("chunk_size", constant.CHUNK_BYTES)
         self.long_trx_time = kwargs.get("long_trx_time", constant.LONG_TRX_TIME)
         self.max_running_before_ddl = kwargs.get(
             "max_running_before_ddl", constant.MAX_RUNNING_BEFORE_DDL
@@ -151,7 +150,6 @@ class CopyPayload(Payload):
         self.skip_delta_checksum = kwargs.get("skip_delta_checksum", False)
         self.skip_named_lock = kwargs.get("skip_named_lock", False)
         self.skip_affected_rows_check = kwargs.get("skip_affected_rows_check", False)
-        self.skip_disk_space_check = kwargs.get("skip_disk_space_check", False)
         self.where = kwargs.get("where", None)
         self.session_overrides_str = kwargs.get("session_overrides", "")
         self.fail_for_implicit_conv = kwargs.get("fail_for_implicit_conv", False)
@@ -166,6 +164,23 @@ class CopyPayload(Payload):
         self.replay_max_changes = kwargs.get(
             "replay_max_changes", constant.MAX_REPLAY_CHANGES
         )
+
+        self.use_sql_wsenv = kwargs.get("use_sql_wsenv", False)
+        if self.use_sql_wsenv:
+            # by default, wsenv requires to use big chunk
+            self.chunk_size = kwargs.get("chunk_size", constant.WSENV_CHUNK_BYTES)
+            # by default, wsenv doesn't use local disk
+            self.skip_disk_space_check = kwargs.get("skip_disk_space_check", True)
+            # skip local disk space check when using wsenv
+            if not self.skip_disk_space_check:
+                raise OSCError("SKIP_DISK_SPACE_CHECK_VALUE_INCOMPATIBLE_WSENV")
+
+            # require outfile_dir not empty
+            if not self.outfile_dir:
+                raise OSCError("OUTFILE_DIR_NOT_SPECIFIED_WSENV")
+        else:
+            self.chunk_size = kwargs.get("chunk_size", constant.CHUNK_BYTES)
+            self.skip_disk_space_check = kwargs.get("skip_disk_space_check", False)
 
     @property
     def current_db(self):
@@ -545,6 +560,7 @@ class CopyPayload(Payload):
         self.set_sql_mode()
         self.enable_priority_ddl()
         self.skip_cache_fill_for_myrocks()
+        self.enable_sql_wsenv()
         self.override_session_vars()
         self.get_osc_lock()
 
@@ -625,6 +641,9 @@ class CopyPayload(Payload):
         # back to a smaller value after OSC
         if self._old_table.auto_increment:
             self._new_table.auto_increment = self._old_table.auto_increment
+        # Populate both old and new tables with explicit charset/collate
+        self.populate_charset_collation(self._old_table)
+        self.populate_charset_collation(self._new_table)
 
     def cleanup_with_force(self):
         """
@@ -828,6 +847,25 @@ class CopyPayload(Payload):
                 },
             )
 
+    def check_disk_free_space_reserved(self):
+        """
+        Check if we have enough free space left during dump data
+        """
+        if self.skip_disk_space_check:
+            return True
+        disk_partition_size = util.disk_partition_size(self.outfile_dir)
+        free_disk_space = util.disk_partition_free(self.outfile_dir)
+        free_space_factor = self.free_space_reserved_percent / 100
+        free_space_reserved = disk_partition_size * free_space_factor
+        if free_disk_space < free_space_reserved:
+            raise OSCError(
+                "NOT_ENOUGH_SPACE",
+                {
+                    "need": util.readable_size(free_space_reserved),
+                    "avail": util.readable_size(free_disk_space),
+                },
+            )
+
     def validate_post_alter_pk(self):
         """
         As we force (primary) when replaying changes, we have to make sure
@@ -929,6 +967,12 @@ class CopyPayload(Payload):
             # outfile to avoid zero division
             if not self.select_chunk_size:
                 self.select_chunk_size = 1
+            log.info(
+                "TABLE contains {} rows, table_avg_row_len: {} bytes,"
+                "chunk_size: {} bytes, ".format(
+                    result[0]["TABLE_ROWS"], tbl_avg_length, self.chunk_size
+                )
+            )
             log.info("Outfile will contain {} rows each".format(self.select_chunk_size))
             self.eta_chunks = max(
                 int(result[0]["TABLE_ROWS"] / self.select_chunk_size), 1
@@ -1094,6 +1138,25 @@ class CopyPayload(Payload):
         self.make_chunk_size_odd()
         self.check_disk_size()
         self.ts_bootstrap_check()
+        self.drop_columns_check()
+
+    def drop_columns_check(self):
+        # We only allow dropping columns with the flag --alow-drop-column.
+        if self.dropped_column_name_list:
+            if self.allow_drop_column:
+                for diff_column in self.dropped_column_name_list:
+                    log.warning(
+                        "Column `{}` is missing in the new schema, "
+                        "but --alow-drop-column is specified. Will "
+                        "drop this column.".format(diff_column)
+                    )
+            else:
+                missing_columns = ", ".join(self.dropped_column_name_list)
+                raise OSCError("MISSING_COLUMN", {"column": missing_columns})
+            # We don't allow dropping columns from current primary key
+            for col in self._pk_for_filter:
+                if col in self.dropped_column_name_list:
+                    raise OSCError("PRI_COL_DROPPED", {"pri_col": col})
 
     def add_drop_table_entry(self, table_name):
         """
@@ -1134,61 +1197,42 @@ class CopyPayload(Payload):
             charset_collations["utf8mb4"] = utf8_override[0]["Value"]
         return charset_collations
 
-    def populate_charset_collation_for_80(self):
-        """
-        Populate charset/collation for column and table if one of them is missing.
-        Doing this handle the auto charset/collation population behaviour in 8.0
-        """
+    def populate_charset_collation(self, schema_obj):
         default_collations = self.get_default_collations()
         collation_charsets = self.get_collations()
-        for column in self._new_table.column_list:
-            if column.charset is not None and column.collate is None:
-                default_collate = default_collations.get(column.charset)
-                if default_collate:
-                    column.collate = default_collate
-                    log.warning(
-                        "Overriding collation to be {} for column {} "
-                        "for schema comparison".format(column.collate, column.name)
-                    )
-            # Similar case where collation is specified without charset
-            if column.charset is None and column.collate is not None:
-                charset = collation_charsets.get(column.collate)
-                if charset:
-                    column.charset = charset
-                    log.warning(
-                        "Overriding charset to be {} for column {} "
-                        "for schema comparison".format(column.charset, column.name)
-                    )
+        if schema_obj.charset is not None and schema_obj.collate is None:
+            schema_obj.collate = default_collations.get(schema_obj.charset, None)
+        if schema_obj.charset is None and schema_obj.collate is not None:
+            # Shouldn't reach here, since every schema should have default charset,
+            # otherwise linting will error out. Leave the logic here just in case.
+            # In this case, we would not populate the charset because we actually
+            # want the user to explicit write the charset in the desired schema.
+            # In db, charset is always populated(explicit) by default.
+            schema_obj.charset = None
 
-        # Take care of table property
-        if self._new_table.charset == "utf8mb4" and self._new_table.collate is None:
-            default_collate = default_collations.get(self._new_table.charset)
-            if default_collate:
-                self._new_table.collate = default_collate
-                log.warning(
-                    "Overriding collation to be {} for table for schema comparison".format(
-                        self._new_table.collate
-                    )
-                )
-                text_types = {"CHAR", "VARCHAR", "TEXT", "MEDIUMTEXT", "LONGTEXT"}
-                for column in self._new_table.column_list:
-                    if column.column_type in text_types and column.collate is None:
-                        log.warning(
-                            "Overriding collation to be {} for {} for schema comparison".format(
-                                self._new_table.collate, column.name
-                            )
-                        )
-                        column.collate = default_collate
-
-        if self._new_table.charset is None and self._new_table.collate is not None:
-            charset = collation_charsets.get(self._new_table.collate)
-            if charset:
-                self._new_table.charset = charset
-                log.warning(
-                    "Overriding charset to be {} for table for schema comparison".format(
-                        self._new_table.charset
-                    )
-                )
+        # make column charset & collate explicit
+        # follow https://dev.mysql.com/doc/refman/8.0/en/charset-column.html
+        text_types = {"CHAR", "VARCHAR", "TEXT", "MEDIUMTEXT", "LONGTEXT", "ENUM"}
+        for column in schema_obj.column_list:
+            if column.column_type in text_types:
+                # Check collate first to guarantee the column uses table collate
+                # if column charset is absent. If checking charset first and column
+                # collate is absent, it will use table charset and get default
+                # collate from the database, which does not work for tables with
+                # non default collate settings
+                if column.collate is None:
+                    if column.charset and default_collations.get(column.charset, None):
+                        column.collate = default_collations[column.charset]
+                    else:
+                        column.collate = schema_obj.collate
+                if column.charset is None:
+                    if column.collate and collation_charsets.get(column.collate, None):
+                        column.charset = collation_charsets[column.collate]
+                    else:
+                        # shouldn't reach here, unless charset_to_collate
+                        # or collate_to_charset doesn't have the mapped value
+                        column.charset = schema_obj.charset
+        return schema_obj
 
     def remove_using_hash_for_80(self):
         """
@@ -1208,37 +1252,14 @@ class CopyPayload(Payload):
         tmp_sql_obj.name = self.new_table_name
         if self.rm_partition:
             tmp_sql_obj.partition = self._old_table.partition
+            tmp_sql_obj.partition_config = self._old_table.partition_config
         tmp_table_ddl = tmp_sql_obj.to_sql()
         log.info("Creating copy table using: {}".format(tmp_table_ddl))
         self.execute_sql(tmp_table_ddl)
-        table_diff = self.query(
-            sql.column_diff,
-            (
-                self._current_db,
-                self.new_table_name,
-                self.table_name,
-                self._current_db,
-            ),
-        )
         self.partitions[self.new_table_name] = self.fetch_partitions(
             self.new_table_name
         )
         self.add_drop_table_entry(self.new_table_name)
-        if table_diff:
-            if self.allow_drop_column:
-                for diff_column in table_diff:
-                    log.warning(
-                        "Column `{}` is missing in the new schema, "
-                        "but --alow-drop-column is specified. Will "
-                        "drop this column.".format(diff_column["COLUMN_NAME"])
-                    )
-            else:
-                missing_columns = ", ".join(col["COLUMN_NAME"] for col in table_diff)
-                raise OSCError("MISSING_COLUMN", {"column": missing_columns})
-            # We don't allow dropping columns from current primary key
-            for col in self._pk_for_filter:
-                if col in self.dropped_column_name_list:
-                    raise OSCError("PRI_COL_DROPPED", {"pri_col": col})
 
         # Check whether the schema is consistent after execution to avoid
         # any implicit conversion
@@ -1249,12 +1270,9 @@ class CopyPayload(Payload):
             # Ignore partition difference, since there will be no implicit
             # conversion here
             obj_after.partition = self._new_table.partition
+            obj_after.partition_config = self._new_table.partition_config
+            self.populate_charset_collation(obj_after)
             if self.mysql_version.is_mysql8:
-                # Pre-populate to avoid collation difference, because 8.0 will
-                # always show collate using the server default when a charset is
-                # defined for text column
-                self.populate_charset_collation_for_80()
-
                 # Remove 'USING HASH' in keys on 8.0, when present in 5.6, as 8.0
                 # removes it by default
                 self.remove_using_hash_for_80()
@@ -1553,13 +1571,22 @@ class CopyPayload(Payload):
         if not self.is_high_pri_ddl_supported:
             self.lock_tables(tables=[self.table_name])
 
-        # Because we've already hold the WRITE LOCK on the table, it's now safe
-        # to deal with operations that require metadata lock
-        self.create_insert_trigger()
-        self.create_delete_trigger()
-        self.create_update_trigger()
+        try:
+            log.info("Creating triggers")
+            # Because we've already hold the WRITE LOCK on the table, it's now safe
+            # to deal with operations that require metadata lock
+            self.create_insert_trigger()
+            self.create_delete_trigger()
+            self.create_update_trigger()
+        except Exception as e:
+            if not self.is_high_pri_ddl_supported:
+                self.unlock_tables()
+            self.start_slave_sql()
+            log.error("Failed to execute sql for creating triggers")
+            raise OSCError("CREATE_TRIGGER_ERROR", {"msg": str(e)})
 
-        self.unlock_tables()
+        if not self.is_high_pri_ddl_supported:
+            self.unlock_tables()
         self.start_slave_sql()
 
     def disable_ttl_for_myrocks(self):
@@ -1680,7 +1707,6 @@ class CopyPayload(Payload):
         affected_rows = 1
         use_where = False
         printed_chunk = 0
-        disk_partition_size = util.disk_partition_size(self.outfile_dir)
         while affected_rows:
             self.outfile_suffix_end = outfile_suffix
             outfile = "{}.{}".format(self.outfile, outfile_suffix)
@@ -1690,17 +1716,7 @@ class CopyPayload(Payload):
                 self.refresh_range_start()
                 use_where = True
                 outfile_suffix += 1
-            free_disk_space = util.disk_partition_free(self.outfile_dir)
-            free_space_factor = self.free_space_reserved_percent / 100
-            free_space_reserved = disk_partition_size * free_space_factor
-            if free_disk_space < free_space_reserved:
-                raise OSCError(
-                    "NOT_ENOUGH_SPACE",
-                    {
-                        "need": util.readable_size(free_space_reserved),
-                        "avail": util.readable_size(free_disk_space),
-                    },
-                )
+            self.check_disk_free_space_reserved()
             progress_pct = int((float(outfile_suffix) / self.eta_chunks) * 100)
             progress_chunk = int(progress_pct / 10)
             if progress_chunk > printed_chunk and self.eta_chunks > 10:
@@ -1735,7 +1751,7 @@ class CopyPayload(Payload):
         self.execute_sql(sql_string, (filepath,))
         # Delete the outfile once we have the data in new table to free
         # up space as soon as possible
-        if self.rm_file(filepath):
+        if not self.use_sql_wsenv and self.rm_file(filepath):
             util.sync_dir(self.outfile_dir)
             self._cleanup_payload.remove_file_entry(filepath)
 
@@ -2906,8 +2922,8 @@ class CopyPayload(Payload):
                 return
             self.unblock_no_pk_creation()
             self.pre_osc_check()
-            self.create_copy_table()
             self.create_delta_table()
+            self.create_copy_table()
             self.create_triggers()
             self.start_snapshot()
             self.select_table_into_outfile()
