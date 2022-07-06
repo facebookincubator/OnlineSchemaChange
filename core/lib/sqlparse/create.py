@@ -93,6 +93,8 @@ class CreateParser(object):
     RIGHT_PARENTHESES = Literal(")").suppress()
     QUOTE = Literal("'") | Literal('"')
     BACK_QUOTE = Optional(Literal("`")).suppress()
+    BACK_SLASH = Optional(Literal("/")).suppress()
+    ASTERISK = Optional(Literal("*")).suppress()
     LENGTH = Word(nums)
     DECIMAL = Combine(Word(nums) + DOT + Word(nums))
     OBJECT_NAME = Word(alphanums + "_" + "-" + "<" + ">" + ":")
@@ -392,6 +394,20 @@ class CreateParser(object):
         + Optional(Literal("=")).suppress()
         + Word(alphanums + "_")("compression").setParseAction(upcaseTokens)
     )
+    # we don't use tablespaces but MySQL 8.0 sometimes adds
+    # /*!50100 TABLESPACE `innodb_system` */ on mysqld
+    # installs without file-per-table
+    TABLESPACE = (
+        BACK_SLASH
+        + ASTERISK
+        + CaselessLiteral("!50100 TABLESPACE ").suppress()
+        + BACK_QUOTE
+        + OBJECT_NAME("tablespace")
+        + BACK_QUOTE
+        + ASTERISK
+        + BACK_SLASH
+    )
+
     # Parse and make sure auto_increment is an integer
     # parseAction function is defined as fn( s, loc, toks ), where:
     # s is the original parse string
@@ -411,7 +427,8 @@ class CreateParser(object):
 
     TABLE_OPTION = ZeroOrMore(
         (
-            ENGINE
+            TABLESPACE
+            | ENGINE
             | DEFAULT_CHARSET
             | TABLE_COLLATE
             | ROW_FORMAT
@@ -691,6 +708,7 @@ class CreateParser(object):
             "compression",
             "auto_increment",
             "comment",
+            "tablespace",
         ]
         for table_option in table_options:
             if table_option in result:

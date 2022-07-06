@@ -16,6 +16,8 @@ from typing import List, NamedTuple, Optional, Set, Union
 
 log = logging.getLogger(__name__)
 
+IGNORE_TABLESPACES = ["innodb_system"]
+
 
 def escape(keyword):
     """
@@ -664,6 +666,7 @@ class Table(object):
         self.constraint = None
         self.partition_config: Optional[PartitionConfig] = None
         self.has_80_features = False
+        self.tablespace = None
 
     def __str__(self):
         table_str = ""
@@ -684,7 +687,8 @@ class Table(object):
         table_str += "INDEXES: \n"
         for index in self.indexes:
             table_str += "\t{}\n".format(str(index))
-        table_str += "Constraint: {}".format(str(self.constraint))
+        table_str += "Constraint: {}\n".format(str(self.constraint))
+        table_str += "TABLESPACE: {}".format(str(self.tablespace))
 
         return table_str
 
@@ -737,6 +741,10 @@ class Table(object):
                 sql += ",\n    " + idx.to_sql()
 
         sql += "\n) "
+        if self.tablespace is not None:
+            # ignore innodb_system tablespace
+            if self.tablespace not in IGNORE_TABLESPACES:
+                sql += "/*!50100 TABLESPACE `{}` */".format(self.tablespace)
         if self.engine is not None:
             sql += "ENGINE={} ".format(self.engine)
         if self.auto_increment is not None:
