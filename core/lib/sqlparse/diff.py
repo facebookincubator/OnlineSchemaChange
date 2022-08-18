@@ -477,6 +477,8 @@ class SchemaDiff(object):
                     segments.append("{}={}".format(attr, "default"))
                 elif attr == "partition" and self.ignore_partition is False:
                     self.generate_table_partition_operations(tbl_option_new, segments)
+                elif attr == "key_block_size" and tbl_option_new is None:
+                    segments.append("{}={}".format(attr, 0))
                 else:
                     segments.append("{}={}".format(attr, tbl_option_new))
 

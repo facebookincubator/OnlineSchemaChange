@@ -18,6 +18,27 @@ from ...sqlparse import (
 
 
 class SQLParserTest(unittest.TestCase):
+    def test_remove_table_attrs(self):
+        tbl_1 = """
+        CREATE TABLE `tb1` (
+  `id` int NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=4
+        """
+        tbl_2 = """
+        CREATE TABLE `tb1` (
+  `id` int NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+        """
+        tbl_1_obj = parse_create(tbl_1)
+        tbl_2_obj = parse_create(tbl_2)
+        tbl_diff = SchemaDiff(tbl_1_obj, tbl_2_obj)
+        self.assertEqual(
+            "ALTER TABLE `tb1` key_block_size=0, row_format=default",
+            tbl_diff.to_sql(),
+        )
+
     def test_two_identical_table(self):
         """
         Two identical table schema shouldn't generate any diff results
