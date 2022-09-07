@@ -11,6 +11,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from .create import CreateParser, parse_create, ParseError, PartitionParseError
 from .diff import (
+    BaseAlterType,
     ColAlterType,
     get_type_conv_columns,
     IndexAlterType,
@@ -40,4 +41,5 @@ __all__ = [
     "NewMysql80FeatureAlterType",
     "INSTANT_DDLS",
     "IndexAlterType",
+    "BaseAlterType",
 ]

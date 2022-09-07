@@ -45,6 +45,7 @@ class ColAlterType(BaseAlterType):
     CHANGE_COL_CHARSET = "change_col_charset"
     CHANGE_COL_COLLATE = "change_col_collate"
     CHANGE_COL_COMMENT = "change_col_comment"
+    ADD_TIMESTAMP_COL = "add_timestamp_col"
 
 
 class IndexAlterType(BaseAlterType):
@@ -84,9 +85,8 @@ class NewMysql80FeatureAlterType(BaseAlterType):
 
 
 INSTANT_DDLS = {
-    ColAlterType.CHANGE_COL_DEFAULT_VAL,
     ColAlterType.ADD_COL,
-    IndexAlterType.CHANGE_INDEX_TYPE,
+    ColAlterType.ADD_TIMESTAMP_COL,
 }
 
 
@@ -334,6 +334,9 @@ class SchemaDiff(object):
                     continue
                 self._update_col_attrs_changes(col, old_columns[col.name])
                 segments.append("MODIFY {}".format(col.to_sql()))
+
+        if need_default_ts_bootstrap(self.left, self.right):
+            self.add_alter_type(ColAlterType.ADD_TIMESTAMP_COL)
         return segments
 
     def _is_null_change(self, old_col, new_col):
@@ -351,9 +354,13 @@ class SchemaDiff(object):
         return not old_col.has_same_default(new_col)
 
     def _update_col_attrs_changes(self, new_col, old_col):
-        if (
-            new_col.column_type != old_col.column_type
-            or new_col.length != old_col.length
+        if new_col.auto_increment and not old_col.auto_increment:
+            self.add_alter_type(ColAlterType.ADD_AUTO_INC_COL)
+        # ignore int display width since it is unrelated to the data type
+        int_types = {"int", "bigint", "tinyint", "smallint", "mediumint"}
+        if new_col.column_type != old_col.column_type or (
+            new_col.column_type.lower() not in int_types
+            and new_col.length != old_col.length
         ):
             self.add_alter_type(ColAlterType.CHANGE_COL_DATA_TYPE)
         if (
@@ -823,11 +830,20 @@ class SchemaDiff(object):
     def partition_definition_type(self, def_type):
         return PartitionConfig.TYPE_MAP[def_type]
 
-    def valid_partitioning_alter(self, type):
-        return (
+    @classmethod
+    def valid_partitioning_alter(cls, type):
+        if (
             isinstance(type, PartitionAlterType)
             and type != PartitionAlterType.INVALID_PARTITIONING
-        )
+        ):
+            return True
+        if (
+            isinstance(type, str)
+            and type in (item.name for item in PartitionAlterType)
+            and type != PartitionAlterType.INVALID_PARTITIONING.name
+        ):
+            return True
+        return False
 
     def to_sql(self):
         """
