@@ -775,6 +775,9 @@ class CreateParser(object):
             if "unsigned" in column_def:
                 if column_def.unsigned == "UNSIGNED":
                     column.unsigned = True
+            if "zerofill" in column_def:
+                if column_def.zerofill == "ZEROFILL":
+                    column.zerofill = True
             if "default" in column_def:
                 if "ts_len" in column_def:
                     column.default = "{}({})".format(

@@ -216,6 +216,7 @@ class Column(object):
         self.comment = None
         self.nullable = True
         self.unsigned = None
+        self.zerofill = None
         self.is_default_bit = False
         self.auto_increment = None
 
@@ -231,6 +232,7 @@ class Column(object):
         col_str.append("CHARSET: {}".format(self.charset))
         col_str.append("COLLATE: {}".format(self.collate))
         col_str.append("NULLABLE: {}".format(self.nullable))
+        col_str.append("ZEROFILL: {}".format(self.zerofill))
         col_str.append("UNSIGNED: {}".format(self.unsigned))
         col_str.append("COMMENT: {}".format(self.comment))
         return " ".join(col_str)
@@ -256,6 +258,7 @@ class Column(object):
             "length",
             "comment",
             "nullable",
+            "zerofill",
             "unsigned",
             "is_default_bit",
             "auto_increment",
@@ -309,6 +312,8 @@ class Column(object):
             column_segment.append("CHARACTER SET {}".format(self.charset))
         if self.unsigned is not None:
             column_segment.append("UNSIGNED")
+        if self.zerofill is not None:
+            column_segment.append("ZEROFILL")
         if self.collate is not None:
             column_segment.append("COLLATE {}".format(self.collate))
         # By default MySQL will implicitly make column as nullable if not
