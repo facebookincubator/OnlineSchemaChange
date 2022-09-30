@@ -1694,6 +1694,14 @@ class CopyPayload(Payload):
         return affected_rows
 
     @wrap_hook
+    def log_dump_progress(self, outfile_suffix):
+        progress = "Dump progress: {}/{}(ETA) chunks".format(
+            outfile_suffix, self.eta_chunks
+        )
+        self.stats["dump_progress"] = progress
+        log.info(progress)
+
+    @wrap_hook
     def select_table_into_outfile(self):
         log.info("== Stage 2: Dump ==")
         stage_start_time = time.time()
@@ -1720,11 +1728,7 @@ class CopyPayload(Payload):
             progress_pct = int((float(outfile_suffix) / self.eta_chunks) * 100)
             progress_chunk = int(progress_pct / 10)
             if progress_chunk > printed_chunk and self.eta_chunks > 10:
-                log.info(
-                    "Dump progress: {}/{}(ETA) chunks".format(
-                        outfile_suffix, self.eta_chunks
-                    )
-                )
+                self.log_dump_progress(outfile_suffix)
                 printed_chunk = progress_chunk
         self.commit()
         log.info("Dump finished")
@@ -1811,6 +1815,12 @@ class CopyPayload(Payload):
                 raise
 
     @wrap_hook
+    def log_load_progress(self, suffix):
+        progress = "Load progress: {}/{} chunks".format(suffix, self.outfile_suffix_end)
+        self.stats["load_progress"] = progress
+        log.info(progress)
+
+    @wrap_hook
     def load_data(self):
         stage_start_time = time.time()
         log.info("== Stage 3: Load data ==")
@@ -1846,11 +1856,7 @@ class CopyPayload(Payload):
             # Print out information after every 10% chunks have been loaded
             # We won't show progress if the number of chunks is less than 50
             if suffix % max(5, int(self.outfile_suffix_end / 10)) == 0:
-                log.info(
-                    "Load progress: {}/{} chunks".format(
-                        suffix, self.outfile_suffix_end
-                    )
-                )
+                self.log_load_progress(suffix)
 
         if self.is_myrocks_table:
             # Disable rocksdb bulk load after loading data
@@ -2565,6 +2571,14 @@ class CopyPayload(Payload):
         self.stats["time_in_table_checksum"] = time.time() - stage_start_time
 
     @wrap_hook
+    def log_replay_progress(self):
+        self.stats["num_replay_attempts"] += 1
+        self.stats["replay_progress"] = (
+            f"Replay progress: {self.stats['num_replay_attempts']}/"
+            f"{self.replay_max_attempt}(MAX ATTEMPTS)"
+        )
+
+    @wrap_hook
     def replay_till_good2go(self, checksum):
         """
         Keep replaying changes until the time spent in replay is below
@@ -2582,10 +2596,12 @@ class CopyPayload(Payload):
             "Replay at most {} more round(s) until we can finish in {} "
             "seconds".format(self.replay_max_attempt, self.replay_timeout)
         )
+        self.stats["num_replay_attempts"] = 0
         # Temporarily enable slow query log for slow replay statements
         self.execute_sql(sql.set_session_variable("long_query_time"), (1,))
         for i in range(self.replay_max_attempt):
             log.info("Catchup Attempt: {}".format(i + 1))
+            self.log_replay_progress()
             start_time = time.time()
             # If checksum is required, then we need to make sure total time
             # spent in replay+checksum is below replay_timeout.
@@ -2847,6 +2863,7 @@ class CopyPayload(Payload):
         )
         self.execute_sql(sql.set_session_variable("autocommit"), (1,))
         self.start_slave_sql()
+        self.stats["swap_table_progress"] = "Swap table finishes"
 
     def rename_back(self):
         """
