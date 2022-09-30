@@ -983,3 +983,10 @@ class ModelTableTestCase(unittest.TestCase):
         schema_obj = parse_create(sql)
         self.assertIsNone(schema_obj.partition)
         self.assertIsNone(schema_obj.partition_config)
+
+    def test_utf8_alias_charset_equality(self):
+        t1 = "CREATE TABLE `t1`(s1 CHAR(1)) ENGINE=InnoDB DEFAULT CHARSET=utf8"
+        t2 = "CREATE TABLE `t1`(s1 CHAR(1)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3"
+        obj1 = parse_create(t1)
+        obj2 = parse_create(t2)
+        self.assertTrue(obj1 == obj2)

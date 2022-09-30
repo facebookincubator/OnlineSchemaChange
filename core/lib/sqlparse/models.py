@@ -709,8 +709,17 @@ class Table(object):
             # "partition",
             "partition_config",
         ):
+            # "utf8" and "utf8mb3" are alias for table charset
+            # Ref: https://dev.mysql.com/doc/refman/8.0/en/charset-unicode-utf8mb3.html
+            if attr == "charset":
+                if getattr(self, attr) in ("utf8", "utf8mb3") and getattr(
+                    other, attr
+                ) in ("utf8", "utf8mb3"):
+                    continue
+
             if not is_equal(getattr(self, attr), getattr(other, attr)):
                 return False
+
         if self.primary_key != other.primary_key:
             return False
         for idx in self.indexes:
