@@ -2848,10 +2848,35 @@ class CopyPayload(Payload):
         # We will not run delta checksum here, because there will be an error
         # like this, if we run a nested query using `NOT EXISTS`:
         # SQL execution error: [1100] Table 't' was not locked with LOCK TABLES
-        self.execute_sql(sql.rename_table(self.table_name, self.renamed_table_name))
-        self.table_swapped = True
-        self.add_drop_table_entry(self.renamed_table_name)
-        self.execute_sql(sql.rename_table(self.new_table_name, self.table_name))
+        if self.mysql_version.is_mysql8:
+            # mysql 8.0 supports atomic rename inside WRITE locks
+            self.execute_sql(
+                sql.rename_all_tables(
+                    orig_name=self.table_name,
+                    old_name=self.renamed_table_name,
+                    new_name=self.new_table_name,
+                )
+            )
+            self.table_swapped = True
+            self.add_drop_table_entry(self.renamed_table_name)
+            log.info(
+                "Renamed {} TO {}, {} TO {}".format(
+                    self.table_name,
+                    self.renamed_table_name,
+                    self.new_table_name,
+                    self.table_name,
+                )
+            )
+        else:
+            self.execute_sql(sql.rename_table(self.table_name, self.renamed_table_name))
+            log.info(
+                "Renamed {} TO {}".format(self.table_name, self.renamed_table_name)
+            )
+            self.table_swapped = True
+            self.add_drop_table_entry(self.renamed_table_name)
+            self.execute_sql(sql.rename_table(self.new_table_name, self.table_name))
+            log.info("Renamed {} TO {}".format(self.new_table_name, self.table_name))
+
         log.info("Table has successfully swapped, new schema takes effect now")
         self._cleanup_payload.remove_drop_table_entry(
             self._current_db, self.new_table_name

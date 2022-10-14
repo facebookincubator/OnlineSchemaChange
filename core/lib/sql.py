@@ -824,6 +824,20 @@ def rename_table(from_name, to_name) -> str:
     return "ALTER TABLE `{}` rename `{}`".format(escape(from_name), escape(to_name))
 
 
+def rename_all_tables(orig_name: str, old_name: str, new_name: str) -> str:
+    """
+    Rename orig_name -> old_name, new_name -> orig_name
+    """
+    return (
+        "RENAME TABLE `{orig_name}` TO `{old_name}`, "
+        "`{new_name}` TO `{orig_name}`;".format(
+            orig_name=escape(orig_name),
+            old_name=escape(old_name),
+            new_name=escape(new_name),
+        )
+    )
+
+
 def get_all_osc_tables(db=None) -> str:
     sql = (
         "SELECT TABLE_SCHEMA as db, TABLE_NAME "
