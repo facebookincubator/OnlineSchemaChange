@@ -212,7 +212,7 @@ class OSCError(Exception):
                 "table while OSC is running. "
                 "2. some columns have changed their output format, "
                 "for example int -> decimal. "
-                "see also: --skip-checksum-for-modifed "
+                "see also: --skip-checksum-for-modified "
                 "3. it is a bug in OSC"
             ),
             "retryable": True,
