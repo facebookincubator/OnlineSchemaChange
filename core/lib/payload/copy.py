@@ -725,15 +725,14 @@ class CopyPayload(Payload):
             (self.table_name, self._current_db),
         )
         if triggers:
-            trigger_desc = []
-            for trigger in triggers:
-                trigger_desc.append(
-                    "Trigger name: {}, Action: {} {}".format(
-                        trigger["TRIGGER_NAME"],
-                        trigger["ACTION_TIMING"],
-                        trigger["EVENT_MANIPULATION"],
-                    )
+            trigger_desc = [
+                "Trigger name: {}, Action: {} {}".format(
+                    trigger["TRIGGER_NAME"],
+                    trigger["ACTION_TIMING"],
+                    trigger["EVENT_MANIPULATION"],
                 )
+                for trigger in triggers
+            ]
             raise OSCError(
                 "TRIGGER_ALREADY_EXIST", {"triggers": "\n".join(trigger_desc)}
             )
