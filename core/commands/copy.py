@@ -166,7 +166,7 @@ class Copy(CommandBase):
             " be unlikey to ever catchup in such cases.",
         )
         parser.add_argument(
-            "--reserved-space-percent",
+            "--free-space-reserved-percent",
             default=constant.DEFAULT_RESERVED_SPACE_PERCENT,
             type=int,
             help="Keep --outfile-dir with at least this " "percentage of free space",
