@@ -46,6 +46,7 @@ class ColAlterType(BaseAlterType):
     CHANGE_COL_COLLATE = "change_col_collate"
     CHANGE_COL_COMMENT = "change_col_comment"
     ADD_TIMESTAMP_COL = "add_timestamp_col"
+    CHANGE_UNSIGNED = "change_unsigned"
 
 
 class IndexAlterType(BaseAlterType):
@@ -373,6 +374,11 @@ class SchemaDiff(object):
             and ColAlterType.CHANGE_COL_DATA_TYPE not in self._alter_types
         ):
             self.add_alter_type(ColAlterType.CHANGE_NULL)
+        if (
+            old_col.unsigned != new_col.unsigned
+            and ColAlterType.CHANGE_COL_DATA_TYPE not in self._alter_types
+        ):
+            self.add_alter_type(ColAlterType.CHANGE_UNSIGNED)
         if (
             isinstance(new_col, EnumColumn)
             and isinstance(old_col, EnumColumn)
