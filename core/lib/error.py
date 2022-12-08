@@ -446,7 +446,7 @@ class OSCError(Exception):
     @property
     def desc(self):
         description = self.err_entry["desc"].format(**self.desc_kwargs)
-        return "{}: {}".format(self.err_key, description)
+        return "{}: {}: {}".format(self.code, self.err_key, description)
 
     @property
     def mysql_err_code(self):
