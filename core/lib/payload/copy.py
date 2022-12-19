@@ -1200,7 +1200,11 @@ class CopyPayload(Payload):
         default_collations = self.get_default_collations()
         collation_charsets = self.get_collations()
         if schema_obj.charset is not None and schema_obj.collate is None:
-            schema_obj.collate = default_collations.get(schema_obj.charset, None)
+            # "utf8" and "utf8mb3" are alias for table charset
+            if schema_obj.charset == "utf8mb3":
+                schema_obj.collate = default_collations.get("utf8", None)
+            else:
+                schema_obj.collate = default_collations.get(schema_obj.charset, None)
         if schema_obj.charset is None and schema_obj.collate is not None:
             # Shouldn't reach here, since every schema should have default charset,
             # otherwise linting will error out. Leave the logic here just in case.

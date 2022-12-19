@@ -153,6 +153,44 @@ class CopyPayloadTestCase(unittest.TestCase):
         payload.get_collations = Mock(return_value={"latin1_bin": "latin1"})
         payload.create_copy_table()
 
+    def test_populate_charset_collation_utf8_alias_default_collate(self) -> None:
+        payload = CopyPayload()
+        payload.get_default_collations = Mock(return_value={"utf8": "utf8_general_ci"})
+        payload.get_collations = Mock(return_value={"utf8_general_ci": "utf8"})
+        obj1 = parse_create(
+            "CREATE TABLE `t1`(s1 CHAR(1)) ENGINE=InnoDB DEFAULT CHARSET=utf8"
+        )
+        obj2 = parse_create(
+            "CREATE TABLE `t1`(s1 CHAR(1)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3"
+        )
+        self.assertEqual(
+            payload.populate_charset_collation(obj1),
+            payload.populate_charset_collation(obj2),
+        )
+
+    def test_populate_charset_collation_utf8_alias_custom_collate(self) -> None:
+        payload = CopyPayload()
+        payload.get_default_collations = Mock(return_value={"utf8": "utf8_general_ci"})
+        payload.get_collations = Mock(
+            return_value={"utf8_general_ci": "utf8", "utf8_bin": "utf8"}
+        )
+        obj1 = parse_create(
+            """
+            CREATE TABLE `t1`(s1 CHAR(1))
+            ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin
+            """
+        )
+        obj2 = parse_create(
+            """
+            CREATE TABLE `t1`(s1 CHAR(1))
+            ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8_bin
+            """
+        )
+        self.assertEqual(
+            payload.populate_charset_collation(obj1),
+            payload.populate_charset_collation(obj2),
+        )
+
     def test_checksum_running_with_proper_idx(self):
         payload = CopyPayload()
         payload._new_table = Mock(indexes=[])
