@@ -672,6 +672,7 @@ class Table(object):
         self.partition_config: Optional[PartitionConfig] = None
         self.has_80_features = False
         self.tablespace = None
+        self.fk_constraint = {}
 
     def __str__(self):
         table_str = ""
@@ -692,7 +693,7 @@ class Table(object):
         table_str += "INDEXES: \n"
         for index in self.indexes:
             table_str += "\t{}\n".format(str(index))
-        table_str += "Constraint: {}\n".format(str(self.constraint))
+        table_str += "CONSTRAINT: {}\n".format(str(self.constraint))
         table_str += "TABLESPACE: {}".format(str(self.tablespace))
 
         return table_str
@@ -708,6 +709,7 @@ class Table(object):
             "comment",
             # "partition",
             "partition_config",
+            "constraint",
         ):
             # "utf8" and "utf8mb3" are alias for table charset
             # Ref: https://dev.mysql.com/doc/refman/8.0/en/charset-unicode-utf8mb3.html

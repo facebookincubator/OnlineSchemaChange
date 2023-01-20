@@ -1898,3 +1898,42 @@ class HelpersTest(unittest.TestCase):
         options = {"ALTER TABLE `a` REMOVE PARTITIONING"}
 
         self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
+
+    def test_only_change_fks(
+        self,
+    ):
+        old_table_obj = parse_create(
+            """CREATE TABLE `child` (
+                `id` int(11) DEFAULT NULL,
+                `parent_id` int(11) DEFAULT NULL,
+                KEY `par_ind` (`parent_id`),
+                CONSTRAINT `child_ibfk_1` FOREIGN KEY (`parent_id`)
+                REFERENCES `parent` (`id`) ON DELETE CASCADE,
+                CONSTRAINT `child_ibfk_2` FOREIGN KEY (`parent_name`)
+                REFERENCES `parent` (`name`),
+                CONSTRAINT `child_ibfk_3` FOREIGN KEY (`parent_job`)
+                REFERENCES `parent` (`job`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=latin1;"""
+        )
+        new_table_obj = parse_create(
+            """CREATE TABLE `child` (
+                `id` int(11) DEFAULT NULL,
+                `parent_id` int(11) DEFAULT NULL,
+                KEY `par_ind` (`parent_id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=latin1;"""
+        )
+
+        tbl_diff_1 = SchemaDiff(old_table_obj, new_table_obj)
+        tbl_diff_2 = SchemaDiff(new_table_obj, old_table_obj)
+        # Only dropping FKs
+        self.assertEqual(
+            "ALTER TABLE `child` DROP FOREIGN KEY `child_ibfk_1`, "
+            "DROP FOREIGN KEY `child_ibfk_2`, "
+            "DROP FOREIGN KEY `child_ibfk_3`",
+            tbl_diff_1.to_sql(),
+        )
+        # Only adding FKs
+        self.assertEqual(
+            None,
+            tbl_diff_2.to_sql(),
+        )

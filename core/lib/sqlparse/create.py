@@ -332,16 +332,17 @@ class CreateParser(object):
 
     # Constraint section as this is not a recommended way of using MySQL
     # we'll treat the whole section as a string
-    CONSTRAINT = Combine(
-        ZeroOrMore(
-            COMMA
-            + Optional(CaselessLiteral("CONSTRAINT"))
-            +
-            # foreign key name except the key word 'FOREIGN'
-            Optional((~CaselessLiteral("FOREIGN") + COLUMN_NAME))
-            + CaselessLiteral("FOREIGN")
-            + CaselessLiteral("KEY")
-            + LEFT_PARENTHESES
+    CONSTRAINT_NAME = (
+        CaselessLiteral("CONSTRAINT")
+        +
+        # foreign key name except the key word 'FOREIGN'
+        (~CaselessLiteral("FOREIGN"))
+        + COLUMN_NAME
+    )("constraint_name")
+
+    REFERENCE = Combine(
+        (
+            LEFT_PARENTHESES
             + COL_NAME_LIST
             + RIGHT_PARENTHESES
             + CaselessLiteral("REFERENCES")
@@ -353,7 +354,14 @@ class CreateParser(object):
         ),
         adjacent=False,
         joinString=" ",
-    )("constraint")
+    )("reference")
+    CONSTRAINT_DEF = Group(
+        CONSTRAINT_NAME
+        + CaselessLiteral("FOREIGN")
+        + CaselessLiteral("KEY")
+        + REFERENCE
+    )
+    CONSTRAINT = Group(ZeroOrMore(COMMA + CONSTRAINT_DEF))("constraint")
 
     # Table option section
     ENGINE = (
@@ -731,7 +739,20 @@ class CreateParser(object):
                     f"ParseResult: {presult.dump()}\nRaw: {table.partition}"
                 )
         if "constraint" in result:
-            table.constraint = result.constraint
+            # generate the dictionary fk_constraint and string constraint
+            if not result.constraint:
+                table.constraint = ""
+            else:
+                constraint_list = []
+                for constr_def in result.constraint:
+                    constr_str = (
+                        " ".join(constr_def.constraint_name)
+                        + " FOREIGN KEY "
+                        + constr_def.reference[0]
+                    )
+                    table.fk_constraint[constr_def.constraint_name[1]] = constr_str
+                    constraint_list.append(constr_str)
+                table.constraint = ParseResults(", ".join(constraint_list))
         for column_def in result.column_list:
             if column_def.column_type == "ENUM":
                 column = models.EnumColumn()

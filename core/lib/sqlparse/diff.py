@@ -68,6 +68,7 @@ class TableAlterType(BaseAlterType):
     CHANGE_TABLE_COLLATE = "change_table_collate"
     CHANGE_TABLE_COMMENT = "change_table_comment"
     CHANGE_ENGINE = "change_engine"
+    DROP_FK = "drop_fk"
 
 
 class PartitionAlterType(BaseAlterType):
@@ -116,6 +117,7 @@ class SchemaDiff(object):
             "key_block_size",
             "name",
             "row_format",
+            "constraint",
         ]
         self.ignore_partition = ignore_partition
         if not ignore_partition:
@@ -200,10 +202,15 @@ class SchemaDiff(object):
             tbl_option_old = getattr(self.left, attr)
             tbl_option_new = getattr(self.right, attr)
             if not is_equal(tbl_option_old, tbl_option_new):
-                diffs["removed"].append(TableOptionDiff(attr, tbl_option_old))
-                diffs["added"].append(TableOptionDiff(attr, tbl_option_new))
-                diffs["attrs_modified"].append(attr)
-
+                if attr == "constraint":
+                    for key in set(self.left.fk_constraint.keys()) - set(
+                        self.right.fk_constraint.keys()
+                    ):
+                        diffs["removed"].append(TableOptionDiff(attr, key))
+                else:
+                    diffs["removed"].append(TableOptionDiff(attr, tbl_option_old))
+                    diffs["added"].append(TableOptionDiff(attr, tbl_option_new))
+                    diffs["attrs_modified"].append(attr)
         return diffs
 
     def __str__(self):
@@ -478,7 +485,7 @@ class SchemaDiff(object):
         Generate the table attribute section for ALTER TABLE statement
         """
         segments = []
-
+        dropped_fks = set()
         for attr in self.attrs_to_check:
             tbl_option_old = getattr(self.left, attr)
             tbl_option_new = getattr(self.right, attr)
@@ -492,6 +499,12 @@ class SchemaDiff(object):
                     self.generate_table_partition_operations(tbl_option_new, segments)
                 elif attr == "key_block_size" and tbl_option_new is None:
                     segments.append("{}={}".format(attr, 0))
+                elif attr == "constraint":
+                    dropped_fks = set(self.left.fk_constraint.keys()) - set(
+                        self.right.fk_constraint.keys()
+                    )
+                    for key in sorted(dropped_fks):
+                        segments.append("DROP FOREIGN KEY `{}`".format(key))
                 else:
                     segments.append("{}={}".format(attr, tbl_option_new))
 
@@ -508,6 +521,9 @@ class SchemaDiff(object):
                     self.add_alter_type(TableAlterType.CHANGE_TABLE_COMMENT)
                 elif attr == "engine":
                     self.add_alter_type(TableAlterType.CHANGE_ENGINE)
+                elif attr == "constraint":
+                    if dropped_fks:
+                        self.add_alter_type(TableAlterType.DROP_FK)
 
         return segments
 

@@ -453,27 +453,29 @@ class SQLParserTest(unittest.TestCase):
             self.assertEqual(tbl, parse_create(tbl.to_sql()))
 
     def test_foreign_key(self):
-        sqls = []
-        sqls.append(
+        sql = (
             "Create table foo\n"
             "( column1 int primary key, "
             "foreign key (column1) references table2 (column1))"
         )
-        sqls.append(
+        # Force users to create fks with the constraint
+        with self.assertRaises(ParseError):
+            parse_create(sql)
+        sql = (
             "Create table foo\n"
             "( column1 int primary key, "
-            "constraint `key_with_name` foreign key (column1) "
-            "references table2 (column1))"
+            "constraint `key_with_name_1` foreign key (column1) "
+            "references table2 (column1), "
+            "constraint `key_with_name_2` foreign key (column2) "
+            "references table2 (column2))"
         )
-        sqls.append(
-            "Create table foo\n"
-            "( column1 int primary key, "
-            "constraint foreign key (column1) "
-            "references table2 (column1))"
-        )
-        for sql in sqls:
-            sql_obj = parse_create(sql)
-            self.assertTrue(sql_obj.constraint is not None)
+        sql_obj = parse_create(sql)
+        self.assertTrue(sql_obj.constraint != "")
+        self.assertTrue(sql_obj.fk_constraint != {})
+        sql = "Create table foo\n( column1 int primary key)) "
+        sql_obj = parse_create(sql)
+        self.assertTrue(sql_obj.constraint == "")
+        self.assertTrue(sql_obj.fk_constraint == {})
 
     def test_multiple_primary(self):
         sqls = []
