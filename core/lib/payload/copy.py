@@ -1567,11 +1567,11 @@ class CopyPayload(Payload):
 
     @wrap_hook
     def create_triggers(self):
-        self.wait_until_slow_query_finish()
         self.stop_slave_sql()
         self.ddl_guard()
         log.debug("Locking table: {} before creating trigger".format(self.table_name))
         if not self.is_high_pri_ddl_supported:
+            self.wait_until_slow_query_finish()
             self.lock_tables(tables=[self.table_name])
 
         try:

@@ -1042,6 +1042,26 @@ class CopyPayloadTestCase(unittest.TestCase):
             payload.wait_until_slow_query_finish()
         self.assertEqual(err_context.exception.err_key, "LONG_RUNNING_TRX")
 
+    def test_high_pri_ddl_does_not_wait_for_slow_query(self):
+        payload = self.payload_setup()
+        payload.stop_slave_sql = Mock()
+        payload.ddl_guard = Mock()
+        payload.mysql_version = MySQLVersion("8.0.1-fb-1")
+        payload.get_conn = Mock()
+        payload.execute_sql = Mock()
+        payload.wait_until_slow_query_finish = Mock()
+        payload.create_triggers()
+        self.assertTrue(payload.is_high_pri_ddl_supported)
+        payload.wait_until_slow_query_finish.assert_not_called()
+
+        # If high pri ddl is not supported, we should call wait_until_slow_query_finish
+        payload.get_long_trx = Mock(return_value=False)
+        payload.mysql_version = MySQLVersion("8.0.1-test-1")
+        payload.wait_until_slow_query_finish = Mock(return_value=True)
+        self.assertFalse(payload.is_high_pri_ddl_supported)
+        payload.create_triggers()
+        payload.wait_until_slow_query_finish.assert_called_once()
+
     def test_auto_table_collation_population(self):
         payload = self.payload_setup()
         sql = """
