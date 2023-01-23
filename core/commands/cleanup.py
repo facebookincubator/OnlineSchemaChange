@@ -44,7 +44,7 @@ class Cleanup(CommandBase):
         if not self.payload.fetch_mysql_vars():
             raise OSCError("FAILED_TO_FETCH_MYSQL_VARS")
 
-        # Check database existance
+        # Check database existence
         if self.payload.databases:
             non_exist_dbs = self.payload.check_db_existence()
             if non_exist_dbs:

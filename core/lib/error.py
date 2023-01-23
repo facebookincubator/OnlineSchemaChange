@@ -237,7 +237,7 @@ class OSCError(Exception):
         },
         "FAIL_TO_GUESS_CHUNK_SIZE": {
             "code": 137,
-            "desc": ("Failed to decide optmial chunk size for dump"),
+            "desc": ("Failed to decide optimal chunk size for dump"),
             "retryable": True,
         },
         "NO_INDEX_COVERAGE": {
@@ -344,10 +344,10 @@ class OSCError(Exception):
         "IMPLICIT_CONVERSION_DETECTED": {
             "code": 149,
             "desc": (
-                "Implicity convesion happened after executing the CREATE "
+                "Implicit conversion happened after executing the CREATE "
                 "TABLE statement. It is a best practice to always store your "
                 "schema in a consistent way. Please make sure that the "
-                "statment provided in the file is copied from the output of "
+                "statement provided in the file is copied from the output of "
                 "`SHOW CREATE TABLE`. Difference detected: \n {diff}"
             ),
             "retryable": False,

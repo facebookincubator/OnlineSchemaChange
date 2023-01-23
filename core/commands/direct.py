@@ -65,7 +65,7 @@ class Direct(CommandBase):
         if not self.payload.fetch_mysql_vars():
             raise OSCError("FAILED_TO_FETCH_MYSQL_VARS")
 
-        # Check database existance
+        # Check database existence
         non_exist_dbs = self.payload.check_db_existence()
         if non_exist_dbs:
             raise OSCError("DB_NOT_EXIST", {"db_list": ", ".join(non_exist_dbs)})

@@ -119,7 +119,7 @@ def list_to_col_str(column_list) -> str:
 
 
 def column_name_with_tbl_prefix(column_list, prefix) -> str:
-    """Generate a comma seprated string, which attaches given prefix to the
+    """Generate a comma separated string, which attaches given prefix to the
     given list of column names.
 
     @param column_list:  list of column names
@@ -208,7 +208,7 @@ def checksum_column_list(column_list) -> str:
 
 def get_range_start_condition(columns, values) -> str:
     """
-    Generate a where clase for chunk matching. The size of columns and values
+    Generate a where clause for chunk matching. The size of columns and values
     are equal.
     """
     condition_array = []

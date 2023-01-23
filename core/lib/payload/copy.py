@@ -42,7 +42,7 @@ class CopyPayload(Payload):
     by trigger onto the new table. Finally, a table name flip will be
     issued to make the new schema serve requests
 
-    Properties in this class have consistant name convention. A property name
+    Properties in this class have consistent name convention. A property name
     will look like:
         [old/new]_[pk/non_pk]_column_list
     with:
@@ -537,7 +537,7 @@ class CopyPayload(Payload):
 
     def skip_cache_fill_for_myrocks(self):
         """
-        Skip block cache fill for dumps and scans to avoid cache polution
+        Skip block cache fill for dumps and scans to avoid cache pollution
         """
         if "rocksdb_skip_fill_cache" in self.mysql_vars:
             self.execute_sql(sql.set_session_variable("rocksdb_skip_fill_cache"), (1,))
@@ -787,7 +787,7 @@ class CopyPayload(Payload):
         Given a table_name return its raw data size before compression.
         MyRocks is very good at compression, the on disk dump size
         is much bigger than the actual MyRocks table size, hence we will
-        use raw size for the esitmation of the maximum disk usage
+        use raw size for the estimation of the maximum disk usage
 
         @param table_name:  Name of the table to fetch size
         @type  table_name:  string
@@ -1140,13 +1140,13 @@ class CopyPayload(Payload):
         self.drop_columns_check()
 
     def drop_columns_check(self):
-        # We only allow dropping columns with the flag --alow-drop-column.
+        # We only allow dropping columns with the flag --allow-drop-column.
         if self.dropped_column_name_list:
             if self.allow_drop_column:
                 for diff_column in self.dropped_column_name_list:
                     log.warning(
                         "Column `{}` is missing in the new schema, "
-                        "but --alow-drop-column is specified. Will "
+                        "but --allow-drop-column is specified. Will "
                         "drop this column.".format(diff_column)
                     )
             else:
@@ -1365,7 +1365,7 @@ class CopyPayload(Payload):
 
     def get_long_trx(self):
         """
-        Return a long running transaction agaisnt the table we'll touch,
+        Return a long running transaction against the table we'll touch,
         if there's one.
         This is mainly for safety as long running transaction may block DDL,
         thus blocks more other requests
@@ -1876,12 +1876,12 @@ class CopyPayload(Payload):
         if self.mysql_version.is_mysql8:
             return self.is_var_enabled("max_execution_time")
         else:
-            # the max_statement_time is count in miliseconds
+            # the max_statement_time is count in milliseconds
             try:
                 self.query(sql.select_max_statement_time)
                 return True
             except Exception:
-                # if any excpetion raised here, we'll treat it as
+                # if any exception raised here, we'll treat it as
                 # MAX_STATEMENT_TIME is not supported
                 log.warning("MAX_STATEMENT_TIME doesn't support in this MySQL")
                 return False
@@ -2123,7 +2123,7 @@ class CopyPayload(Payload):
             ):
                 raise OSCError("REPLAY_TIMEOUT")
             replayed_total += len(ids)
-            # Commit transaction after every replay_batch_szie number of
+            # Commit transaction after every replay_batch_size number of
             # changes have been replayed
             if not single_trx and replayed > self.replay_batch_size:
                 self.commit()
@@ -2180,9 +2180,9 @@ class CopyPayload(Payload):
         except MySQLdb.OperationalError as e:
             errnum, errmsg = e.args
             # data_dir cannot always be set to innodb_tmpdir due to
-            # priviledge issue. Falling back to tmpdir if it happens
+            # privilege issue. Falling back to tmpdir if it happens
             # 1193: unknown variable
-            # 1231: Failed to set because of priviledge error
+            # 1231: Failed to set because of privilege error
             if errnum in (1231, 1193):
                 log.warning(
                     "Failed to set innodb_tmpdir, falling back to tmpdir: {}".format(
@@ -2298,7 +2298,7 @@ class CopyPayload(Payload):
         """
         Using the same set of session variable as chunk start point and
         calculate checksum for old table/new table. If assign is provided,
-        current right boundry will be passed into range_start_vars as the
+        current right boundary will be passed into range_start_vars as the
         start of next chunk
         """
         return self.query(
@@ -2328,7 +2328,7 @@ class CopyPayload(Payload):
         log.info(", ".join(self._pk_for_filter + self.checksum_column_list))
         for table_name in [self.table_name, self.new_table_name]:
             if table_name == self.new_table_name:
-                # index for new scehma can be any indexes that provides
+                # index for new schema can be any indexes that provides
                 # uniqueness and covering old PK lookup
                 idx_for_checksum = self.find_coverage_index()
                 outfile = "{}.new".format(self.outfile)
@@ -2418,7 +2418,7 @@ class CopyPayload(Payload):
                 )
             )
             # Dump the data onto local disk for further investigation
-            # This will be very helpful when there's a reproducable checksum
+            # This will be very helpful when there's a reproducible checksum
             # mismatch issue
             if dump_after_checksum:
                 self.execute_sql(
@@ -2555,7 +2555,7 @@ class CopyPayload(Payload):
 
             # We can calculate the checksum for new table outside the
             # transaction, because the data in new table is static without
-            # replaying chagnes
+            # replaying changes
             self.commit()
 
             log.info("Checksuming data from new table")
@@ -2686,7 +2686,7 @@ class CopyPayload(Payload):
 
         """
         if self.eliminate_dups:
-            log.warning("Skip checksum, because --elimiate-duplicate " "specified")
+            log.warning("Skip checksum, because --eliminate-duplicate " "specified")
             return
         elif not self.need_checksum_for_changes():
             return
@@ -2702,12 +2702,12 @@ class CopyPayload(Payload):
             )
         start_time = time.time()
         old_table_checksum = self.checksum_by_replay_chunk(self.table_name)
-        # Checksum for the __new table should be issued inside the transcation
+        # Checksum for the __new table should be issued inside the transaction
         # too. Otherwise those invisible gaps in the __chg table will show
         # up when calculating checksums
         new_table_checksum = self.checksum_by_replay_chunk(self.new_table_name)
         # After calculation checksums from both tables, we now can close the
-        # transcation, if we want
+        # transaction, if we want
         if not single_trx:
             self.commit()
         self.compare_checksum(old_table_checksum, new_table_checksum)
@@ -2895,7 +2895,7 @@ class CopyPayload(Payload):
 
     def rename_back(self):
         """
-        If the orignal table was successfully renamed to _old but the second
+        If the original table was successfully renamed to _old but the second
         rename operation failed, rollback the first renaming
         """
         if (

@@ -224,7 +224,7 @@ class Payload(object):
                     non_exist_dbs.append(db)
             return non_exist_dbs
         except Exception:
-            log.exception("Failed to check database existance")
+            log.exception("Failed to check database existence")
             return False
 
     def read_ddl_files(self):
@@ -388,7 +388,7 @@ class Payload(object):
 
     def rm_file(self, filename):
         """Wrapper of the util.rm function. This is here mainly to make it
-        eaiser for implementing a hook around the rm call
+        easier for implementing a hook around the rm call
 
         @param filename:  Full path of the file needs to be removed
         @type  filename:  string

@@ -80,7 +80,7 @@ class Copy(CommandBase):
         parser.add_argument(
             "--allow-drop-column",
             action="store_true",
-            help="Allow a column to be droppped if it does not"
+            help="Allow a column to be dropped if it does not"
             "exist in the new schema",
         )
         parser.add_argument(
@@ -122,7 +122,7 @@ class Copy(CommandBase):
             "--post-load-statement",
             help="SQL to be executed after loading data into "
             "new table. This is useful when you've specified "
-            "--pre-load-statement for some temporary tunning "
+            "--pre-load-statement for some temporary tuning "
             "before load and want to revert after loading",
         )
         parser.add_argument(
@@ -163,7 +163,7 @@ class Copy(CommandBase):
             "replay before we decide it's impossible.  Setting "
             "this too high can cause our osc_chg table to hit "
             "max int value and even if we use bigint osc will "
-            " be unlikey to ever catchup in such cases.",
+            " be unlikely to ever catchup in such cases.",
         )
         parser.add_argument(
             "--free-space-reserved-percent",
@@ -207,7 +207,7 @@ class Copy(CommandBase):
             default=constant.LOCK_MAX_ATTEMPTS,
             type=int,
             help="For how many times we should have tried"
-            "to lock table for wrirte before exist. LOCK "
+            "to lock table for write before exist. LOCK "
             "WRITE may fail because of dead lock or lock "
             "timeout.",
         )
@@ -274,7 +274,7 @@ class Copy(CommandBase):
             "same time. Use this option, if you really want "
             "to run more than one OSC at the same time, and "
             "don't care about the potential load it will "
-            "cause to the MySQL intance",
+            "cause to the MySQL instance",
         )
         parser.add_argument(
             "--skip-cleanup-after-kill",
