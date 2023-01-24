@@ -74,7 +74,7 @@ class MySQLVersion(object):
     @property
     def is_mysql8(self):
         """
-        Return if current running MySQL is msyql8
+        Return if current running MySQL is mysql8
         """
         return self.major == 8
 

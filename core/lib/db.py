@@ -129,7 +129,7 @@ class MySQLSocketConnection:
 
     def affected_rows(self):
         """
-        Return the number of aftected rows of the last query ran in this
+        Return the number of affected rows of the last query ran in this
         connection
         """
         return self.conn.affected_rows

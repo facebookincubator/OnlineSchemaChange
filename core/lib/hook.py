@@ -52,7 +52,7 @@ class HookBase(object):
     def execute(self, payload):
         try:
             self._execute(payload)
-            log.debug("Hook excution finished")
+            log.debug("Hook execution finished")
         except Exception as e:
             if self.critical:
                 raise
