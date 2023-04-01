@@ -55,6 +55,8 @@ class Payload(object):
         self.skip_named_lock = kwargs.get("skip_named_lock", False)
         self.mysql_vars = {}
         self.is_slave_stopped_by_me = False
+        self.num_finished_dbs = 0
+        self._current_db = None
 
     @property
     def conn(self):
@@ -488,6 +490,7 @@ class Payload(object):
         # Iterate through all the specified databases
         for db in self.db_list:
             log.info("Running changes for database: '{}'".format(db))
+            self._current_db = db
             # Iterate through all the given sql files
             for job in self.sql_list:
                 log.info("Running SQLs from file: '{}'".format(job["filepath"]))

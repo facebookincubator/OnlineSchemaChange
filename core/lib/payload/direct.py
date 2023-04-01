@@ -10,6 +10,7 @@ LICENSE file in the root directory of this source tree.
 import logging as log
 
 import MySQLdb
+from osc.lib.hook import wrap_hook
 
 from ..error import OSCError
 from .base import Payload
@@ -27,6 +28,7 @@ class DirectPayload(Payload):
     big deal for your application
     """
 
+    @wrap_hook
     def run_ddl(self, db, sql):
         log.debug("Creating table using: \n {}".format(sql))
         try:

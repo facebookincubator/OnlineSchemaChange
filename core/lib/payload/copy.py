@@ -60,7 +60,6 @@ class CopyPayload(Payload):
 
     def __init__(self, *args, **kwargs):
         super(CopyPayload, self).__init__(*args, **kwargs)
-        self._current_db = None
         self._pk_for_filter = []
         self._idx_name_for_filter = "PRIMARY"
         self._new_table = None
