@@ -650,7 +650,9 @@ class CreateParser(object):
         )
 
     @classmethod
-    def get_parser(cls):
+    def get_parser(cls, force_new_parser_obj: bool = False):
+        if force_new_parser_obj:
+            return cls.generate_rule()
         if not cls._parser:
             cls._parser = cls.generate_rule()
         return cls._parser
@@ -679,24 +681,28 @@ class CreateParser(object):
         )
 
     @classmethod
-    def get_partitions_parser(cls):
+    def get_partitions_parser(cls, force_new_parser_obj: bool = False):
+        if force_new_parser_obj:
+            return cls.gen_partitions_parser()
         if not cls._partitions_parser:
             cls._partitions_parser = cls.gen_partitions_parser()
         return cls._partitions_parser
 
     @classmethod
-    def parse_partitions(cls, parts) -> ParseResults:
+    def parse_partitions(
+        cls, parts, force_new_parser_obj: bool = False
+    ) -> ParseResults:
         try:
-            return cls.get_partitions_parser().parseString(parts)
+            return cls.get_partitions_parser(force_new_parser_obj).parseString(parts)
         except ParseException as e:
             raise ParseError(f"Error parsing partitions: {e.line}, {e.column}")
 
     @classmethod
-    def parse(cls, sql):
+    def parse(cls, sql, force_new_parser_obj: bool = False):
         try:
             if not isinstance(sql, str):
                 sql = sql.decode("utf-8")
-            result = cls.get_parser().parseString(sql)
+            result = cls.get_parser(force_new_parser_obj).parseString(sql)
         except ParseException as e:
             raise ParseError(
                 "Failed to parse SQL, unsupported syntax: {}".format(e),
@@ -726,7 +732,7 @@ class CreateParser(object):
             # need to dedup here
             table.partition = result.partition.replace("\n\n", "\n")
             try:
-                presult = cls.parse_partitions(table.partition)
+                presult = cls.parse_partitions(table.partition, force_new_parser_obj)
                 table.partition_config = cls.partition_to_model(presult)
             except ParseException as e:
                 raise ParseError(
@@ -988,8 +994,8 @@ class CreateParser(object):
         return pc
 
 
-def parse_create(sql):
-    return CreateParser.parse(sql)
+def parse_create(sql, force_new_parser_obj: bool = False):
+    return CreateParser.parse(sql, force_new_parser_obj)
 
 
 def _process_partition_definitions(
