@@ -59,7 +59,9 @@ class CleanupPayload(Payload):
                 log.exception("Failed to cleanup file: {}".format(filepath))
 
         # Drop table and triggers
-        if not self._conn:
+        # If we have multiple databases, re-require the connection
+        # since the previous connection might already reach wait_timeout
+        if not self._conn or len(self.databases) > 1:
             self._conn = self.get_conn(db)
 
         self.gen_drop_sqls()
