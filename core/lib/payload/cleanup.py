@@ -61,7 +61,7 @@ class CleanupPayload(Payload):
         # Drop table and triggers
         # If we have multiple databases, re-require the connection
         # since the previous connection might already reach wait_timeout
-        if not self._conn or len(self.databases) > 1:
+        if not self._conn or (self.databases and len(self.databases) > 1):
             self._conn = self.get_conn(db)
 
         self.gen_drop_sqls()

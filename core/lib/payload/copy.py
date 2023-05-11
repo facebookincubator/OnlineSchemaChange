@@ -2913,6 +2913,7 @@ class CopyPayload(Payload):
         log.info("== Stage 7: Cleanup ==")
         # Close current connection to free up all the temporary resource
         # and locks
+        cleanup_start_time = time.time()
         try:
             self.rename_back()
             self.start_slave_sql()
@@ -2930,6 +2931,7 @@ class CopyPayload(Payload):
         self._cleanup_payload.socket = self.socket
         self._cleanup_payload.get_conn_func = self.get_conn_func
         self._cleanup_payload.cleanup(self._current_db)
+        self.stats["time_in_cleanup"] = time.time() - cleanup_start_time
 
     def print_stats(self):
         log.info("Time in dump: {:.3f}s".format(self.stats.get("time_in_dump", 0)))
@@ -2944,6 +2946,9 @@ class CopyPayload(Payload):
             "Time in delta checksum: {:.3f}s".format(
                 self.stats.get("time_in_delta_checksum", 0)
             )
+        )
+        log.info(
+            "Time in cleanup: {:.3f}s".format(self.stats.get("time_in_cleanup", 0))
         )
         log.info(
             "Time holding locks: {:.3f}s".format(self.stats.get("time_in_lock", 0))
