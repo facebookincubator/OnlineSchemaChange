@@ -11,6 +11,7 @@ LICENSE file in the root directory of this source tree.
 import codecs
 import collections
 import logging
+import os
 
 import MySQLdb
 
@@ -487,10 +488,20 @@ class Payload(object):
         if not self.fetch_mysql_vars():
             raise OSCError("FAILED_TO_FETCH_MYSQL_VARS")
 
+        _current_db_outfile_dir = self.outfile_dir
         # Iterate through all the specified databases
         for db in self.db_list:
             log.info("Running changes for database: '{}'".format(db))
             self._current_db = db
+
+            # wsenv: always append current db to avoid file conflict
+            if _current_db_outfile_dir and self.use_sql_wsenv:
+                self.outfile_dir = _current_db_outfile_dir + os.sep + db
+                log.info(
+                    f"wsenv: updating outfile_dir with current db: \n"
+                    f"'{self.outfile_dir}'"
+                )
+
             # Iterate through all the given sql files
             for job in self.sql_list:
                 log.info("Running SQLs from file: '{}'".format(job["filepath"]))
