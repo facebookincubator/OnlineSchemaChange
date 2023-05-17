@@ -318,6 +318,25 @@ class Copy(CommandBase):
             action="store_true",
             help="Enable dump/load data with wsenv if specified",
         )
+        parser.add_argument(
+            "--enable-outfile-compression",
+            action="store_true",
+            dest="enable_outfile_compression",
+            help=(
+                "Enable outfile compression"
+                " (WARN: Some MySQL versions might lead to immediate crash)"
+            ),
+        )
+        parser.add_argument(
+            "--compressed-outfile-extension",
+            dest="compressed_outfile_extension",
+            help=(
+                "When outfile compression is enabled the following file extension will"
+                " be used."
+                " NOTE: This is relevant as different MySQL servers might use different"
+                " compression algorithms, add compression algorithm suffix."
+            ),
+        )
 
     def setup_parser(self, parser, **kwargs):
         super(Copy, self).setup_parser(parser, **kwargs)

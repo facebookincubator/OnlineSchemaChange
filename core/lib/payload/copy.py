@@ -181,6 +181,13 @@ class CopyPayload(Payload):
             self.chunk_size = kwargs.get("chunk_size", constant.CHUNK_BYTES)
             self.skip_disk_space_check = kwargs.get("skip_disk_space_check", False)
 
+        self.enable_outfile_compression = kwargs.get(
+            "enable_outfile_compression", False
+        )
+        self.compressed_outfile_extension = kwargs.get(
+            "compressed_outfile_extension", None
+        )
+
     @property
     def current_db(self):
         """
@@ -427,6 +434,40 @@ class CopyPayload(Payload):
         # duplicates during data loading
         return self._new_table.droppable_indexes(keep_unique_key=self.eliminate_dups)
 
+    def _outfile_extension(self, skip_compressed_extension: bool = False) -> str:
+        if (
+            not skip_compressed_extension
+            and self.enable_outfile_compression
+            and self.compressed_outfile_extension
+        ):
+            return ".{}.{}".format(
+                # NOTE: Do not use chunk size in compression
+                #       This is intentional because we want to be able to predictably
+                #       determine the exact file that mysqld would create
+                #       (such as `{filename}.{mysqld_chunk_number}.{extension}`)
+                #       and because OSC does already do chunking in the not
+                #       compressed path
+                0,  # mysql_chunk_number is always 0
+                self.compressed_outfile_extension,
+            )
+        else:
+            return ""
+
+    def _outfile_name(
+        self,
+        chunk_id: int,
+        suffix: Optional[str] = None,
+        skip_compressed_extension: bool = False,
+    ) -> str:
+        return "{}{}.{}{}".format(
+            self.outfile,
+            suffix or "",
+            chunk_id,
+            self._outfile_extension(
+                skip_compressed_extension=skip_compressed_extension
+            ),
+        )
+
     def set_tx_isolation(self):
         """
         Setting the session isolation level to RR for OSC
@@ -658,8 +699,20 @@ class CopyPayload(Payload):
         for filepath in (self.outfile_exclude_id, self.outfile_include_id):
             cleanup_payload.add_file_entry(filepath)
         # cleanup outfiles for detailed checksum
-        for suffix in ["old", "new"]:
-            cleanup_payload.add_file_entry("{}.{}".format(self.outfile, suffix))
+        cleanup_payload.add_file_entry(
+            "{}*".format(
+                self._outfile_name(
+                    suffix=".old", chunk_id=0, skip_compressed_extension=True
+                )
+            )
+        )
+        cleanup_payload.add_file_entry(
+            "{}*".format(
+                self._outfile_name(
+                    suffix=".new", chunk_id=0, skip_compressed_extension=True
+                )
+            )
+        )
         # cleanup outfiles for table dump
         file_prefixes = [
             self.outfile,
@@ -668,7 +721,9 @@ class CopyPayload(Payload):
         ]
         for file_prefix in file_prefixes:
             log.debug("globbing {}".format(file_prefix))
-            for outfile in glob.glob("{}.[0-9]*".format(file_prefix)):
+            for outfile in glob.glob(
+                "{}.[0-9]*".format(file_prefix),
+            ):
                 cleanup_payload.add_file_entry(outfile)
         for trigger in (
             self.delete_trigger_name,
@@ -1643,13 +1698,23 @@ class CopyPayload(Payload):
     def select_full_table_into_outfile(self):
         stage_start_time = time.time()
         try:
-            outfile = "{}.1".format(self.outfile)
+            outfile = self._outfile_name(chunk_id=1)
             sql_string = sql.select_full_table_into_file(
                 self._pk_for_filter + self.old_non_pk_column_list,
                 self.table_name,
                 self.where,
+                enable_outfile_compression=self.enable_outfile_compression,
             )
-            affected_rows = self.execute_sql(sql_string, (outfile,))
+            affected_rows = self.execute_sql(
+                sql_string,
+                (
+                    self._outfile_name(
+                        chunk_id=1,
+                        # MySQL does create the file with the extension itself
+                        skip_compressed_extension=True,
+                    ),
+                ),
+            )
             self.outfile_suffix_end = 1
             self.stats["outfile_lines"] = affected_rows
             self._cleanup_payload.add_file_entry(outfile)
@@ -1676,6 +1741,7 @@ class CopyPayload(Payload):
                 use_where,
                 self.where,
                 self._idx_name_for_filter,
+                enable_outfile_compression=self.enable_outfile_compression,
             )
             affected_rows = self.execute_sql(sql_string, (outfile,))
         except MySQLdb.OperationalError as e:
@@ -1691,7 +1757,7 @@ class CopyPayload(Payload):
         )
         self.stats["outfile_cnt"] = 1 + self.stats.setdefault("outfile_cnt", 0)
         self._cleanup_payload.add_file_entry(
-            "{}.{}".format(self.outfile, self.outfile_suffix_end)
+            self._outfile_name(chunk_id=self.outfile_suffix_end)
         )
         return affected_rows
 
@@ -1719,7 +1785,11 @@ class CopyPayload(Payload):
         printed_chunk = 0
         while affected_rows:
             self.outfile_suffix_end = outfile_suffix
-            outfile = "{}.{}".format(self.outfile, outfile_suffix)
+            outfile = self._outfile_name(
+                chunk_id=outfile_suffix,
+                # MySQL does create the file with the extension itself
+                skip_compressed_extension=True,
+            )
             affected_rows = self.select_chunk_into_outfile(outfile, use_where)
             # Refresh where condition range for next select
             if affected_rows:
@@ -1750,10 +1820,14 @@ class CopyPayload(Payload):
     @wrap_hook
     def load_chunk(self, column_list, chunk_id):
         sql_string = sql.load_data_infile(
-            self.new_table_name, column_list, ignore=self.eliminate_dups
+            self.new_table_name,
+            column_list,
+            ignore=self.eliminate_dups,
+            enable_outfile_compression=self.enable_outfile_compression,
         )
         log.debug(sql_string)
-        filepath = "{}.{}".format(self.outfile, chunk_id)
+
+        filepath = self._outfile_name(chunk_id=chunk_id)
         self.execute_sql(sql_string, (filepath,))
         # Delete the outfile once we have the data in new table to free
         # up space as soon as possible
@@ -1896,6 +1970,7 @@ class CopyPayload(Payload):
                 into_col_list=(self.IDCOLNAME, self.DMLCOLNAME),
                 from_table=self.tmp_table_include_id,
                 from_col_list=(self.IDCOLNAME, self.DMLCOLNAME),
+                enable_outfile_compression=self.enable_outfile_compression,
             )
         )
 
@@ -2330,11 +2405,21 @@ class CopyPayload(Payload):
                 # index for new schema can be any indexes that provides
                 # uniqueness and covering old PK lookup
                 idx_for_checksum = self.find_coverage_index()
-                outfile = "{}.new".format(self.outfile)
+                outfile = self._outfile_name(
+                    suffix=".new",
+                    chunk_id=0,
+                    # MySQL does create the file with the extension itself
+                    skip_compressed_extension=True,
+                )
             else:
                 # index for old schema should always be PK
                 idx_for_checksum = "PRIMARY"
-                outfile = "{}.old".format(self.outfile)
+                outfile = self._outfile_name(
+                    suffix=".old",
+                    chunk_id=0,
+                    # MySQL does create the file with the extension itself
+                    skip_compressed_extension=True,
+                )
             log.info("Dump offending chunk from {} into {}".format(table_name, outfile))
             self.execute_sql(
                 sql.dump_current_chunk(
@@ -2345,6 +2430,7 @@ class CopyPayload(Payload):
                     self.select_chunk_size,
                     idx_for_checksum,
                     use_where,
+                    enable_outfile_compression=self.enable_outfile_compression,
                 ),
                 (outfile,),
             )
@@ -2429,6 +2515,7 @@ class CopyPayload(Payload):
                         self.select_chunk_size,
                         idx_for_checksum,
                         use_where,
+                        enable_outfile_compression=self.enable_outfile_compression,
                     ),
                     ("{}.{}".format(outfile_prefix, str(outfile_id)),),
                 )

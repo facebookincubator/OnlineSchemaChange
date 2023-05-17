@@ -6,7 +6,7 @@ All rights reserved.
 This source code is licensed under the BSD-style license found in the
 LICENSE file in the root directory of this source tree.
 """
-from typing import Any, List, Union
+from typing import Any, List, Optional, Union
 
 
 get_lock = "SELECT get_lock(%s, 0) as lockstatus"
@@ -83,7 +83,7 @@ default_collation = (
 )
 
 all_collation = (
-    "SELECT COLLATION_NAME,CHARACTER_SET_NAME " "FROM information_schema.COLLATIONS"
+    "SELECT COLLATION_NAME,CHARACTER_SET_NAME FROM information_schema.COLLATIONS"
 )
 
 """
@@ -105,7 +105,7 @@ def escape(literal):
     return literal.replace("`", "``")
 
 
-def list_to_col_str(column_list) -> str:
+def list_to_col_str(column_list: List[str]) -> str:
     """Basic helper function for turn a list of column names into a single
     string separated by comma, and escaping the column name in the meanwhile
 
@@ -206,7 +206,7 @@ def checksum_column_list(column_list) -> str:
     return ", ".join(wrap_checksum_function(i) for i in column_list)
 
 
-def get_range_start_condition(columns, values) -> str:
+def get_range_start_condition(columns: List[str], values: List[Any]) -> str:
     """
     Generate a where clause for chunk matching. The size of columns and values
     are equal.
@@ -381,31 +381,56 @@ def lock_tables(tables) -> str:
     return lock_sql
 
 
-def select_into_file(id_col_name, dml_col_name, delta_table_name) -> str:
+def select_into_file(
+    id_col_name: str,
+    dml_col_name: str,
+    delta_table_name: str,
+    enable_outfile_compression: bool = False,
+) -> str:
     return (
         "SELECT `{}`, `{}` "
         "FROM `{}` "
-        "ORDER BY `{}` INTO OUTFILE %s".format(
+        "ORDER BY `{}` INTO OUTFILE %s {}".format(
             escape(id_col_name),
             escape(dml_col_name),
             escape(delta_table_name),
             escape(id_col_name),
+            # NOTE: Do not use chunk size in compression
+            #       This is intentional because we want to be able to predictably
+            #       determine the exact file that mysqld would create
+            #       (such as `{filename}.{mysqld_chunk_number}.{extension}`)
+            #       and because OSC does already do chunking in the not compressed path
+            " COMPRESSED" if enable_outfile_compression else "",
         )
     )
 
 
-def select_full_table_into_file(col_list, table_name, where_filter=None) -> str:
+def select_full_table_into_file(
+    col_list: List[str],
+    table_name: str,
+    where_filter: Optional[str] = None,
+    enable_outfile_compression: bool = False,
+) -> str:
     if where_filter:
         where_clause = "WHERE ({})".format(where_filter)
     else:
         where_clause = ""
-    return ("SELECT {} " "FROM `{}` " "{} " "INTO OUTFILE %s").format(
-        list_to_col_str(col_list), escape(table_name), where_clause
+
+    return "SELECT {} FROM `{}` {} INTO OUTFILE %s{}".format(
+        list_to_col_str(col_list),
+        escape(table_name),
+        where_clause,
+        # NOTE: Do not use chunk size in compression
+        #       This is intentional because we want to be able to predictably
+        #       determine the exact file that mysqld would create
+        #       (such as `{filename}.{mysqld_chunk_number}.{extension}`)
+        #       and because OSC does already do chunking in the not compressed path
+        " COMPRESSED" if enable_outfile_compression else "",
     )
 
 
 def select_full_table_into_file_by_chunk(
-    table_name,
+    table_name: str,
     range_start_vars_array,
     range_end_vars_array,
     old_pk_list,
@@ -414,6 +439,7 @@ def select_full_table_into_file_by_chunk(
     use_where,
     where_filter,
     idx_name: str = "PRIMARY",
+    enable_outfile_compression: bool = False,
 ) -> str:
     assign = ", ".join(assign_range_end_vars(old_pk_list, range_end_vars_array))
     if use_where:
@@ -437,21 +463,37 @@ def select_full_table_into_file_by_chunk(
         "SELECT {} "
         "FROM `{}` FORCE INDEX (`{}`) {} "
         "ORDER BY {} LIMIT {} "
-        "INTO OUTFILE %s ".format(
+        "INTO OUTFILE %s{}".format(
             column_name_list,
             escape(table_name),
             idx_name,
             where_clause,
             list_to_col_str(old_pk_list),
             select_chunk_size,
+            # NOTE: Do not use chunk size in compression
+            #       This is intentional because we want to be able to predictably
+            #       determine the exact file that mysqld would create
+            #       (such as `{filename}.{mysqld_chunk_number}.{extension}`)
+            #       and because OSC does already do chunking in the not compressed path
+            " COMPRESSED" if enable_outfile_compression else "",
         )
     )
 
 
-def load_data_infile(table_name, col_list, ignore: bool = False) -> str:
+def load_data_infile(
+    table_name, col_list, ignore: bool = False, enable_outfile_compression: bool = False
+) -> str:
     ignore_str = "IGNORE" if ignore else ""
-    return "LOAD DATA INFILE %s {} INTO TABLE `{}` " "CHARACTER SET BINARY ({})".format(
-        ignore_str, escape(table_name), list_to_col_str(col_list)
+    return "LOAD DATA INFILE %s {} INTO TABLE `{}`{} CHARACTER SET BINARY ({})".format(
+        ignore_str,
+        escape(table_name),
+        # NOTE: Do not use chunk size in compression
+        #       This is intentional because we want to be able to predictably
+        #       determine the exact file that mysqld would create
+        #       (such as `{filename}.{mysqld_chunk_number}.{extension}`)
+        #       and because OSC does already do chunking in the not compressed path
+        " COMPRESSED" if enable_outfile_compression else "",
+        list_to_col_str(col_list),
     )
 
 
@@ -462,7 +504,7 @@ def drop_index(idx_name, table_name) -> str:
 def insert_into_select_from(
     into_table, into_col_list, from_table, from_col_list
 ) -> str:
-    return ("INSERT INTO `{}` ({}) " "SELECT {} FROM `{}`").format(
+    return "INSERT INTO `{}` ({}) SELECT {} FROM `{}`".format(
         into_table,
         list_to_col_str(into_col_list),
         list_to_col_str(from_col_list),
@@ -541,9 +583,7 @@ def replay_update_row(
 
 
 def get_chg_row(id_col_name, dml_col_name, tmp_table_include_id) -> str:
-    return (
-        "SELECT `{id}`, `{dml_type}` " "FROM `{table}` " "WHERE `{id}` = %s "
-    ).format(
+    return "SELECT `{id}`, `{dml_type}` FROM `{table}` WHERE `{id}` = %s ".format(
         **{
             "id": escape(id_col_name),
             "dml_type": escape(dml_col_name),
@@ -636,13 +676,14 @@ def checksum_full_table(table_name, columns) -> str:
 
 
 def dump_current_chunk(
-    table_name,
+    table_name: str,
     columns,
     pk_list,
     range_start_values,
     chunk_size,
     force_index: str = "PRIMARY",
     use_where: bool = False,
+    enable_outfile_compression: bool = False,
 ) -> str:
     row_range = get_range_start_condition(pk_list, range_start_values)
     if use_where:
@@ -658,13 +699,19 @@ def dump_current_chunk(
         column_name_list = wrapped_pk_list
     return (
         "SELECT {} FROM `{}` FORCE INDEX (`{}`) {} "
-        "ORDER BY {} LIMIT {} INTO OUTFILE %s".format(
+        "ORDER BY {} LIMIT {} INTO OUTFILE %s{}".format(
             column_name_list,
             escape(table_name),
             escape(force_index),
             where_clause,
             list_to_col_str(pk_list),
             chunk_size,
+            # NOTE: Do not use chunk size in compression
+            #       This is intentional because we want to be able to predictably
+            #       determine the exact file that mysqld would create
+            #       (such as `{filename}.{mysqld_chunk_number}.{extension}`)
+            #       and because OSC does already do chunking in the not compressed path
+            " COMPRESSED" if enable_outfile_compression else "",
         )
     )
 
