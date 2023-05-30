@@ -1571,7 +1571,7 @@ class CopyPayload(Payload):
             "Hit max attempts: {}, but the threads running still don't drop"
             "below: {}.".format(self.ddl_guard_attempts, self.max_running_before_ddl)
         )
-        raise OSCError("DDL_GUARD_FAILED")
+        raise OSCError("DDL_GUARD_ATTEMPTS")
 
     @wrap_hook
     def lock_tables(self, tables):
