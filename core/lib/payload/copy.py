@@ -80,6 +80,8 @@ class CopyPayload(Payload):
         self.eta_chunks = 1
         self._last_kill_timer = None
         self.table_swapped = False
+        self.current_catchup_start_time = 0
+        self.current_catchup_end_time = 0
 
         self.repl_status = kwargs.get("repl_status", "")
         self.outfile_dir = kwargs.get("outfile_dir", "")
@@ -2110,6 +2112,7 @@ class CopyPayload(Payload):
         @type  single_trx:  bool
         """
         stage_start_time = time.time()
+        self.current_catchup_start_time = int(stage_start_time)
         log.debug("Timeout for replay changes: {}".format(self.replay_timeout))
         time_start = time.time()
         deleted, inserted, updated = 0, 0, 0
@@ -2236,7 +2239,9 @@ class CopyPayload(Payload):
             self.commit()
         self.last_replayed_id = max_id_now
 
-        time_spent = time.time() - stage_start_time
+        end_time = time.time()
+        self.current_catchup_end_time = int(end_time)
+        time_spent = end_time - stage_start_time
         self.stats["time_in_replay"] = (
             self.stats.setdefault("time_in_replay", 0) + time_spent
         )
@@ -2245,6 +2250,11 @@ class CopyPayload(Payload):
                 inserted, deleted, updated, time_spent
             )
         )
+
+        if time_spent > 0.0:
+            self.stats["last_catchup_speed"] = (
+                inserted + deleted + updated
+            ) / time_spent
 
     def set_innodb_tmpdir(self, innodb_tmpdir):
         try:
@@ -2660,7 +2670,7 @@ class CopyPayload(Payload):
         self.stats["time_in_table_checksum"] = time.time() - stage_start_time
 
     @wrap_hook
-    def log_replay_progress(self):
+    def evaluate_replay_progress(self):
         self.stats["num_replay_attempts"] += 1
         self.stats["replay_progress"] = (
             f"Replay progress: {self.stats['num_replay_attempts']}/"
@@ -2690,7 +2700,7 @@ class CopyPayload(Payload):
         self.execute_sql(sql.set_session_variable("long_query_time"), (1,))
         for i in range(self.replay_max_attempt):
             log.info("Catchup Attempt: {}".format(i + 1))
-            self.log_replay_progress()
+            self.evaluate_replay_progress()
             start_time = time.time()
             # If checksum is required, then we need to make sure total time
             # spent in replay+checksum is below replay_timeout.

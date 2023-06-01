@@ -427,6 +427,11 @@ class OSCError(Exception):
             "desc": ("-skip-disk-space-check must be true when using wsenv"),
             "retryable": False,
         },
+        "OSC_CANNOT_MATCH_WRITE_RATE": {
+            "code": 257,
+            "desc": "OSC catchup speed {speed} is not matching the write rate. We have exhausted the retries. Please reduce the incoming write rate or use a different deployment method for this(check documentation before proceeding)",
+            "retryable": False,
+        },
     }
 
     def __init__(self, err_key, desc_kwargs=None, mysql_err_code=None):
