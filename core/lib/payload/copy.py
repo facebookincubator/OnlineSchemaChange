@@ -1324,6 +1324,7 @@ class CopyPayload(Payload):
         # any implicit conversion
         if self.fail_for_implicit_conv:
             obj_after = self.fetch_table_schema(self.new_table_name)
+            is_rocksdb = obj_after.engine.upper() == "ROCKSDB"
             obj_after.engine = self._new_table.engine
             obj_after.name = self._new_table.name
             # Ignore partition difference, since there will be no implicit
@@ -1335,7 +1336,13 @@ class CopyPayload(Payload):
                 # Remove 'USING HASH' in keys on 8.0, when present in 5.6, as 8.0
                 # removes it by default
                 self.remove_using_hash_for_80()
-
+            if is_rocksdb:
+                log.warning(
+                    f"Ignore BTREE indexes in table `{self._new_table.name}` on RocksDB"
+                )
+                for idx in self._new_table.indexes:
+                    if idx.using == "BTREE":
+                        idx.using = None
             if obj_after != self._new_table:
                 raise OSCError(
                     "IMPLICIT_CONVERSION_DETECTED",
