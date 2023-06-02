@@ -14,7 +14,9 @@ from typing import List, Set, Union
 
 from pyparsing import (
     alphanums,
+    CaselessKeyword,
     CaselessLiteral,
+    Char,
     Combine,
     delimitedList,
     Group,
@@ -30,6 +32,7 @@ from pyparsing import (
     replaceWith,
     SkipTo,
     StringEnd,
+    StringStart,
     upcaseTokens,
     White,
     Word,
@@ -89,12 +92,14 @@ class CreateParser(object):
     WORD_TABLE = CaselessLiteral("TABLE").suppress()
     COMMA = Literal(",").suppress()
     DOT = Literal(".")
+    SEMICOLON = Char(";")
     LEFT_PARENTHESES = Literal("(").suppress()
     RIGHT_PARENTHESES = Literal(")").suppress()
     QUOTE = Literal("'") | Literal('"')
     BACK_QUOTE = Optional(Literal("`")).suppress()
-    BACK_SLASH = Optional(Literal("/")).suppress()
+    FORWARD_SLASH = Optional(Literal("/")).suppress()
     ASTERISK = Optional(Literal("*")).suppress()
+    C_STYLE_COMMENT = QuotedString(quoteChar="/*", endQuoteChar="*/", multiline=True)
     LENGTH = Word(nums)
     DECIMAL = Combine(Word(nums) + DOT + Word(nums))
     OBJECT_NAME = Word(alphanums + "_" + "-" + "<" + ">" + ":")
@@ -397,6 +402,21 @@ class CreateParser(object):
         + Optional(Literal("=")).suppress()
         + Word(nums)("key_block_size").setParseAction(lambda s, l, t: [int(t[0])])
     )
+    MIN_ROWS = (
+        CaselessKeyword("MIN_ROWS").suppress()
+        + Optional(Literal("=")).suppress()
+        + Word(nums)("min_rows")
+    )
+    MAX_ROWS = (
+        CaselessKeyword("MAX_ROWS").suppress()
+        + Optional(Literal("=")).suppress()
+        + Word(nums)("max_rows")
+    )
+    AVG_ROW_LENGTH = (
+        CaselessKeyword("AVG_ROW_LENGTH").suppress()
+        + Optional(Literal("=")).suppress()
+        + Word(nums)("avg_row_length")
+    )
     COMPRESSION = (
         CaselessLiteral("COMPRESSION").suppress()
         + Optional(Literal("=")).suppress()
@@ -406,14 +426,14 @@ class CreateParser(object):
     # /*!50100 TABLESPACE `innodb_system` */ on mysqld
     # installs without file-per-table
     TABLESPACE = (
-        BACK_SLASH
+        FORWARD_SLASH
         + ASTERISK
         + CaselessLiteral("!50100 TABLESPACE ").suppress()
         + BACK_QUOTE
         + OBJECT_NAME("tablespace")
         + BACK_QUOTE
         + ASTERISK
-        + BACK_SLASH
+        + FORWARD_SLASH
     )
 
     # Parse and make sure auto_increment is an integer
@@ -444,6 +464,9 @@ class CreateParser(object):
             | COMPRESSION
             | TABLE_AUTO_INCRE
             | TABLE_COMMENT
+            | MIN_ROWS
+            | MAX_ROWS
+            | AVG_ROW_LENGTH
         )
         # Table attributes could be comma separated too.
         + Optional(COMMA).suppress()
@@ -635,7 +658,8 @@ class CreateParser(object):
     def generate_rule(cls):
         # The final rule for the whole statement match
         return (
-            cls.WORD_CREATE
+            StringStart()
+            + cls.WORD_CREATE
             + cls.WORD_TABLE
             + cls.IF_NOT_EXIST
             + cls.TABLE_NAME
@@ -647,6 +671,9 @@ class CreateParser(object):
             + cls.RIGHT_PARENTHESES
             + cls.TABLE_OPTION("table_options")
             + cls.PARTITION
+            + Optional(cls.SEMICOLON)
+            + Optional(cls.C_STYLE_COMMENT)
+            + StringEnd()
         )
 
     @classmethod

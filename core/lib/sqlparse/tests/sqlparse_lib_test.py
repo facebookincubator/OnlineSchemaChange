@@ -7,9 +7,12 @@ This source code is licensed under the BSD-style license found in the
 LICENSE file in the root directory of this source tree.
 """
 
+import logging
 import unittest
 
 from ...sqlparse import parse_create, ParseError
+
+log = logging.getLogger(__name__)
 
 
 class SQLParserTest(unittest.TestCase):
@@ -472,7 +475,7 @@ class SQLParserTest(unittest.TestCase):
         sql_obj = parse_create(sql)
         self.assertTrue(sql_obj.constraint != "")
         self.assertTrue(sql_obj.fk_constraint != {})
-        sql = "Create table foo\n( column1 int primary key)) "
+        sql = "Create table foo\n( column1 int primary key) "
         sql_obj = parse_create(sql)
         self.assertTrue(sql_obj.constraint == "")
         self.assertTrue(sql_obj.fk_constraint == {})
@@ -811,9 +814,10 @@ class ModelTableTestCase(unittest.TestCase):
             " column5 set('a','b'),"
             "PRIMARY key (`column``1`) ,"
             "key `idx_name` (column1, column2(19)) ,"
-            "unique key `idx_name2` (column1))"
+            "unique key `idx_name2` (column1),"
             "key (auto_inc))"
         )
+        log.info(sql)
         sql_obj = parse_create(sql)
         # both `idx_name` `idx_name2` are droppable
         droppable_indexes = sql_obj.droppable_indexes(keep_unique_key=False)
@@ -992,3 +996,11 @@ class ModelTableTestCase(unittest.TestCase):
         obj1 = parse_create(t1)
         obj2 = parse_create(t2)
         self.assertTrue(obj1 == obj2)
+
+    def test_single_ddl(self):
+        """
+        Verify that only a single CREATE TABLE statement is permitted.
+        """
+        sql = "CREATE TABLE `t1`(s1 CHAR(1)); CREATE TABLE t2(foo int);"
+        with self.assertRaises(ParseError):
+            _ = parse_create(sql)
