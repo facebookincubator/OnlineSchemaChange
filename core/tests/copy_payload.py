@@ -462,7 +462,7 @@ class CopyPayloadTestCase(unittest.TestCase):
             payload.execute_sql = Mock(
                 side_effect=MySQLdb.OperationalError(1086, "abc")
             )
-            payload.select_chunk_into_outfile("path/to/outfile", False)
+            payload.select_chunk_into_outfile(False)
         self.assertEqual(err_context.exception.err_key, "FILE_ALREADY_EXIST")
 
         # Any mysql error other than 1086 should surface
@@ -470,7 +470,7 @@ class CopyPayloadTestCase(unittest.TestCase):
             payload.execute_sql = Mock(
                 side_effect=MySQLdb.OperationalError(1111, "abc")
             )
-            payload.select_chunk_into_outfile("path/to/outfile", False)
+            payload.select_chunk_into_outfile(False)
         self.assertEqual(err_context.exception.args[0], 1111)
 
     def test_partitions_being_added(self):

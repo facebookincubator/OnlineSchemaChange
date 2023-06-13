@@ -240,7 +240,11 @@ def show_table_stats(db_name) -> str:
     return "SHOW TABLE STATUS IN `{}` LIKE %s".format(escape(db_name))
 
 
-def get_myrocks_table_size() -> str:
+def get_myrocks_table_dump_size() -> str:
+    """
+    Return raw table data size without indexes as it would be dumped without
+    compression.
+    """
     return """
         SELECT SUM(DATA_SIZE) as raw_size
         FROM

@@ -849,7 +849,7 @@ class CopyPayload(Payload):
         @type  table_name:  string
         """
         result = self.query(
-            sql.get_myrocks_table_size(),
+            sql.get_myrocks_table_dump_size(),
             (
                 self._current_db,
                 self.table_name,
@@ -867,10 +867,35 @@ class CopyPayload(Payload):
         @param table_name:  Name of the table to fetch size
         @type  table_name:  string
         """
+        # Size of the new table on disk including all indexes.
+        # In MyRocks it could be compressed.
+        return self.get_table_size_from_IS(table_name)
+
+    def get_expected_compression_ratio_pct(self) -> int:
+        """
+        Return expected compression ratio pct for new table.
+        """
+        return 100
+
+    def get_expected_dump_size(self, table_name):
+        """
+        Given a table_name return its expected outfile size in Bytes.
+
+        @param table_name:  Name of the table to fetch size
+        @type  table_name:  string
+        """
+        on_disk_size = self.get_table_size(table_name)
+
+        # Figure out the dump data size and adjust for compression.
+        dump_size = on_disk_size
         if self.is_myrocks_table:
-            return self.get_table_size_for_myrocks(table_name)
-        else:
-            return self.get_table_size_from_IS(table_name)
+            dump_size = self.get_table_size_for_myrocks(table_name)
+
+        if self.enable_outfile_compression:
+            dump_size *= self.get_expected_compression_ratio_pct()
+            dump_size //= 100  # Perform integer floor division.
+
+        return dump_size
 
     def check_disk_size(self):
         """
@@ -880,14 +905,17 @@ class CopyPayload(Payload):
             return True
 
         self.table_size = int(self.get_table_size(self.table_name))
+        dump_size = int(self.get_expected_dump_size(self.table_name))
         disk_space = int(util.disk_partition_free(self.outfile_dir))
         # With allow_new_pk, we will create one giant outfile, and so at
         # some point will have the entire new table and the entire outfile
         # both existing simultaneously.
         if self.allow_new_pk and not self._old_table.primary_key.column_list:
-            required_size = self.table_size * 2
+            required_size = self.table_size + dump_size
         else:
-            required_size = self.table_size * 1.1
+            # Dump chunks are deleted as they are loaded into new table.
+            # Take the max of table and dump size and add 10% just in case.
+            required_size = max(self.table_size, dump_size) * 1.1
         log.info(
             "Disk space required: {}, available: {}".format(
                 util.readable_size(required_size), util.readable_size(disk_space)
@@ -1726,6 +1754,7 @@ class CopyPayload(Payload):
             )
             self.outfile_suffix_end = 1
             self.stats["outfile_lines"] = affected_rows
+            self.stats["outfile_size"] = os.path.getsize(outfile)
             self._cleanup_payload.add_file_entry(outfile)
             self.commit()
         except MySQLdb.OperationalError as e:
@@ -1738,7 +1767,13 @@ class CopyPayload(Payload):
         self.stats["time_in_dump"] = time.time() - stage_start_time
 
     @wrap_hook
-    def select_chunk_into_outfile(self, outfile, use_where):
+    def select_chunk_into_outfile(self, use_where):
+        # MySQL will append compressed extension to file name if needed.
+        outfile = self._outfile_name(
+            chunk_id=self.outfile_suffix_end,
+            skip_compressed_extension=True,
+        )
+
         try:
             sql_string = sql.select_full_table_into_file_by_chunk(
                 self.table_name,
@@ -1760,14 +1795,19 @@ class CopyPayload(Payload):
                 raise OSCError("FILE_ALREADY_EXIST", {"file": outfile})
             else:
                 raise
+
+        # Now get the real outfile name with compressed extension if needed.
+        outfile = self._outfile_name(chunk_id=self.outfile_suffix_end)
+
         log.debug("{} affected".format(affected_rows))
         self.stats["outfile_lines"] = affected_rows + self.stats.setdefault(
             "outfile_lines", 0
         )
         self.stats["outfile_cnt"] = 1 + self.stats.setdefault("outfile_cnt", 0)
-        self._cleanup_payload.add_file_entry(
-            self._outfile_name(chunk_id=self.outfile_suffix_end)
+        self.stats["outfile_size"] = os.path.getsize(outfile) + self.stats.setdefault(
+            "outfile_size", 0
         )
+        self._cleanup_payload.add_file_entry(outfile)
         return affected_rows
 
     @wrap_hook
@@ -1794,12 +1834,7 @@ class CopyPayload(Payload):
         printed_chunk = 0
         while affected_rows:
             self.outfile_suffix_end = outfile_suffix
-            outfile = self._outfile_name(
-                chunk_id=outfile_suffix,
-                # MySQL does create the file with the extension itself
-                skip_compressed_extension=True,
-            )
-            affected_rows = self.select_chunk_into_outfile(outfile, use_where)
+            affected_rows = self.select_chunk_into_outfile(use_where)
             # Refresh where condition range for next select
             if affected_rows:
                 self.refresh_range_start()
@@ -3057,6 +3092,9 @@ class CopyPayload(Payload):
         log.info(
             "Time holding locks: {:.3f}s".format(self.stats.get("time_in_lock", 0))
         )
+        log.info(f"Outfile count: {self.stats.get('outfile_cnt', 0)}")
+        log.info(f"Outfile total rows: {self.stats.get('outfile_lines', 0)}")
+        log.info(f"Outfile total size: {self.stats.get('outfile_size', 0)} bytes")
 
     @wrap_hook
     def run_ddl(self, db, sql):
