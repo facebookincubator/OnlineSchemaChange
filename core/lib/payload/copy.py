@@ -1754,7 +1754,9 @@ class CopyPayload(Payload):
             )
             self.outfile_suffix_end = 1
             self.stats["outfile_lines"] = affected_rows
-            self.stats["outfile_size"] = os.path.getsize(outfile)
+            self.stats["outfile_size"] = (
+                os.path.getsize(outfile) if not self.use_sql_wsenv else 0
+            )
             self._cleanup_payload.add_file_entry(outfile)
             self.commit()
         except MySQLdb.OperationalError as e:
@@ -1804,8 +1806,10 @@ class CopyPayload(Payload):
             "outfile_lines", 0
         )
         self.stats["outfile_cnt"] = 1 + self.stats.setdefault("outfile_cnt", 0)
-        self.stats["outfile_size"] = os.path.getsize(outfile) + self.stats.setdefault(
-            "outfile_size", 0
+        self.stats["outfile_size"] = (
+            os.path.getsize(outfile) + self.stats.setdefault("outfile_size", 0)
+            if not self.use_sql_wsenv
+            else 0
         )
         self._cleanup_payload.add_file_entry(outfile)
         return affected_rows
@@ -3094,7 +3098,8 @@ class CopyPayload(Payload):
         )
         log.info(f"Outfile count: {self.stats.get('outfile_cnt', 0)}")
         log.info(f"Outfile total rows: {self.stats.get('outfile_lines', 0)}")
-        log.info(f"Outfile total size: {self.stats.get('outfile_size', 0)} bytes")
+        if not self.use_sql_wsenv:
+            log.info(f"Outfile total size: {self.stats.get('outfile_size', 0)} bytes")
 
     @wrap_hook
     def run_ddl(self, db, sql):
