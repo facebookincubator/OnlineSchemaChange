@@ -73,6 +73,7 @@ class CopyPayload(Payload):
         self.outfile_suffix_start = 0
         self.last_replayed_id = 0
         self.last_checksumed_id = 0
+        self.current_checksum_record = -1
         self.table_size = 0
         self.session_overrides = []
         self._cleanup_payload = CleanupPayload(*args, **kwargs)
@@ -83,6 +84,9 @@ class CopyPayload(Payload):
         self.table_swapped = False
         self.current_catchup_start_time = 0
         self.current_catchup_end_time = 0
+        self.max_id_to_replay_upto_for_good2go = -1
+        self.under_transaction = False
+        self.checksum_required_for_replay = False
 
         self.repl_status = kwargs.get("repl_status", "")
         self.outfile_dir = kwargs.get("outfile_dir", "")
@@ -772,6 +776,26 @@ class CopyPayload(Payload):
                 return
         raise Exception("Cannot determine output dir for dump")
 
+    def table_check(self):
+        tables_to_check = (
+            self.new_table_name,
+            self.delta_table_name,
+            self.renamed_table_name,
+        )
+        for table_name in tables_to_check:
+            if self.table_exists(table_name):
+                raise OSCError(
+                    "TABLE_ALREADY_EXIST", {"db": self._current_db, "table": table_name}
+                )
+
+        # Make sure new table schema has primary key
+        if not all(
+            (self._new_table.primary_key, self._new_table.primary_key.column_list)
+        ):
+            raise OSCError(
+                "NO_PK_EXIST", {"db": self._current_db, "table": self.table_name}
+            )
+
     def trigger_check(self):
         """
         Check whether there's any trigger already exist on the table we're
@@ -1155,25 +1179,7 @@ class CopyPayload(Payload):
         Also doing some index sanity check.
         """
         # Make sure temporary table we will use during copy doesn't exist
-        tables_to_check = (
-            self.new_table_name,
-            self.delta_table_name,
-            self.renamed_table_name,
-        )
-        for table_name in tables_to_check:
-            if self.table_exists(table_name):
-                raise OSCError(
-                    "TABLE_ALREADY_EXIST", {"db": self._current_db, "table": table_name}
-                )
-
-        # Make sure new table schema has primary key
-        if not all(
-            (self._new_table.primary_key, self._new_table.primary_key.column_list)
-        ):
-            raise OSCError(
-                "NO_PK_EXIST", {"db": self._current_db, "table": self.table_name}
-            )
-
+        self.table_check()
         self.decide_pk_for_filter()
 
         # Check if we can have indexes in new table to efficiently look up
@@ -1574,12 +1580,14 @@ class CopyPayload(Payload):
         Start a transaction.
         """
         self.execute_sql(sql.start_transaction)
+        self.under_transaction = True
 
     def commit(self):
         """
         Commit and close the transaction
         """
         self.execute_sql(sql.commit)
+        self.under_transaction = False
 
     def ddl_guard(self):
         """
@@ -2036,11 +2044,14 @@ class CopyPayload(Payload):
         # If no events has been replayed, max would return a string 'None'
         # instead of a pythonic None. So we should treat 'None' as 0 here
         if result[0]["max_id"] == "None":
-            return 0
+            return max(0, self.max_id_to_replay_upto_for_good2go)
+        elif self.max_id_to_replay_upto_for_good2go != -1:
+            return self.max_id_to_replay_upto_for_good2go
+
         return result[0]["max_id"]
 
     @wrap_hook
-    def replay_delete_row(self, sql, *ids):
+    def replay_delete_row(self, sql, last_id, *ids):
         """
         Replay delete type change
 
@@ -2059,7 +2070,7 @@ class CopyPayload(Payload):
                 raise OSCError("REPLAY_WRONG_AFFECTED", {"num": affected_row})
 
     @wrap_hook
-    def replay_insert_row(self, sql, *ids):
+    def replay_insert_row(self, sql, last_id, *ids):
         """
         Replay insert type change
 
@@ -2078,7 +2089,7 @@ class CopyPayload(Payload):
                 raise OSCError("REPLAY_WRONG_AFFECTED", {"num": affected_row})
 
     @wrap_hook
-    def replay_update_row(self, sql, *ids):
+    def replay_update_row(self, sql, last_id, *ids):
         """
         Replay update type change
 
@@ -2163,12 +2174,6 @@ class CopyPayload(Payload):
         not
         @type  single_trx:  bool
         """
-        stage_start_time = time.time()
-        self.current_catchup_start_time = int(stage_start_time)
-        log.debug("Timeout for replay changes: {}".format(self.replay_timeout))
-        time_start = time.time()
-        deleted, inserted, updated = 0, 0, 0
-
         # all the changes to be replayed in this round will be stored in
         # tmp_table_include_id. Though change events may keep being generated,
         # we'll only replay till the end of temporary table
@@ -2180,11 +2185,19 @@ class CopyPayload(Payload):
             replay_ms = self.replay_timeout * 1000
         else:
             replay_ms = None
-        if delta_id_limit:
-            max_id_now = delta_id_limit
-        else:
-            max_id_now = self.get_max_delta_id()
-        log.debug("max_id_now is %r / %r", max_id_now, self.replay_max_changes)
+        max_id_now = self.determine_replay_id(
+            delta_id_limit if delta_id_limit else self.get_max_delta_id()
+        )
+
+        stage_start_time = time.time()
+        self.current_catchup_start_time = int(stage_start_time)
+        log.debug("Timeout for replay changes: {}".format(self.replay_timeout))
+        time_start = stage_start_time
+        deleted, inserted, updated = 0, 0, 0
+
+        self.record_currently_replaying_id(max_id_now)
+
+        log.info("max_id_now is %r / %r", max_id_now, self.replay_max_changes)
         if max_id_now > self.replay_max_changes:
             raise OSCError(
                 "REPLAY_TOO_MANY_DELTAS",
@@ -2263,13 +2276,13 @@ class CopyPayload(Payload):
 
             # Use corresponding SQL to replay each type of changes
             if chg_type == self.DML_TYPE_DELETE:
-                self.replay_delete_row(delete_sql, ids)
+                self.replay_delete_row(delete_sql, ids[-1], ids)
                 deleted += len(ids)
             elif chg_type == self.DML_TYPE_UPDATE:
-                self.replay_update_row(update_sql, ids)
+                self.replay_update_row(update_sql, ids[-1], ids)
                 updated += len(ids)
             elif chg_type == self.DML_TYPE_INSERT:
-                self.replay_insert_row(insert_sql, ids)
+                self.replay_insert_row(insert_sql, ids[-1], ids)
                 inserted += len(ids)
             else:
                 # We are not supposed to reach here, unless someone explicitly
@@ -2281,9 +2294,7 @@ class CopyPayload(Payload):
             progress_pct = int(replayed_total / len(delta) * 100)
             if progress_pct > showed_pct:
                 log.info(
-                    "Replay progress: {}/{} changes".format(
-                        replayed_total + 1, len(delta)
-                    )
+                    "Replay progress: {}/{} changes".format(replayed_total, len(delta))
                 )
                 showed_pct += 10
         # Commit for last batch
@@ -2307,6 +2318,19 @@ class CopyPayload(Payload):
             self.stats["last_catchup_speed"] = (
                 inserted + deleted + updated
             ) / time_spent
+
+    def record_currently_replaying_id(self, max_id_now: int) -> None:
+        return
+
+    def determine_replay_id(self, max_replay_id: int):
+        if self.max_id_to_replay_upto_for_good2go != -1:
+            if (
+                not max_replay_id
+                or max_replay_id > self.max_id_to_replay_upto_for_good2go
+            ):
+                return self.max_id_to_replay_upto_for_good2go
+
+        return max_replay_id
 
     def set_innodb_tmpdir(self, innodb_tmpdir):
         try:
@@ -2383,6 +2407,8 @@ class CopyPayload(Payload):
             raise OSCError("CHECKSUM_MISMATCH")
         log.info("{} checksum chunks in total".format(len(old_table_checksum)))
 
+        checksum_xor = 0
+        # Also, generate an xor of all the checksum entries for a quick sanity test
         for idx, checksum_entry in enumerate(old_table_checksum):
             for col in checksum_entry:
                 if not old_table_checksum[idx][col] == new_table_checksum[idx][col]:
@@ -2408,6 +2434,10 @@ class CopyPayload(Payload):
                         )
                     )
                     raise OSCError("CHECKSUM_MISMATCH")
+                else:
+                    checksum_xor ^= old_table_checksum[idx][col]
+
+        self.current_checksum_record = checksum_xor
 
     def checksum_full_table(self):
         """
@@ -2688,6 +2718,7 @@ class CopyPayload(Payload):
         self.start_transaction()
         # To fill the gap between old and new table since last replay
         log.info("Replay changes to bring two tables to a comparable state")
+        self.checksum_required_for_replay = True
         self.replay_changes(single_trx=True)
 
         # if we don't have a PK on old schema, then we are not able to checksum
@@ -2717,9 +2748,13 @@ class CopyPayload(Payload):
             self.detailed_checksum()
 
         self.last_checksumed_id = self.last_replayed_id
+        self.record_checksum()
 
         log.info("Checksum match between new and old table")
         self.stats["time_in_table_checksum"] = time.time() - stage_start_time
+
+    def record_checksum(self):
+        return
 
     @wrap_hook
     def evaluate_replay_progress(self):
@@ -2730,7 +2765,7 @@ class CopyPayload(Payload):
         )
 
     @wrap_hook
-    def replay_till_good2go(self, checksum):
+    def replay_till_good2go(self, checksum, final_catchup: bool = False):
         """
         Keep replaying changes until the time spent in replay is below
         self.replay_timeout
@@ -2762,10 +2797,12 @@ class CopyPayload(Payload):
                     "Catch up in order to compare checksum for the "
                     "rows that have been changed"
                 )
+                self.checksum_required_for_replay = True
                 self.replay_changes(single_trx=True)
                 self.checksum_for_changes(single_trx=False)
             else:
                 # Break replay into smaller chunks if it's too big
+                self.checksum_required_for_replay = False
                 max_id_now = self.get_max_delta_id()
                 while max_id_now - self.last_replayed_id > self.max_replay_batch_size:
                     delta_id_limit = self.last_replayed_id + self.max_replay_batch_size
@@ -2863,6 +2900,8 @@ class CopyPayload(Payload):
         self.stats["time_in_delta_checksum"] = self.stats.setdefault(
             "time_in_delta_checksum", 0
         ) + (time.time() - start_time)
+
+        self.record_checksum()
 
     @wrap_hook
     def apply_partition_differences(
@@ -2995,6 +3034,7 @@ class CopyPayload(Payload):
         stage_start_time = time.time()
         self.lock_tables((self.new_table_name, self.table_name, self.delta_table_name))
         log.info("Final round of replay before swap table")
+        self.checksum_required_for_replay = False
         self.replay_changes(single_trx=True, holding_locks=True)
         # We will not run delta checksum here, because there will be an error
         # like this, if we run a nested query using `NOT EXISTS`:
@@ -3107,6 +3147,11 @@ class CopyPayload(Payload):
         if not self.use_sql_wsenv:
             log.info(f"Outfile total size: {self.stats.get('outfile_size', 0)} bytes")
 
+    def execute_steps_to_cutover(self):
+        self.sync_table_partitions()
+        self.swap_tables()
+        self.reset_no_pk_creation()
+
     @wrap_hook
     def run_ddl(self, db, sql):
         try:
@@ -3135,10 +3180,10 @@ class CopyPayload(Payload):
             self.analyze_table()
             self.checksum()
             log.info("== Stage 5: Catch up to reduce time for holding lock ==")
-            self.replay_till_good2go(checksum=self.skip_delta_checksum)
-            self.sync_table_partitions()
-            self.swap_tables()
-            self.reset_no_pk_creation()
+            self.replay_till_good2go(
+                checksum=self.skip_delta_checksum, final_catchup=True
+            )
+            self.execute_steps_to_cutover()
             self.cleanup()
             self.print_stats()
             self.stats["wall_time"] = time.time() - time_started

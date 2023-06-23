@@ -127,6 +127,13 @@ class MySQLSocketConnection:
         """
         self.conn.query("SET SESSION SQL_LOG_BIN=0;")
 
+    def set_binlog(self):
+        """
+        Enable session binlog events. Providing an option to run schema change
+        via replication when applicable.
+        """
+        self.conn.query("SET SESSION SQL_LOG_BIN=1;")
+
     def affected_rows(self):
         """
         Return the number of affected rows of the last query ran in this

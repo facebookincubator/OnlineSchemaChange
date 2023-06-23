@@ -277,6 +277,19 @@ class Payload(object):
                 {"stage": "before running ddl", "errnum": errcode, "errmsg": errmsg},
             )
 
+    def set_binlog(self):
+        """
+        Set session sql_log_bin=ON
+        """
+        try:
+            self._conn.set_binlog()
+        except MySQLdb.MySQLError as e:
+            errcode, errmsg = e.args
+            raise OSCError(
+                "GENERIC_MYSQL_ERROR",
+                {"stage": "before running ddl", "errnum": errcode, "errmsg": errmsg},
+            )
+
     @property
     def is_high_pri_ddl_supported(self):
         """
