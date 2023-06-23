@@ -70,6 +70,7 @@ class CopyPayload(Payload):
         self.is_ttl_disabled_by_me = False
         self.stop_before_swap = False
         self.outfile_suffix_end = 0
+        self.outfile_suffix_start = 0
         self.last_replayed_id = 0
         self.last_checksumed_id = 0
         self.table_size = 0
@@ -1752,6 +1753,7 @@ class CopyPayload(Payload):
                     ),
                 ),
             )
+            self.outfile_suffix_start = 1
             self.outfile_suffix_end = 1
             self.stats["outfile_lines"] = affected_rows
             self.stats["outfile_size"] = (
@@ -1832,6 +1834,7 @@ class CopyPayload(Payload):
             log.info("Dumping full table in one go.")
             return self.select_full_table_into_outfile()
         outfile_suffix = 1
+        self.outfile_suffix_start = 1
         # To let the loop run at least once
         affected_rows = 1
         use_where = False
@@ -1978,7 +1981,7 @@ class CopyPayload(Payload):
             # Enable rocksdb explicit commit before loading data
             self.change_explicit_commit(enable=True)
 
-        for suffix in range(1, self.outfile_suffix_end + 1):
+        for suffix in range(self.outfile_suffix_start, self.outfile_suffix_end + 1):
             self.load_chunk(column_list, suffix)
             # Print out information after every 10% chunks have been loaded
             # We won't show progress if the number of chunks is less than 50
