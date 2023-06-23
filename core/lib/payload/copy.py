@@ -1874,14 +1874,17 @@ class CopyPayload(Payload):
             enable_outfile_compression=self.enable_outfile_compression,
         )
         log.debug(sql_string)
-
-        filepath = self._outfile_name(chunk_id=chunk_id)
-        self.execute_sql(sql_string, (filepath,))
+        filepath = self._outfile_name(chunk_id)
+        self.load_chunk_file(filepath, sql_string, chunk_id)
         # Delete the outfile once we have the data in new table to free
         # up space as soon as possible
         if not self.use_sql_wsenv and self.rm_file(filepath):
             util.sync_dir(self.outfile_dir)
             self._cleanup_payload.remove_file_entry(filepath)
+
+    # chunk_id can be used for tracking by hooks etc.
+    def load_chunk_file(self, filepath, sql_string: str, chunk_id: int):
+        self.execute_sql(sql_string, (filepath,))
 
     def change_explicit_commit(self, enable=True):
         """
