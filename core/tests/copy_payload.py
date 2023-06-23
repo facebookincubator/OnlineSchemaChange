@@ -818,7 +818,7 @@ class CopyPayloadTestCase(unittest.TestCase):
         payload.execute_sql = Mock(return_value=0)
         row = {payload.IDCOLNAME: 1}
         with self.assertRaises(OSCError) as err_context:
-            payload.replay_insert_row(row)
+            payload.replay_insert_row(row, 1)
         self.assertEqual(err_context.exception.err_key, "REPLAY_WRONG_AFFECTED")
 
     def test_skip_affected_rows_check(self):
@@ -828,7 +828,7 @@ class CopyPayloadTestCase(unittest.TestCase):
         payload.skip_affected_rows_check = True
         payload.execute_sql = Mock(return_value=0)
         row = {payload.IDCOLNAME: 1}
-        payload.replay_insert_row(row)
+        payload.replay_insert_row(row, 1)
 
     def test_is_rbr_safe_stmt(self):
         # is_trigger_rbr_safe should always be True if STATEMENT binlog_format
