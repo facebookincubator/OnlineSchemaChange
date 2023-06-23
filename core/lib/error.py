@@ -432,6 +432,11 @@ class OSCError(Exception):
             "desc": "OSC catchup speed {speed} is not matching the write rate. We have exhausted the retries. Please reduce the incoming write rate or use a different deployment method for this(check documentation before proceeding)",
             "retryable": False,
         },
+        "GENERIC_RETRYABLE_EXCEPTION": {
+            "code": 258,
+            "desc": ("{errmsg}"),
+            "retryable": True,
+        },
     }
 
     def __init__(self, err_key, desc_kwargs=None, mysql_err_code=None):
