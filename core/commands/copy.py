@@ -337,17 +337,6 @@ class Copy(CommandBase):
                 " compression algorithms, add compression algorithm suffix."
             ),
         )
-        parser.add_argument(
-            "--host",
-            default="",
-            help="Specify the mysql hostname to connect to. Used along side socket info provided",
-        )
-        parser.add_argument(
-            "--port",
-            default=-1,
-            type=int,
-            help="Specify the mysql port to connect to",
-        )
 
     def setup_parser(self, parser, **kwargs):
         super(Copy, self).setup_parser(parser, **kwargs)
