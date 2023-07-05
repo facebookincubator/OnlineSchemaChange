@@ -433,7 +433,7 @@ class CopyPayload(Payload):
         can be dropped before loading data into self.new_table_name to speed
         up data loading
         """
-        # If we don't specified index recreation then just return a empty list
+        # If we don't specify index recreation then just return a empty list
         # which stands for no index is suitable of dropping
         if not self.idx_recreation:
             return []
