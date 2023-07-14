@@ -103,7 +103,7 @@ class TableOptionDiff(object):
 
 class SchemaDiff(object):
     """
-    Representing the difference between two Table object
+    Represents the difference between two Table objects.
     """
 
     def __init__(self, left, right, ignore_partition=False):
