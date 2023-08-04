@@ -38,6 +38,11 @@ class CleanupPayload(Payload):
         self.databases = kwargs.get("database")
         self.kill_first = kwargs.get("kill", False)
         self.kill_only = kwargs.get("kill_only", False)
+        self.print_tables = kwargs.get("print_tables", False)
+        self.tables_to_print = []
+
+    def set_current_table(self, table_name):
+        self._current_table = table_name
 
     def cleanup(self, db="mysql"):
         """
@@ -63,7 +68,11 @@ class CleanupPayload(Payload):
         # since the previous connection might already reach wait_timeout
         if not self._conn or (self.databases and len(self.databases) > 1):
             self._conn = self.get_conn(db)
-
+        if self.print_tables:
+            self.tables_to_print.append(
+                ("SELECT * FROM `{}`".format(self._current_table), db)
+            )
+            self.print_osc_tables(db)
         self.gen_drop_sqls()
         self.get_mysql_settings()
         self.init_mysql_version()
@@ -115,6 +124,23 @@ class CleanupPayload(Payload):
             self.unlock_tables()
         self.sqls_to_execute = []
         self.start_slave_sql()
+
+    def print_osc_tables(self, db="mysql"):
+        # print all tables in OSC job in test
+        if not self._conn or (self.databases and len(self.databases) > 1):
+            self._conn = self.get_conn(db)
+        self.execute_sql("USE `{}`".format(escape(db)))
+        for stmt, stmt_db in self.tables_to_print:
+            # Work on the currernt db only
+            if stmt_db != db:
+                continue
+            try:
+                rows = self.query(stmt)
+                for row in rows:
+                    log.debug(row)
+            except Exception:
+                # If there's an exception (e.g. the table is renamed), just skip it
+                continue
 
     def add_file_entry(self, filepath):
         log.debug("Cleanup file entry added: {}".format(filepath))
@@ -184,6 +210,7 @@ class CleanupPayload(Payload):
         self.to_drop.append(
             {"type": "table", "db": db, "name": table, "partitions": partitions}
         )
+        self.tables_to_print.append(("SELECT * FROM `{}`".format(table), db))
 
     def remove_drop_table_entry(self, db, table_name):
         for entry in self.to_drop:

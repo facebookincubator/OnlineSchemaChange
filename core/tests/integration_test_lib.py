@@ -23,6 +23,7 @@ log = logging.getLogger(__name__)
 def gen_test_cases(
     base_dir,
     get_conn,
+    is_rocksdb=False,
     test_to_run=None,
     database="test",
     socket="/var/lib/mysql/mysql.sock",
@@ -52,7 +53,10 @@ def gen_test_cases(
             param_dict = {
                 "socket": socket,
                 "database": [database],
+                "print_tables": True,
             }
+            if is_rocksdb:
+                param_dict["rocksdb_bulk_load_allow_sk"] = True
             for param in config["params"]:
                 if param == "ddl_file_list":
                     for filename in config["params"]["ddl_file_list"]:

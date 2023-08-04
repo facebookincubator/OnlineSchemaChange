@@ -17,6 +17,7 @@ from threading import Timer
 from typing import List, Optional, Set
 
 import MySQLdb
+from osc.lib.sqlparse.diff import IndexAlterType
 
 from .. import constant, sql, util
 from ..error import OSCError
@@ -688,6 +689,9 @@ class CopyPayload(Payload):
         # back to a smaller value after OSC
         if self._old_table.auto_increment:
             self._new_table.auto_increment = self._old_table.auto_increment
+        # We don't change the storage engine in OSC, so just use
+        # the fetched instance storage engine
+        self._new_table.engine = self._old_table.engine
         # Populate both old and new tables with explicit charset/collate
         self.populate_charset_collation(self._old_table)
         self.populate_charset_collation(self._new_table)
@@ -1107,6 +1111,7 @@ class CopyPayload(Payload):
     def decide_pk_for_filter(self):
         # If we are adding a PK, then we should use all the columns in
         # old table to identify an unique row
+        all_col_def = {col.name: col for col in self._old_table.column_list}
         if not all(
             (self._old_table.primary_key, self._old_table.primary_key.column_list)
         ):
@@ -1117,7 +1122,6 @@ class CopyPayload(Payload):
                         "Old table doesn't have a PK but has an UK: {}".format(idx.name)
                     )
                     self._pk_for_filter = [col.name for col in idx.column_list]
-                    self._pk_for_filter_def = idx.column_list.copy()
                     self._idx_name_for_filter = idx.name
                     break
             else:
@@ -1126,7 +1130,6 @@ class CopyPayload(Payload):
                     self._pk_for_filter = [
                         col.name for col in self._old_table.column_list
                     ]
-                    self._pk_for_filter_def = self._old_table.column_list.copy()
                     self.is_full_table_dump = True
                 else:
                     raise OSCError("NEW_PK")
@@ -1145,14 +1148,15 @@ class CopyPayload(Payload):
                         "Will do full table dump (no chunking)."
                     )
                     self._pk_for_filter = [c.name for c in self._old_table.column_list]
-                    self._pk_for_filter_def = self._old_table.column_list.copy()
                     self.is_full_table_dump = True
                     break
             else:
                 self._pk_for_filter = [
                     col.name for col in self._old_table.primary_key.column_list
                 ]
-                self._pk_for_filter_def = self._old_table.primary_key.column_list.copy()
+        self._pk_for_filter_def = [
+            all_col_def[col_name] for col_name in self._pk_for_filter
+        ]
 
     def ts_bootstrap_check(self):
         """
@@ -1359,8 +1363,6 @@ class CopyPayload(Payload):
         # any implicit conversion
         if self.fail_for_implicit_conv:
             obj_after = self.fetch_table_schema(self.new_table_name)
-            is_rocksdb = obj_after.engine.upper() == "ROCKSDB"
-            obj_after.engine = self._new_table.engine
             obj_after.name = self._new_table.name
             # Ignore partition difference, since there will be no implicit
             # conversion here
@@ -1371,7 +1373,7 @@ class CopyPayload(Payload):
                 # Remove 'USING HASH' in keys on 8.0, when present in 5.6, as 8.0
                 # removes it by default
                 self.remove_using_hash_for_80()
-            if is_rocksdb:
+            if self.is_myrocks_table:
                 log.warning(
                     f"Ignore BTREE indexes in table `{self._new_table.name}` on RocksDB"
                 )
@@ -1408,7 +1410,7 @@ class CopyPayload(Payload):
             self.execute_sql(
                 sql.create_idx_on_delta_table(
                     self.delta_table_name,
-                    [col.to_sql() for col in self._pk_for_filter_def],
+                    [col.name for col in self._pk_for_filter_def],
                 )
             )
 
@@ -1902,6 +1904,12 @@ class CopyPayload(Payload):
         Turn on/off rocksdb_commit_in_the_middle to avoid commit stall for
         large data infiles
         """
+        if self.may_have_dup_unique_keys():
+            log.warning("Disable explicit_commit, because there may be duplicate keys.")
+            return
+        log.info(
+            "explicit_commit is enabled" if enable else "explicit_commit is disabled"
+        )
         v = 1 if enable else 0
         try:
             self.execute_sql(
@@ -1918,14 +1926,10 @@ class CopyPayload(Payload):
                 raise
 
     def change_rocksdb_bulk_load(self, enable=True):
-        # rocksdb_bulk_load relies on data being dumping in the same sequence
-        # as new pk. If we are changing pk, then we cannot ensure that
-        if self._old_table.primary_key != self._new_table.primary_key:
-            log.warning("Skip rocksdb_bulk_load, because we are changing PK")
+        if self.should_disable_bulk_load():
             return
-
         v = 1 if enable else 0
-
+        log.info("Bulk load is enabled" if enable else "Bulk load is disabled")
         #  rocksdb_bulk_load and rocksdb_bulk_load_allow_sk have the
         #  following sequence requirement so setting values accordingly.
         #  SET SESSION rocksdb_bulk_load_allow_sk=1;
@@ -1951,6 +1955,35 @@ class CopyPayload(Payload):
                 log.warning("Failed to set rocksdb_bulk_load: {}".format(errmsg))
             else:
                 raise
+
+    def should_disable_bulk_load(self):
+        reason = ""
+        # rocksdb_bulk_load relies on data being dumping in the same sequence
+        # as new pk. If we are changing pk, then we cannot ensure that
+        if self._old_table.primary_key != self._new_table.primary_key:
+            reason = "because we are changing PK"
+        elif self.may_have_dup_unique_keys():
+            reason = "because there may be duplicated unique keys"
+        else:
+            new_cols = {col.name: col for col in self._new_table.column_list}
+            for idx, col_name in enumerate(self._pk_for_filter):
+                if (
+                    new_cols[col_name].charset != self._pk_for_filter_def[idx].charset
+                    or new_cols[col_name].collate
+                    != self._pk_for_filter_def[idx].collate
+                ):
+                    reason = "because we are changing PK column charset/collate"
+                    break
+        if reason:
+            log.warning("Disable rocksdb_bulk_load, " + reason)
+            return True
+        return False
+
+    def may_have_dup_unique_keys(self):
+        diff = SchemaDiff(self._old_table, self._new_table)
+        return not self.eliminate_dups and (
+            IndexAlterType.BECOME_UNIQUE_INDEX in diff.alter_types
+        )
 
     @wrap_hook
     def log_load_progress(self, suffix):
@@ -3157,6 +3190,7 @@ class CopyPayload(Payload):
         try:
             time_started = time.time()
             self._new_table = parse_create(sql)
+            self._cleanup_payload.set_current_table(self.table_name)
             self._current_db = db
             self._current_db_dir = util.dirname_for_db(db)
             self.init_connection(db)
