@@ -195,6 +195,7 @@ class CopyPayload(Payload):
         self.compressed_outfile_extension = kwargs.get(
             "compressed_outfile_extension", None
         )
+        self.max_id_now = 0
 
     @property
     def current_db(self):
@@ -2084,22 +2085,41 @@ class CopyPayload(Payload):
         return result[0]["max_id"]
 
     @wrap_hook
-    def replay_delete_row(self, sql, last_id, *ids):
+    def replay_delete_row(self, replay_sql, last_id, *ids):
         """
         Replay delete type change
 
-        @param sql:  SQL statement to replay the changes stored in chg table
-        @type  sql:  string
+        @param replay_sql:  SQL statement to replay the changes stored in chg table
+        @type  replay_sql:  string
         @param ids:  values of ID column from self.delta_table_name
         @type  ids:  list
         """
-        affected_row = self.execute_sql(sql, ids)
+        affected_row = self.execute_sql(replay_sql, ids)
         if (
             not self.eliminate_dups
             and not self.where
             and not self.skip_affected_rows_check
         ):
             if not affected_row != 0:
+                log.error(f"failed to replay {ids}")
+                outfile = self._outfile_name(
+                    suffix=".failed_replay",
+                    chunk_id=0,
+                    # MySQL does create the file with the extension itself
+                    skip_compressed_extension=True,
+                )
+                # dump bad replay changes into an outfile
+                self.query(
+                    sql.get_replay_tbl_in_outfile(
+                        self.IDCOLNAME,
+                        self.delta_table_name,
+                        outfile,
+                    ),
+                    (
+                        self.last_replayed_id,
+                        self.max_id_now,
+                    ),
+                )
                 raise OSCError("REPLAY_WRONG_AFFECTED", {"num": affected_row})
 
     @wrap_hook
@@ -2229,6 +2249,7 @@ class CopyPayload(Payload):
         deleted, inserted, updated = 0, 0, 0
 
         self.record_currently_replaying_id(max_id_now)
+        self.max_id_now = max_id_now
 
         log.info("max_id_now is %r / %r", max_id_now, self.replay_max_changes)
         if max_id_now > self.replay_max_changes:

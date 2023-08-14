@@ -596,6 +596,25 @@ def get_chg_row(id_col_name, dml_col_name, tmp_table_include_id) -> str:
     )
 
 
+def get_replay_tbl_in_outfile(
+    id_col_name,
+    tmp_table_include_id,
+    outfile,
+) -> str:
+    return (
+        "SELECT * "
+        "FROM `{table}` "
+        "WHERE `{id}` > %s AND `{id}` <= %s "
+        "ORDER BY `{id}` INTO OUTFILE '{outfile}'"
+    ).format(
+        **{
+            "id": escape(id_col_name),
+            "table": escape(tmp_table_include_id),
+            "outfile": outfile,
+        }
+    )
+
+
 def get_replay_row_ids(
     id_col_name,
     dml_col_name,
