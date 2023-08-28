@@ -61,7 +61,7 @@ class PartitionParseError(Exception):
     pass
 
 
-class CreateParser(object):
+class CreateParser:
     """
     This class can take a plain "CREATE TABLE" SQL as input and parse it into
     a Table object, so that we have more insight on the detail of this SQL.

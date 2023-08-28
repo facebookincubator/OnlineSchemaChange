@@ -51,7 +51,7 @@ def is_equal(left, right):
         return True
 
 
-class IndexColumn(object):
+class IndexColumn:
     """
     A column definition inside index section.
     This is different from a table column definition, because only `name`,
@@ -92,7 +92,7 @@ class IndexColumn(object):
         return sql_str
 
 
-class DocStoreIndexColumn(object):
+class DocStoreIndexColumn:
     """
     A column definition inside index section for DocStore.
     DocStore index column has more attributes than the normal one
@@ -125,7 +125,7 @@ class DocStoreIndexColumn(object):
             return "{} AS {}".format(self.document_path, self.key_type)
 
 
-class TableIndex(object):
+class TableIndex:
     """
     An index definition. This can defined either directly after single column
     definition or after all column definitions
@@ -201,7 +201,7 @@ class TableIndex(object):
         return " ".join(segments)
 
 
-class Column(object):
+class Column:
     """
     Representing a column definiton in a table
     """
@@ -648,7 +648,7 @@ class PartitionConfig:
             return output
 
 
-class Table(object):
+class Table:
     """
     Representing a table definiton
     """

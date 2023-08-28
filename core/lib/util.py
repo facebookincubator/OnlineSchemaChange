@@ -136,7 +136,7 @@ def readable_size(nbytes):
     return "%s %s" % (f, suffixes[i])
 
 
-class RangeChain(object):
+class RangeChain:
     """
     A memory efficient class for memorize all the points that we've filled
     within a range containing consecutive natural values.

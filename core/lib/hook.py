@@ -41,7 +41,7 @@ def wrap_hook(func):
     return func_with_hook
 
 
-class HookBase(object):
+class HookBase:
     """
     Base hook, cannot be used directly
     """

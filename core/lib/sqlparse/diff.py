@@ -92,7 +92,7 @@ INSTANT_DDLS = {
 }
 
 
-class TableOptionDiff(object):
+class TableOptionDiff:
     def __init__(self, option_name, value):
         self.option_name = option_name
         self.value = value
@@ -101,7 +101,7 @@ class TableOptionDiff(object):
         return "{}={}".format(self.option_name, self.value)
 
 
-class SchemaDiff(object):
+class SchemaDiff:
     """
     Represents the difference between two Table objects.
     """

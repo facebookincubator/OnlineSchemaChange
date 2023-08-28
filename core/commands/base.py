@@ -12,7 +12,7 @@ import logging
 log = logging.getLogger(__name__)
 
 
-class CommandBase(object):
+class CommandBase:
     DESCRIPTION = """
     This is a default description. You should overwrite it in your sub-class.
     """

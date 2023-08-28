@@ -23,7 +23,7 @@ from ..sqlparse import parse_create, ParseError
 log = logging.getLogger(__name__)
 
 
-class Payload(object):
+class Payload:
     """
     Base class for all supported schema change
     """

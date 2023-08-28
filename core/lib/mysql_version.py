@@ -10,7 +10,7 @@ LICENSE file in the root directory of this source tree.
 FB_FORK_NAME = "fb"
 
 
-class MySQLVersion(object):
+class MySQLVersion:
     def __init__(self, version_str):
         self._version_str = version_str
         self._version = ""
