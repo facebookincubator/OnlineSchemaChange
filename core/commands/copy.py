@@ -301,6 +301,11 @@ class Copy(CommandBase):
             "different from the one in file after execution",
         )
         parser.add_argument(
+            "--allow-unsafe-ts-bootstrap",
+            action="store_true",
+            help="Allow bootstrapping ts for this osc",
+        )
+        parser.add_argument(
             "--max-wait-for-slow-query",
             type=int,
             default=constant.MAX_WAIT_FOR_SLOW_QUERY,
