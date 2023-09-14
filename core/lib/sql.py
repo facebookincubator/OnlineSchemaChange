@@ -286,8 +286,9 @@ def create_delta_table(
 
 
 def create_idx_on_delta_table(delta_table_name, pk_list) -> str:
+    # Escape pk since these pks can be reserved mysql keywords.
     return ("CREATE INDEX `ix_pri` ON `{}` ({})").format(
-        escape(delta_table_name), ", ".join(pk_list)
+        escape(delta_table_name), ", ".join("`" + pk + "`" for pk in pk_list)
     )
 
 
