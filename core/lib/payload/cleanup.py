@@ -38,6 +38,7 @@ class CleanupPayload(Payload):
         self.databases = kwargs.get("database")
         self.kill_first = kwargs.get("kill", False)
         self.kill_only = kwargs.get("kill_only", False)
+        self.additional_osc_tables = kwargs.get("additional_tables", [])
         self.print_tables = kwargs.get("print_tables", False)
         self.tables_to_print = []
 
@@ -248,6 +249,17 @@ class CleanupPayload(Payload):
                 (
                     constant.PREFIX,
                     constant.PREFIX,
+                ),
+            )
+            for row in results:
+                self.add_drop_table_entry(row["db"], row["TABLE_NAME"])
+
+        for table in self.additional_osc_tables:
+            results = self.query(
+                sql.get_all_osc_tables(),
+                (
+                    table,
+                    table,
                 ),
             )
             for row in results:

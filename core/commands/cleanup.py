@@ -30,6 +30,12 @@ class Cleanup(CommandBase):
         parser.add_argument(
             "--kill-only", help="Exit right after killing OSC", action="store_true"
         )
+        parser.add_argument(
+            "--additional-tables",
+            dest="additional_tables",
+            default=[],
+            help="list of additional osc tables which may have been created.",
+        )
 
     def pre_run(self):
         # Test database connection
@@ -58,5 +64,5 @@ class Cleanup(CommandBase):
         log.debug("Pre-run check started")
         self.pre_run()
 
-        log.debug("Start to run schema change")
+        log.debug("Start to run schema change cleanup")
         self.payload.cleanup_all()

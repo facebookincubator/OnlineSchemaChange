@@ -12,6 +12,7 @@ import codecs
 import collections
 import logging
 import os
+import time
 
 import MySQLdb
 
@@ -464,9 +465,22 @@ class Payload:
         """
         if self.skip_named_lock:
             return
-        result = self.query(sql.release_lock, (constant.OSC_LOCK_NAME,))
-        if not result or not result[0]["lockstatus"] == 1:
-            log.warning("Unable to release osc lock: {}".format(constant.OSC_LOCK_NAME))
+        retries = 5
+        # Don't give up so easily. Not releasing locks will cause future OSCs to fail.
+        while retries > 0:
+            try:
+                result = self.query(sql.release_lock, (constant.OSC_LOCK_NAME,))
+                if not result or not result[0]["lockstatus"] == 1:
+                    log.warning(
+                        "Unable to release osc lock: {}".format(constant.OSC_LOCK_NAME)
+                    )
+                else:
+                    break
+            except Exception as e:
+                log.exception(e)
+
+            retries -= 1
+            time.sleep(5)
 
     def run(self):
         """
