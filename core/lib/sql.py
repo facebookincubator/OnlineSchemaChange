@@ -913,7 +913,7 @@ def get_all_osc_tables(db=None) -> str:
     sql = (
         "SELECT TABLE_SCHEMA as db, TABLE_NAME "
         "FROM information_schema.TABLES "
-        "WHERE left(TABLE_NAME, length(%s)) = %s"
+        "WHERE left(TABLE_NAME, length(%s)) = %s "
     )
     if db:
         sql += "AND TABLE_SCHEMA = %s "
