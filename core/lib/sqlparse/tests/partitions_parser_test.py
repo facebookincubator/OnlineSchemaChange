@@ -11,6 +11,7 @@ import logging
 import unittest
 
 from osc.lib.sqlparse import CreateParser, PartitionParseError
+
 from osc.lib.sqlparse.models import PartitionConfig, PartitionDefinitionEntry
 
 log = logging.getLogger(__name__)
