@@ -139,6 +139,7 @@ class TableIndex:
         self.key_type = None
         self.using = None
         self.column_list = []
+        self.visibility = True
 
     def __str__(self):
         idx_str = []
@@ -163,6 +164,7 @@ class TableIndex:
             "is_unique",
             "key_type",
             "using",
+            "visibility",
         ):
             if not is_equal(getattr(self, attr), getattr(other, attr)):
                 return False
@@ -191,13 +193,14 @@ class TableIndex:
         segments.append(
             "({})".format(", ".join([col.to_sql() for col in self.column_list]))
         )
-
         if self.using is not None:
             segments.append("USING {}".format(self.using))
         if self.key_block_size is not None:
             segments.append("KEY_BLOCK_SIZE={}".format(self.key_block_size))
         if self.comment is not None:
             segments.append("COMMENT {}".format(self.comment))
+        if not self.visibility:
+            segments.append("INVISIBLE")
         return " ".join(segments)
 
 
@@ -273,6 +276,13 @@ class Column:
             if self.column_type.lower() in int_types and attr == "length":
                 continue
 
+            if (
+                attr == "column_type"
+                and getattr(self, attr) in ("BOOL", "BOOLEAN")
+                and getattr(other, attr) in ("BOOL", "BOOLEAN")
+            ):
+                self.column_type = "BOOLEAN"
+                continue
             if not is_equal(getattr(self, attr), getattr(other, attr)):
                 return False
         return self.has_same_default(other)

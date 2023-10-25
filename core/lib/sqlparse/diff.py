@@ -59,6 +59,7 @@ class IndexAlterType(BaseAlterType):
     DROP_INDEX = "drop_index"  # inplace, metadata only
     CHANGE_PK = "change_pk"  # copy
     BECOME_UNIQUE_INDEX = "become_unique_index"
+    CHANGE_INDEX_VISIBILITY = "change_index_visibility"
 
 
 class TableAlterType(BaseAlterType):
@@ -458,7 +459,14 @@ class SchemaDiff:
             self.add_alter_type(IndexAlterType.BECOME_UNIQUE_INDEX)
         if not (idx_name in old_indexes and idx_name in new_indexes):
             return
-        attrs = ["key_block_size", "comment", "is_unique", "key_type", "using"]
+        attrs = [
+            "key_block_size",
+            "comment",
+            "is_unique",
+            "key_type",
+            "using",
+            "visibility",
+        ]
         for attr in attrs:
             if not is_equal(
                 getattr(old_indexes[idx_name], attr),
@@ -479,6 +487,8 @@ class SchemaDiff:
                     self.add_alter_type(IndexAlterType.CHANGE_KEY_TYPE)
                 elif attr == "using":
                     self.add_alter_type(IndexAlterType.CHANGE_INDEX_TYPE)
+                elif attr == "visibility":
+                    self.add_alter_type(IndexAlterType.CHANGE_INDEX_VISIBILITY)
 
     def _gen_tbl_attr_sql(self):
         """

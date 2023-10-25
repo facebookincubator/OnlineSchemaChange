@@ -1021,7 +1021,10 @@ class CreateParser:
         return pc
 
 
-def parse_create(sql, force_new_parser_obj: bool = False):
+def parse_create(
+    sql,
+    force_new_parser_obj: bool = False,
+):
     return CreateParser.parse(sql, force_new_parser_obj)
 
 
