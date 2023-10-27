@@ -67,6 +67,7 @@ class CopyPayload(Payload):
         self._old_table = None
         self._replayed_chg_ids = util.RangeChain()
         self.select_chunk_size = 0
+        self.select_checksum_chunk_size = 0
         self.bypass_replay_timeout = False
         self.is_ttl_disabled_by_me = False
         self.stop_before_swap = False
@@ -173,9 +174,16 @@ class CopyPayload(Payload):
         )
 
         self.use_sql_wsenv = kwargs.get("use_sql_wsenv", False)
+
+        # checksum can have their own chunks
+        self.checksum_chunk_size = kwargs.get(
+            "chunk_size", constant.CHECKSUM_CHUNK_BYTES
+        )
+
         if self.use_sql_wsenv:
             # by default, wsenv requires to use big chunk
             self.chunk_size = kwargs.get("chunk_size", constant.WSENV_CHUNK_BYTES)
+
             # by default, wsenv doesn't use local disk
             self.skip_disk_space_check = kwargs.get("skip_disk_space_check", True)
             # skip local disk space check when using wsenv
@@ -1049,11 +1057,14 @@ class CopyPayload(Payload):
 
     def make_chunk_size_odd(self):
         """
-        Ensure select_chunk_size is an odd number. Because we use this number
-        as chunk size for checksum as well. If a column has exact the same
+        Ensure select_chunk_size is an odd number. If a column has exact the same
         value for all its rows, then return value from BIT_XOR(CRC32(`col`))
         will be zero for even number of rows, no matter what value it has.
         """
+        if self.select_checksum_chunk_size % 2 == 0:
+            self.select_checksum_chunk_size = self.select_checksum_chunk_size + 1
+
+        # TODO: not needed ideally, right now. But will leave it.
         if self.select_chunk_size % 2 == 0:
             self.select_chunk_size = self.select_chunk_size + 1
 
@@ -1075,15 +1086,24 @@ class CopyPayload(Payload):
             if tbl_avg_length < 20:
                 tbl_avg_length = 20
             self.select_chunk_size = self.chunk_size // tbl_avg_length
+
             # This means either the avg row size is huge, or user specified
             # a tiny select_chunk_size on CLI. Let's make it one row per
             # outfile to avoid zero division
             if not self.select_chunk_size:
                 self.select_chunk_size = 1
+
+            self.select_checksum_chunk_size = self.checksum_chunk_size // tbl_avg_length
+            if not self.select_checksum_chunk_size:
+                self.select_checksum_chunk_size = 1
+
             log.info(
                 "TABLE contains {} rows, table_avg_row_len: {} bytes,"
-                "chunk_size: {} bytes, ".format(
-                    result[0]["TABLE_ROWS"], tbl_avg_length, self.chunk_size
+                "chunk_size: {} bytes checksum chunk_size {} bytes, ".format(
+                    result[0]["TABLE_ROWS"],
+                    tbl_avg_length,
+                    self.chunk_size,
+                    self.checksum_chunk_size,
                 )
             )
             log.info("Outfile will contain {} rows each".format(self.select_chunk_size))
@@ -2643,7 +2663,7 @@ class CopyPayload(Payload):
                     self._pk_for_filter,
                     self.range_start_vars_array,
                     self.range_end_vars_array,
-                    self.select_chunk_size,
+                    self.select_checksum_chunk_size,
                     use_where,
                     idx_for_checksum,
                 )
@@ -2658,7 +2678,7 @@ class CopyPayload(Payload):
                         self.checksum_column_list,
                         self._pk_for_filter,
                         self.range_start_vars_array,
-                        self.select_chunk_size,
+                        self.select_checksum_chunk_size,
                         idx_for_checksum,
                         use_where,
                         enable_outfile_compression=self.enable_outfile_compression,
