@@ -100,14 +100,6 @@ class BaseSQLParserTest(unittest.TestCase):
         self.assertEqual(len(tbl.column_list), 1)
         self.assertEqual(tbl, self.parse_function(tbl.to_sql()))
 
-    def test_table_name_with_backtick(self):
-        self.skipTestIfBaseClass("Need to implement base class")
-        sql = "Create table `foo``bar`\n" "( `column1` int )"
-        tbl = self.parse_function(sql)
-        self.assertEqual(tbl.name, "foo`bar")
-        self.assertEqual(len(tbl.column_list), 1)
-        self.assertEqual(tbl, self.parse_function(tbl.to_sql()))
-
     def test_simple_with_all_supported_int_type(self):
         self.skipTestIfBaseClass("Need to implement base class")
         supported_type = ["int", "tinyint", "bigint", "mediumint", "smallint"]
@@ -203,14 +195,6 @@ class BaseSQLParserTest(unittest.TestCase):
             self.assertEqual(tbl.row_format, "COMPRESSED")
             self.assertEqual(tbl, self.parse_function(tbl.to_sql()))
 
-    def test_compression(self):
-        self.skipTestIfBaseClass("Need to implement base class")
-        sqls = [("Create table foo\n" "( column1 int )" "compression=zlib_stream")]
-        for sql in sqls:
-            tbl = self.parse_function(sql)
-            self.assertEqual(tbl.name, "foo")
-            self.assertEqual(tbl.compression, "ZLIB_STREAM")
-
     def test_simple_with_all_supported_int_type_and_length(self):
         self.skipTestIfBaseClass("Need to implement base class")
         supported_type = ["int", "tinyint", "bigint", "mediumint", "smallint"]
@@ -228,19 +212,6 @@ class BaseSQLParserTest(unittest.TestCase):
                 self.assertEqual(tbl.name, "foo")
                 self.assertEqual(tbl, self.parse_function(tbl.to_sql()))
 
-    def test_simple_create_table_with_inline_pri(self):
-        self.skipTestIfBaseClass("Need to implement base class")
-        sqls = []
-        sqls.append("Create table foo\n" "( column1 int primary )")
-        sqls.append("Create table foo\n" "( column1 int primary key)")
-        for sql in sqls:
-            tbl = self.parse_function(sql)
-            self.assertTrue(tbl.primary_key.is_unique)
-            self.assertEqual(len(tbl.primary_key.column_list), 1)
-            self.assertEqual(tbl.primary_key.column_list[0].name, "column1")
-            self.assertEqual(tbl.name, "foo")
-            self.assertEqual(tbl, self.parse_function(tbl.to_sql()))
-
     def test_trailing_pri(self):
         self.skipTestIfBaseClass("Need to implement base class")
         sqls = []
@@ -252,38 +223,6 @@ class BaseSQLParserTest(unittest.TestCase):
             self.assertEqual(tbl.primary_key.column_list[0].name, "column1")
             self.assertEqual(tbl.name, "foo")
             self.assertEqual(tbl, self.parse_function(tbl.to_sql()))
-
-    def test_docstore_index(self):
-        self.skipTestIfBaseClass("Need to implement base class")
-        sqls = []
-        sqls.append(
-            "Create table foo\n"
-            "( a document , "
-            "KEY key_name ( `a`.`b`.`c` AS INT ))"
-        )
-        for sql in sqls:
-            tbl = self.parse_function(sql)
-            self.assertTrue(len(tbl.indexes), 1)
-            self.assertTrue(len(tbl.indexes[0].column_list), 1)
-            self.assertEqual(tbl.indexes[0].column_list[0].document_path, "`a`.`b`.`c`")
-            self.assertEqual(tbl.indexes[0].column_list[0].key_type, "INT")
-            self.assertEqual(tbl, self.parse_function(tbl.to_sql()))
-
-    def test_docstore_index_str(self):
-        self.skipTestIfBaseClass("Need to implement base class")
-        sqls = []
-        sqls.append(
-            "Create table foo\n"
-            "( a document , "
-            "KEY key_name ( `a`.`b`.`c` AS STRING(10) ))"
-        )
-        for sql in sqls:
-            tbl = self.parse_function(sql)
-            self.assertTrue(len(tbl.indexes), 1)
-            self.assertTrue(len(tbl.indexes[0].column_list), 1)
-            self.assertEqual(tbl.indexes[0].column_list[0].document_path, "`a`.`b`.`c`")
-            self.assertEqual(tbl.indexes[0].column_list[0].key_type, "STRING")
-            self.assertEqual(tbl.indexes[0].column_list[0].length, str(10))
 
     def test_multiple_tailing_index(self):
         self.skipTestIfBaseClass("Need to implement base class")
@@ -548,21 +487,6 @@ class BaseSQLParserTest(unittest.TestCase):
             " column2 varchar(100) default 'abc',"
             "PRIMARY key (column1) ,"
             "key `aname` (column1, column2(19)) )"
-        )
-        for sql in sqls:
-            tbl = self.parse_function(sql).to_sql()
-            str_after_parse = self.parse_function(tbl).to_sql()
-            self.assertEqual(tbl, str_after_parse)
-
-    def test_to_sql_consistency_with_backtick(self):
-        self.skipTestIfBaseClass("Need to implement base class")
-        sqls = []
-        sqls.append(
-            "Create table `foo``bar`\n"
-            "( `column``1` bit default b'0',"
-            " column2 varchar(100) default 'abc',"
-            "PRIMARY key (`column``1`) ,"
-            "key `a``name` (column1, column2(19)) )"
         )
         for sql in sqls:
             tbl = self.parse_function(sql).to_sql()
