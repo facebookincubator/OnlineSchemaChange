@@ -39,6 +39,7 @@ class CleanupPayload(Payload):
         self.kill_first = kwargs.get("kill", False)
         self.kill_only = kwargs.get("kill_only", False)
         self.additional_osc_tables = kwargs.get("additional_tables", [])
+        self.disable_replication = kwargs.get("disable_replication", True)
         self.print_tables = kwargs.get("print_tables", False)
         self.tables_to_print = []
 
@@ -77,7 +78,8 @@ class CleanupPayload(Payload):
         self.gen_drop_sqls()
         self.get_mysql_settings()
         self.init_mysql_version()
-        self.set_no_binlog()
+        if self.disable_replication:
+            self.set_no_binlog()
         self.stop_slave_sql()
 
         # Stop sql thread to avoid MDL lock contention and blocking reads before
@@ -227,6 +229,16 @@ class CleanupPayload(Payload):
         """
         self.cleanup()
 
+    def fetch_all_tables(self):
+        results = self.query(
+            sql.get_all_osc_tables(),
+            (
+                constant.PREFIX,
+                constant.PREFIX,
+            ),
+        )
+        return [row["TABLE_NAME"] for row in results]
+
     def search_for_tables(self):
         """
         List all the tables that may left over by OSC in last run
@@ -255,6 +267,7 @@ class CleanupPayload(Payload):
                 self.add_drop_table_entry(row["db"], row["TABLE_NAME"])
 
         for table in self.additional_osc_tables:
+            log.info(f"reading table: {table}")
             results = self.query(
                 sql.get_all_osc_tables(),
                 (

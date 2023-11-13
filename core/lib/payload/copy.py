@@ -78,6 +78,7 @@ class CopyPayload(Payload):
         self.current_checksum_record = -1
         self.table_size = 0
         self.session_overrides = []
+        self.disable_replication = kwargs.get("disable_replication", True)
         self._cleanup_payload = CleanupPayload(*args, **kwargs)
         self.stats = {}
         self.partitions = {}
@@ -714,7 +715,11 @@ class CopyPayload(Payload):
             "--force-cleanup specified, cleaning up things that may left "
             "behind by last run"
         )
-        cleanup_payload = CleanupPayload(charset=self.charset, sudo=self.sudo)
+        cleanup_payload = CleanupPayload(
+            charset=self.charset,
+            sudo=self.sudo,
+            disable_replication=self.disable_replication,
+        )
         # cleanup outfiles for include_id and exclude_id
         for filepath in (self.outfile_exclude_id, self.outfile_include_id):
             cleanup_payload.add_file_entry(filepath)
@@ -939,10 +944,10 @@ class CopyPayload(Payload):
         """
         Check if we have enough disk space to execute the DDL
         """
+        self.table_size = int(self.get_table_size(self.table_name))
         if self.skip_disk_space_check:
             return True
 
-        self.table_size = int(self.get_table_size(self.table_name))
         dump_size = int(self.get_expected_dump_size(self.table_name))
         disk_space = int(util.disk_partition_free(self.outfile_dir))
         # With allow_new_pk, we will create one giant outfile, and so at
@@ -2045,9 +2050,9 @@ class CopyPayload(Payload):
 
         for suffix in range(self.outfile_suffix_start, self.outfile_suffix_end + 1):
             self.load_chunk(column_list, suffix)
-            # Print out information after every 10% chunks have been loaded
+            # Print out information after every 5% chunks have been loaded
             # We won't show progress if the number of chunks is less than 50
-            if suffix % max(5, int(self.outfile_suffix_end / 10)) == 0:
+            if suffix % max(5, int(self.outfile_suffix_end / 5)) == 0:
                 self.log_load_progress(suffix)
 
         if self.is_myrocks_table:
@@ -2668,6 +2673,7 @@ class CopyPayload(Payload):
                     idx_for_checksum,
                 )
             )
+
             # Dump the data onto local disk for further investigation
             # This will be very helpful when there's a reproducible checksum
             # mismatch issue
@@ -2689,11 +2695,27 @@ class CopyPayload(Payload):
 
             # Refresh where condition range for next select
             if checksum:
+                self.checksum_callback(
+                    table_name,
+                    use_where,
+                    checksum[0],
+                    idx_for_checksum,
+                )
                 self.refresh_range_start()
                 affected_rows = checksum[0]["cnt"]
                 checksum_result.append(checksum[0])
                 use_where = True
+
+        self.checksum_end_callback()
         return checksum_result
+
+    def checksum_callback(
+        self, table_name, use_where, checksum_chunk_result, idx_for_checksum
+    ):
+        return
+
+    def checksum_end_callback(self):
+        return
 
     def need_checksum(self):
         """
@@ -2901,6 +2923,9 @@ class CopyPayload(Payload):
                     "Proceed after max replay attempts exceeded. "
                     "Because --bypass-replay-timeout is specified"
                 )
+
+    def get_max_replay_batch_size(self) -> int:
+        return self.max_replay_batch_size
 
     @wrap_hook
     def checksum_by_replay_chunk(self, table_name):
