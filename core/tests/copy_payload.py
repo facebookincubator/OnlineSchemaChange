@@ -314,13 +314,13 @@ class CopyPayloadTestCase(unittest.TestCase):
 
         # Make sure kill selects only on tables a and b
         kill_calls = mocked_conn.kill_query_by_id.call_args_list
-        self.assertEquals(len(kill_calls), 5)
+        self.assertEqual(len(kill_calls), 5)
         for idx, killed in enumerate(
             (query_id, query_id + 1, query_id + 2, query_id + 3, query_id + 4)
         ):
             args, kwargs = kill_calls[idx]
-            self.assertEquals(len(args), 1)
-            self.assertEquals(args[0], killed)
+            self.assertEqual(len(args), 1)
+            self.assertEqual(args[0], killed)
 
     def test_selects_not_being_killed(self):
         # limit wait time to 1 sec
@@ -1257,14 +1257,14 @@ class CopyPayloadPKFilterTestCase(unittest.TestCase):
         self.payload._old_table = self.table_obj_1pk
         self.payload._new_table = self.table_obj_2pk
         self.payload.decide_pk_for_filter()
-        self.assertEquals(self.payload._pk_for_filter, ["id1"])
+        self.assertEqual(self.payload._pk_for_filter, ["id1"])
 
     def test_decide_pk_for_filter_uk_to_2pk(self):
         # An UK should be used if there's no existing pk
         self.payload._old_table = self.table_obj_uk
         self.payload._new_table = self.table_obj_2pk
         self.payload.decide_pk_for_filter()
-        self.assertEquals(self.payload._pk_for_filter, ["id1"])
+        self.assertEqual(self.payload._pk_for_filter, ["id1"])
 
     def test_decide_pk_for_filter_no_uk_allow(self):
         # An UK should be used if there's no existing pk
@@ -1272,7 +1272,7 @@ class CopyPayloadPKFilterTestCase(unittest.TestCase):
         self.payload._new_table = self.table_obj_1pk
         self.payload.allow_new_pk = True
         self.payload.decide_pk_for_filter()
-        self.assertEquals(self.payload._pk_for_filter, ["id1", "id2", "id3"])
+        self.assertEqual(self.payload._pk_for_filter, ["id1", "id2", "id3"])
         self.assertTrue(self.payload.is_full_table_dump)
 
     def test_decide_pk_for_filter_newcol_not_indexed(self):
@@ -1281,7 +1281,7 @@ class CopyPayloadPKFilterTestCase(unittest.TestCase):
         self.payload._new_table = self.table_obj_newcol
         self.payload.decide_pk_for_filter()
 
-        self.assertEquals(self.payload._pk_for_filter, ["id1"])
+        self.assertEqual(self.payload._pk_for_filter, ["id1"])
         self.assertFalse(self.payload.is_full_table_dump)
         self.assertEqual(self.payload.find_coverage_index(), "PRIMARY")
         self.assertTrue(self.payload.validate_post_alter_pk())
@@ -1290,7 +1290,7 @@ class CopyPayloadPKFilterTestCase(unittest.TestCase):
         self.payload._new_table = self.table_obj_newcol_with_idx
         self.payload.decide_pk_for_filter()
 
-        self.assertEquals(self.payload._pk_for_filter, ["id1"])
+        self.assertEqual(self.payload._pk_for_filter, ["id1"])
         self.assertFalse(self.payload.is_full_table_dump)
         self.assertEqual(self.payload.find_coverage_index(), "PRIMARY")
         self.assertTrue(self.payload.validate_post_alter_pk())
@@ -1301,7 +1301,7 @@ class CopyPayloadPKFilterTestCase(unittest.TestCase):
         self.payload._new_table = self.table_obj_pk2_prefixed
         self.payload.decide_pk_for_filter()
 
-        self.assertEquals(self.payload._pk_for_filter, ["id1", "name", "dummy1"])
+        self.assertEqual(self.payload._pk_for_filter, ["id1", "name", "dummy1"])
         self.assertTrue(self.payload.is_full_table_dump)
         self.assertIsNone(self.payload.find_coverage_index())
         self.assertFalse(self.payload.validate_post_alter_pk())
@@ -1312,7 +1312,7 @@ class CopyPayloadPKFilterTestCase(unittest.TestCase):
         self.payload.decide_pk_for_filter()
 
         # Going from 2 PK columns into 1 is considered as efficient
-        self.assertEquals(self.payload._pk_for_filter, ["id1", "id2"])
+        self.assertEqual(self.payload._pk_for_filter, ["id1", "id2"])
         self.assertFalse(self.payload.is_full_table_dump)
         self.assertTrue(self.payload.validate_post_alter_pk())
 
