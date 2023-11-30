@@ -331,6 +331,7 @@ class Payload:
 
     def enable_sql_wsenv(self):
         if self.use_sql_wsenv:
+            log.info("Try to enable enable_sql_wsenv")
             self.execute_sql(sql.set_session_variable("enable_sql_wsenv"), (1,))
             # disable fsync to disk for WS
             self.execute_sql(sql.set_session_variable("select_into_disk_sync"), (0,))
@@ -340,9 +341,14 @@ class Payload:
             self.execute_sql(
                 sql.set_session_variable("select_into_file_fsync_timeout"), (0,)
             )
-            # increase IO buffer size to 64M
+            # increase write IO buffer size to 64M
             self.execute_sql(
                 sql.set_session_variable("select_into_buffer_size"),
+                (constant.WSENV_CHUNK_BYTES,),
+            )
+            # increase read IO buffer size to 64M
+            self.execute_sql(
+                sql.set_session_variable("load_data_infile_buffer_size"),
                 (constant.WSENV_CHUNK_BYTES,),
             )
 
