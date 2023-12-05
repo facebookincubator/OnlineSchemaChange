@@ -87,6 +87,70 @@ class BaseSQLParserTest(unittest.TestCase):
         tbl_2 = self.parse_function(sql2)
         tbl_diff = SchemaDiff(tbl_1, tbl_2)
         self.assertEqual(len(tbl_diff.diffs()["msgs"]), 3)
+        self.assertEqual(
+            (
+                "ALTER TABLE `foo` MODIFY `column1` INT NULL FIRST,"
+                " MODIFY `column2` VARCHAR(10) NULL AFTER `column1`"
+            ),
+            tbl_diff.to_sql(),
+        )
+
+        sql_1 = (
+            "Create table foo ("
+            " column1 varchar(10),"
+            " column2 int,"
+            " column3 int,"
+            " column4 int,"
+            " column5 int,"
+            " column6 int)"
+        )
+
+        sql_2 = (
+            "Create table foo ("
+            " column1 varchar(10),"
+            " column5 int,"
+            " column6 int,"
+            " column2 int,"
+            " column3 int,"
+            " column4 int)"
+        )
+        tbl_1 = self.parse_function(sql_1)
+        tbl_2 = self.parse_function(sql_2)
+        tbl_diff = SchemaDiff(tbl_1, tbl_2)
+        self.assertEqual(
+            (
+                "ALTER TABLE `foo` MODIFY `column5` INT NULL AFTER `column1`,"
+                " MODIFY `column6` INT NULL AFTER `column5`,"
+                " MODIFY `column2` INT NULL AFTER `column6`,"
+                " MODIFY `column3` INT NULL AFTER `column2`,"
+                " MODIFY `column4` INT NULL AFTER `column3`"
+            ),
+            tbl_diff.to_sql(),
+        )
+
+        sql_2 = (
+            "Create table foo ("
+            " column1 varchar(10),"
+            " column5 int,"
+            " column2 int,"
+            " column7 int,"
+            " column3 int,"
+            " column4 int,"
+            " column6 int)"
+        )
+
+        tbl_2 = self.parse_function(sql_2)
+        tbl_diff = SchemaDiff(tbl_1, tbl_2)
+        self.assertEqual(
+            (
+                "ALTER TABLE `foo` ADD `column7` INT NULL AFTER `column2`,"
+                " MODIFY `column5` INT NULL AFTER `column1`,"
+                " MODIFY `column2` INT NULL AFTER `column5`,"
+                " MODIFY `column3` INT NULL AFTER `column7`,"
+                " MODIFY `column4` INT NULL AFTER `column3`"
+            ),
+            tbl_diff.to_sql(),
+        )
 
     def test_col_order_with_new_col(self):
         self.skipTestIfBaseClass("Need to implement base class")

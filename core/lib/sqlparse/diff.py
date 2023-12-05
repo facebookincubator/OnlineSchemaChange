@@ -263,6 +263,7 @@ class SchemaDiff:
         # Add columns
         # If the added column is not at the end, recognize that as reordering columns
         handled_cols = []
+        first_handled = tail = len(new_column_names) - 1
         for idx, col in enumerate(self.right.column_list):
             if col.name not in old_columns.keys():
                 if idx == 0:
@@ -290,6 +291,8 @@ class SchemaDiff:
                         + [col.name]
                         + old_column_names[new_idx:]
                     )
+                if idx < first_handled:
+                    first_handled = idx
                 handled_cols.append(col.name)
                 self.add_alter_type(ColAlterType.ADD_COL)
                 if col.column_type == "JSON":
@@ -303,6 +306,7 @@ class SchemaDiff:
         # old and new column list, this means the position of this particular
         # column hasn't been changed. Otherwise add a MODIFY clause to change the
         # position
+        old_tail = len(old_column_names) - 1
         for idx, col_name in enumerate(new_column_names):
             # If the column is recently added, then skip because it's already
             # in the DDL
@@ -316,16 +320,21 @@ class SchemaDiff:
             if idx == 0:
                 if old_pos == 0:
                     continue
+                first_handled = 0
                 segments.append("MODIFY {} FIRST".format(col.to_sql()))
                 handled_cols.append(col_name)
                 self.add_alter_type(ColAlterType.REORDER_COL)
                 continue
 
-            # If this column has the same ancestor then it means there's no sequence
-            # adjustment needed
-            if new_column_names[idx - 1] == old_column_names[old_pos - 1]:
-                continue
-
+            # before first_handled, modify the order when the distance to the head has changed
+            if idx <= first_handled:
+                if old_pos == idx:
+                    continue
+                first_handled = idx
+            # after first_handled, modify the order when the distance to the tail has changed
+            else:
+                if tail - idx == old_tail - old_pos:
+                    continue
             segments.append(
                 "MODIFY {} AFTER `{}`".format(
                     col.to_sql(), escape(new_column_names[idx - 1])
