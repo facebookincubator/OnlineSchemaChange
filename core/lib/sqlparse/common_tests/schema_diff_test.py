@@ -536,6 +536,8 @@ class BaseHelpersTest(unittest.TestCase):
         success = False
         for option in resultOptions:
             try:
+                print(old_table_obj.partition_config)
+                print(new_table_obj.partition_config)
                 self.assertEqual(
                     option,
                     SchemaDiff(

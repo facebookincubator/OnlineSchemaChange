@@ -940,7 +940,7 @@ class BaseModelTableTestCase(unittest.TestCase):
             "KEY `identity` (`identity`),"
             "KEY `object_id` (`object_id`),"
             "KEY `created_at` (`created_at`)"
-            ") ENGINE=InnoDB DEFAULT CHARSET=latin1"
+            ") ENGINE=InnoDB DEFAULT CHARSET=latin1\n"
             "/*!50100 PARTITION BY RANGE (id) ("
             "PARTITION p0 VALUES LESS THAN (6) ENGINE = 'innodb' COMMENT 'whatever',"
             "PARTITION p1 VALUES LESS THAN (11),"
