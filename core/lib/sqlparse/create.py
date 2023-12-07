@@ -54,6 +54,8 @@ class ParseError(Exception):
         self._column = column
 
     def __str__(self):
+        if self._line == 0 and self._column == 0:
+            return self._msg
         return "Line: {}, Column: {}\n {}".format(self._line, self._column, self._msg)
 
 

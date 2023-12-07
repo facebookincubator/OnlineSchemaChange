@@ -555,11 +555,15 @@ class SchemaDiff:
         try:
             old_tbl_parts = PartitionConfig()
             new_tbl_parts = PartitionConfig()
-            if self.left.partition:
+            if self.left.partition_config:
+                old_tbl_parts = self.left.partition_config
+            elif self.left.partition:
                 old_tbl_parts = CreateParser.partition_to_model(
                     CreateParser.parse_partitions(self.left.partition)
                 )
-            if self.right.partition:
+            if self.right.partition_config:
+                new_tbl_parts = self.right.partition_config
+            elif self.right.partition:
                 new_tbl_parts = CreateParser.partition_to_model(
                     CreateParser.parse_partitions(self.right.partition)
                 )

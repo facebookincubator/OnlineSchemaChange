@@ -625,7 +625,11 @@ class PartitionConfig:
                 output += f" PARTITIONS {self.num_partitions}"
             return output
         elif self.part_type == self.PTYPE_HASH:
-            output += f" ({_proc_list(self.fields_or_expr)})"
+            output += (
+                f" ({_proc_list(self.fields_or_expr)})"
+                if any(isinstance(x, list) for x in self.fields_or_expr)
+                else f" {_proc_list(self.fields_or_expr)}"
+            )
             if self.num_partitions > 1:
                 output += f" PARTITIONS {self.num_partitions}"
             return output

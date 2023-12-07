@@ -1532,7 +1532,11 @@ class BaseHelpersTest(unittest.TestCase):
         )
 
         options = {
-            "ALTER TABLE `a` PARTITION BY RANGE (time_updated) (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB)"
+            "ALTER TABLE `a` PARTITION BY RANGE (time_updated) (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB)",
+            (
+                "ALTER TABLE `a` PARTITION BY RANGE (time_updated) (\n"
+                "PARTITION p0 VALUES LESS THAN (1481313630) ENGINE INNODB)"
+            ),
         }
 
         self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
@@ -1562,7 +1566,11 @@ class BaseHelpersTest(unittest.TestCase):
         )
 
         options = {
-            "ALTER TABLE `a` PARTITION BY RANGE (time_updated) (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB)"
+            "ALTER TABLE `a` PARTITION BY RANGE (time_updated) (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB)",
+            (
+                "ALTER TABLE `a` PARTITION BY RANGE (time_updated) (\n"
+                "PARTITION p0 VALUES LESS THAN (1481313630) ENGINE INNODB)"
+            ),
         }
 
         self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
@@ -1594,7 +1602,11 @@ class BaseHelpersTest(unittest.TestCase):
         )
 
         options = {
-            "ALTER TABLE `a` PARTITION BY RANGE (time_updated) (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB)"
+            "ALTER TABLE `a` PARTITION BY RANGE (time_updated) (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB)",
+            (
+                "ALTER TABLE `a` PARTITION BY RANGE (time_updated) (\n"
+                "PARTITION p0 VALUES LESS THAN (1481313630) ENGINE INNODB)"
+            ),
         }
 
         self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
@@ -1623,7 +1635,11 @@ class BaseHelpersTest(unittest.TestCase):
         )
 
         options = {
-            "ALTER TABLE `a` PARTITION BY LIST (time_updated) (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB)"
+            "ALTER TABLE `a` PARTITION BY LIST (time_updated) (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB)",
+            (
+                "ALTER TABLE `a` PARTITION BY LIST (time_updated) (\n"
+                "PARTITION p0 VALUES IN (1481313630) ENGINE INNODB)"
+            ),
         }
 
         self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
@@ -1652,7 +1668,11 @@ class BaseHelpersTest(unittest.TestCase):
         )
 
         options = {
-            "ALTER TABLE `a` PARTITION BY LIST (time_updated) (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB)"
+            "ALTER TABLE `a` PARTITION BY LIST (time_updated) (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB)",
+            (
+                "ALTER TABLE `a` PARTITION BY LIST (time_updated) (\n"
+                "PARTITION p0 VALUES IN (1481313630) ENGINE INNODB)"
+            ),
         }
 
         self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
@@ -1681,7 +1701,11 @@ class BaseHelpersTest(unittest.TestCase):
         )
 
         options = {
-            "ALTER TABLE `a` PARTITION BY LIST (time_updated) (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB)"
+            "ALTER TABLE `a` PARTITION BY LIST (time_updated) (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB)",
+            (
+                "ALTER TABLE `a` PARTITION BY LIST (time_updated) (\n"
+                "PARTITION p0 VALUES IN (1481313630) ENGINE INNODB)"
+            ),
         }
 
         self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
@@ -1709,7 +1733,11 @@ class BaseHelpersTest(unittest.TestCase):
             "PARTITIONS 12"
         )
 
-        options = {"ALTER TABLE `a` PARTITION BY KEY (time_updated) PARTITIONS 12"}
+        options = {
+            "ALTER TABLE `a` PARTITION BY KEY (time_updated) PARTITIONS 12",
+            # new scheduler
+            "ALTER TABLE `a` PARTITION BY KEY (`time_updated`) PARTITIONS 12",
+        }
 
         self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
 
@@ -1763,7 +1791,11 @@ class BaseHelpersTest(unittest.TestCase):
             "PARTITIONS 12"
         )
 
-        options = {"ALTER TABLE `a` PARTITION BY KEY (time_updated) PARTITIONS 12"}
+        options = {
+            "ALTER TABLE `a` PARTITION BY KEY (time_updated) PARTITIONS 12",
+            # new scheduler
+            "ALTER TABLE `a` PARTITION BY KEY (`time_updated`) PARTITIONS 12",
+        }
 
         self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
 
@@ -1817,7 +1849,11 @@ class BaseHelpersTest(unittest.TestCase):
             "PARTITIONS 12"
         )
 
-        options = {"ALTER TABLE `a` PARTITION BY KEY (time_updated) PARTITIONS 12"}
+        options = {
+            "ALTER TABLE `a` PARTITION BY KEY (time_updated) PARTITIONS 12",
+            # new scheduler
+            "ALTER TABLE `a` PARTITION BY KEY (`time_updated`) PARTITIONS 12",
+        }
 
         self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
 
@@ -1886,7 +1922,11 @@ class BaseHelpersTest(unittest.TestCase):
             "PARTITIONS 12"
         )
 
-        options = {"ALTER TABLE `a` PARTITION BY KEY (time_updated) PARTITIONS 12"}
+        options = {
+            "ALTER TABLE `a` PARTITION BY KEY (time_updated) PARTITIONS 12",
+            # new scheduler
+            "ALTER TABLE `a` PARTITION BY KEY (`time_updated`) PARTITIONS 12",
+        }
 
         self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
 
@@ -1908,7 +1948,11 @@ class BaseHelpersTest(unittest.TestCase):
         )
 
         options = {
-            "ALTER TABLE `a` PARTITION BY RANGE (time_updated) (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB)"
+            "ALTER TABLE `a` PARTITION BY RANGE (time_updated) (PARTITION p0 VALUES LESS THAN (1481313630) ENGINE = InnoDB)",
+            (
+                "ALTER TABLE `a` PARTITION BY RANGE (time_updated) (\n"
+                "PARTITION p0 VALUES LESS THAN (1481313630) ENGINE INNODB)"
+            ),
         }
 
         self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
@@ -1931,7 +1975,11 @@ class BaseHelpersTest(unittest.TestCase):
         )
 
         options = {
-            "ALTER TABLE `a` PARTITION BY LIST (time_updated) (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB)"
+            "ALTER TABLE `a` PARTITION BY LIST (time_updated) (PARTITION p0 VALUES IN (1481313630) ENGINE = InnoDB)",
+            (
+                "ALTER TABLE `a` PARTITION BY LIST (time_updated) (\n"
+                "PARTITION p0 VALUES IN (1481313630) ENGINE INNODB)"
+            ),
         }
 
         self.sql_statement_partitions_helper(old_table_obj, new_table_obj, options)
