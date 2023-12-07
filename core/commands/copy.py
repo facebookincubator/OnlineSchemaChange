@@ -113,6 +113,13 @@ class Copy(CommandBase):
             "if not specified here",
         )
         parser.add_argument(
+            "--outfile-dir-alloc-id",
+            type=str,
+            default=None,
+            help="Allocation ID for outfile directory. This only "
+            "applies for directory in warm storage.",
+        )
+        parser.add_argument(
             "--pre-load-statement",
             help="SQL to be executed before loading data into "
             "new table. You may want lower down durability to "
