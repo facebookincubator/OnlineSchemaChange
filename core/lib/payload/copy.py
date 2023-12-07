@@ -2695,27 +2695,12 @@ class CopyPayload(Payload):
 
             # Refresh where condition range for next select
             if checksum:
-                self.checksum_callback(
-                    table_name,
-                    use_where,
-                    checksum[0],
-                    idx_for_checksum,
-                )
                 self.refresh_range_start()
                 affected_rows = checksum[0]["cnt"]
                 checksum_result.append(checksum[0])
                 use_where = True
 
-        self.checksum_end_callback()
         return checksum_result
-
-    def checksum_callback(
-        self, table_name, use_where, checksum_chunk_result, idx_for_checksum
-    ):
-        return
-
-    def checksum_end_callback(self):
-        return
 
     def need_checksum(self):
         """
