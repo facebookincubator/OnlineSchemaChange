@@ -727,7 +727,7 @@ class CreateParser:
             raise ParseError(f"Error parsing partitions: {e.line}, {e.column}")
 
     @classmethod
-    def parse(cls, sql, force_new_parser_obj: bool = False):
+    def parse(cls, sql, force_new_parser_obj: bool = False) -> models.Table:
         try:
             if not isinstance(sql, str):
                 sql = sql.decode("utf-8")
@@ -1026,7 +1026,7 @@ class CreateParser:
 def parse_create(
     sql,
     force_new_parser_obj: bool = False,
-):
+) -> models.Table:
     return CreateParser.parse(sql, force_new_parser_obj)
 
 

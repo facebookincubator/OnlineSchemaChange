@@ -12,7 +12,6 @@ import unittest
 from osc.lib.sqlparse import (
     get_type_conv_columns,
     need_default_ts_bootstrap,
-    parse_create,
     SchemaDiff,
 )
 
@@ -260,7 +259,7 @@ class BaseSQLParserTest(unittest.TestCase):
 
         for attr in ("comment",):
             sql2 = sql1 + ' {}="{}" '.format(attr, "abc")
-            tbl_2 = parse_create(sql2)
+            tbl_2 = self.parse_function(sql2)
 
             tbl_diff = SchemaDiff(tbl_1, tbl_2)
             self.assertEqual(len(tbl_diff.diffs()["added"]), 1)
