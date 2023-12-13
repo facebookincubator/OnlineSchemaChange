@@ -205,6 +205,7 @@ class CopyPayload(Payload):
             "compressed_outfile_extension", None
         )
         self.max_id_now = 0
+        self.parse_function = parse_create
 
     @property
     def current_db(self):
@@ -647,7 +648,7 @@ class CopyPayload(Payload):
         ddl = self.query(sql.show_create_table(table_name))
         if ddl:
             try:
-                return parse_create(ddl[0]["Create Table"])
+                return self.parse_function(ddl[0]["Create Table"])
             except ParseError as e:
                 raise OSCError(
                     "TABLE_PARSING_ERROR",
@@ -3240,7 +3241,7 @@ class CopyPayload(Payload):
     def run_ddl(self, db, sql):
         try:
             time_started = time.time()
-            self._new_table = parse_create(sql)
+            self._new_table = self.parse_function(sql)
             self._cleanup_payload.set_current_table(self.table_name)
             self._current_db = db
             self._current_db_dir = util.dirname_for_db(db)
