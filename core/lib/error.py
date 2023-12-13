@@ -86,7 +86,7 @@ class OSCError(Exception):
             "code": 115,
             "desc": (
                 "Failed to grab external lock, "
-                "existing locks that may block us: {locks}"
+                "existing locks that may block us: {locks}. We serialize schema change operations since these consume significant machine resources on instance/host and can impact user workload if executed in parallel. Please use the wiki linked above to search for additional debug information about the blocking lock name[search for the name in the wiki]."
             ),
             "retryable": True,
         },
