@@ -437,6 +437,11 @@ class OSCError(Exception):
             "desc": ("{errmsg}"),
             "retryable": True,
         },
+        "GENERIC_NONRETRY_EXCEPTION": {
+            "code": 259,
+            "desc": ("{errmsg}"),
+            "retryable": False,
+        },
     }
 
     def __init__(self, err_key, desc_kwargs=None, mysql_err_code=None):
