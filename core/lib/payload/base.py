@@ -474,7 +474,12 @@ class Payload:
             return
         result = self.query(sql.get_lock, (constant.OSC_LOCK_NAME,))
         if not result or not result[0]["lockstatus"] == 1:
+            log.warning(f"failed lock result: {result}")
+            if result:
+                log.warning(f"failed lock status: {result[0]}")
             raise OSCError("UNABLE_TO_GET_LOCK")
+        else:
+            log.warning(f"success lock result: {result}")
 
     def release_osc_lock(self):
         """
