@@ -36,8 +36,6 @@ def default_get_mysql_connection(
     MySQLdb.Connect does.
     """
     connection_config = {
-        "user": user_name,
-        "passwd": user_pass,
         "unix_socket": socket,
         "db": dbname,
         "use_unicode": True,
@@ -45,6 +43,11 @@ def default_get_mysql_connection(
     }
     if charset:
         connection_config["charset"] = charset
+    if user_name:
+        connection_config["user"] = user_name
+    if user_pass:
+        connection_config["passwd"] = user_pass
+
     dbh = MySQLdb.Connect(**connection_config)
     dbh.autocommit(True)
     if timeout:
