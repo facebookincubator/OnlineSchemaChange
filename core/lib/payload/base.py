@@ -180,7 +180,7 @@ class Payload:
         """
         self._sql_now = sql
         self._sql_args_now = args
-        log.debug("Running the following SQL on MySQL: {} {}".format(sql, args))
+        log.debug("Running the following SQL on MySQL: [{}] Args: {}".format(sql, args))
         return self._conn.query(sql, args)
 
     def execute_sql(self, sql, args=None):
@@ -190,7 +190,7 @@ class Payload:
         """
         self._sql_now = sql
         self._sql_args_now = args
-        log.debug("Running the following SQL on MySQL: {} {}".format(sql, args))
+        log.debug("Running the following SQL on MySQL: [{}] Args: {}".format(sql, args))
         return self._conn.execute(sql, args)
 
     def fetch_mysql_vars(self):

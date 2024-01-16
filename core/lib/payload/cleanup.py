@@ -99,7 +99,7 @@ class CleanupPayload(Payload):
                 if stmt_db != current_db:
                     self.execute_sql("USE `{}`".format(escape(stmt_db)))
                     current_db = stmt_db
-                log.info("Executing db: {} sql: {}".format(stmt_db, stmt))
+                log.info("Executing on DB: [{}] sql: [{}]".format(stmt_db, stmt))
                 self.execute_sql(stmt)
             except MySQLdb.OperationalError as e:
                 errnum, _ = e.args
