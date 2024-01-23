@@ -208,22 +208,32 @@ def checksum_column_list(column_list) -> str:
 
 def get_range_start_condition(columns: List[str], values: List[Any]) -> str:
     """
-    Generate a where clause for chunk matching. The size of columns and values
-    are equal.
+    Generate a where clause for chunk selection. The length of the columns and
+    values lists should be equal. Essentially, this produces a set of predicates
+    that select rows strictly greater than the values given, assuming the
+    columns make up an index, or prefix of, in order.
+
+    E.g. if you have columns making up an index (a, b, c) and starting values
+    (1, 5, 20), then the predicate will be such that:
+
+        a > 1 OR (a = 1 AND b > 5) OR (a = 1 AND b = 5 AND c > 20)
+
     """
     condition_array = []
     for i in range(len(columns)):
-        range_str = "`{}` > {}".format(columns[i], values[i])
-        if i > 0:
-            prev_col = " AND ".join(
-                "`{}` = {}".format(columns[i], values[i]) for i in range(i)
-            )
-        else:
-            prev_col = ""
-        if prev_col:
-            condition_array.append("( {} AND {} )".format(range_str, prev_col))
-        else:
-            condition_array.append("( {} )".format(range_str))
+        # First, generate a "greater" predicate for the current column.
+        greater_pred = "`{}` > {}".format(columns[i], values[i])
+
+        # Generate an equality predicate for all columns prior to the current,
+        # if any.
+        equality_preds = " AND ".join(
+            "`{}` = {}".format(columns[i], values[i]) for i in range(i)
+        )
+        predicates = [greater_pred]
+        if equality_preds:
+            predicates.append(equality_preds)
+
+        condition_array.append("( " + " AND ".join(predicates) + " )")
     return " OR ".join(condition_array)
 
 
