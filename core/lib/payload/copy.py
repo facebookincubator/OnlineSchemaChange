@@ -159,6 +159,8 @@ class CopyPayload(Payload):
         self.skip_delta_checksum = kwargs.get("skip_delta_checksum", False)
         self.skip_named_lock = kwargs.get("skip_named_lock", False)
         self.skip_affected_rows_check = kwargs.get("skip_affected_rows_check", False)
+        # Debugging only
+        self.skip_chunk_cleanup = False
         self.where = kwargs.get("where", None)
         self.session_overrides_str = kwargs.get("session_overrides", "")
         self.fail_for_implicit_conv = kwargs.get("fail_for_implicit_conv", False)
@@ -1918,7 +1920,9 @@ class CopyPayload(Payload):
         self.load_chunk_file(filepath, sql_string, chunk_id)
         # Delete the outfile once we have the data in new table to free
         # up space as soon as possible
-        if not self.use_sql_wsenv and self.rm_file(filepath):
+        if not (self.skip_chunk_cleanup or self.use_sql_wsenv) and self.rm_file(
+            filepath
+        ):
             util.sync_dir(self.outfile_dir)
             self._cleanup_payload.remove_file_entry(filepath)
 
