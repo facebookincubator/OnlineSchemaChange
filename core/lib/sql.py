@@ -216,7 +216,7 @@ def get_range_start_condition(columns: List[str], values: List[Any]) -> str:
         range_str = "`{}` > {}".format(columns[i], values[i])
         if i > 0:
             prev_col = " AND ".join(
-                " `{}` = {} ".format(columns[i], values[i]) for i in range(i)
+                "`{}` = {}".format(columns[i], values[i]) for i in range(i)
             )
         else:
             prev_col = ""
