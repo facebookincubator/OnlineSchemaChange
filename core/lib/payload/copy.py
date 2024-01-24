@@ -7,6 +7,7 @@ This source code is licensed under the BSD-style license found in the
 LICENSE file in the root directory of this source tree.
 """
 
+import gc
 import glob
 import logging
 import os
@@ -2385,6 +2386,9 @@ class CopyPayload(Payload):
         if not single_trx:
             self.commit()
         self.last_replayed_id = max_id_now
+
+        gc_count = gc.collect(2)
+        log.info("GC collected {} objects".format(gc_count))
 
         end_time = time.time()
         self.current_catchup_end_time = int(end_time)
