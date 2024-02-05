@@ -18,6 +18,7 @@ from threading import Timer
 from typing import List, Optional, Set
 
 import MySQLdb
+from libfb.py.decorators import retryable
 from osc.lib.sqlparse.diff import IndexAlterType
 
 from .. import constant, sql, util
@@ -682,6 +683,13 @@ class CopyPayload(Payload):
         ]
 
     @wrap_hook
+    def swap_table_block(self):
+        self.stats[
+            "swap_table_block"
+        ] = "Waiting on periodic database backup to complete. ETA: 3 hours."
+        return
+
+    @retryable(num_tries=3)
     def init_table_obj(self):
         """
         Instantiate self._old_table by parsing the output of SHOW CREATE
@@ -1089,6 +1097,14 @@ class CopyPayload(Payload):
                 self.table_name,
             ),
         )
+
+        if self.should_disable_bulk_load() and self.is_myrocks_table:
+            self.chunk_size = constant.CHUNK_BYTES
+            self.checksum_chunk_size = constant.CHUNK_BYTES
+            log.info(
+                f"since bulk load has been disabled, we reduce the chunk size: {constant.CHUNK_BYTES}."
+            )
+
         if result:
             tbl_avg_length = result[0]["AVG_ROW_LENGTH"]
             # avoid huge chunk row count
@@ -2708,6 +2724,10 @@ class CopyPayload(Payload):
                 affected_rows = checksum[0]["cnt"]
                 checksum_result.append(checksum[0])
                 use_where = True
+
+                # tl;dr: Python memory management needs help.
+                gc_count = gc.collect(2)
+                log.info("GC collected {} objects".format(gc_count))
 
         return checksum_result
 
