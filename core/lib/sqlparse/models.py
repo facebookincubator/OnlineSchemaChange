@@ -283,6 +283,25 @@ class Column:
             ):
                 self.column_type = "BOOLEAN"
                 continue
+
+            # "utf8" and "utf8mb3" are alias for column charset
+            # Ref: https://dev.mysql.com/doc/refman/8.0/en/charset-unicode-utf8mb3.html
+            if attr == "charset":
+                if getattr(self, attr) in ("utf8", "utf8mb3") and getattr(
+                    other, attr
+                ) in ("utf8", "utf8mb3"):
+                    continue
+
+            if attr == "collate":
+                cur_attr = getattr(self, attr)
+                other_attr = getattr(other, attr)
+
+                if cur_attr and other_attr:
+                    cur_attr = cur_attr.replace("utf8mb3", "utf8")
+                    other_attr = other_attr.replace("utf8mb3", "utf8")
+                    if cur_attr == other_attr:
+                        continue
+
             if not is_equal(getattr(self, attr), getattr(other, attr)):
                 return False
         return self.has_same_default(other)
@@ -732,6 +751,18 @@ class Table:
                     other, attr
                 ) in ("utf8", "utf8mb3"):
                     continue
+
+            if attr == "row_format":
+                engineCheck = "engine"
+                currentEngine = getattr(self, engineCheck)
+                otherEngine = getattr(other, engineCheck)
+                if currentEngine and otherEngine:
+                    currentEngine = currentEngine.upper()
+                    otherEngine = otherEngine.upper()
+
+                    # MyRocks has only one row format.
+                    if currentEngine == otherEngine and otherEngine == "ROCKSDB":
+                        continue
 
             if not is_equal(getattr(self, attr), getattr(other, attr)):
                 return False

@@ -12,7 +12,7 @@ from dba.osc.core.lib.sqlparse.common_tests.sqlparse_lib_test import (
     BaseModelTableTestCase,
     BaseSQLParserTest,
 )
-from osc.lib.sqlparse import CreateParser
+from osc.lib.sqlparse import CreateParser, parse_create, SchemaDiff
 
 
 class SQLParserTest(BaseSQLParserTest):
@@ -71,6 +71,24 @@ class SQLParserTest(BaseSQLParserTest):
             self.assertEqual(tbl.primary_key.column_list[0].name, "column1")
             self.assertEqual(tbl.name, "foo")
             self.assertEqual(tbl, self.parse_function(tbl.to_sql()))
+
+    def test_utf8_and_utf8mb3_charset_compare(self):
+        sqls = [
+            (
+                "Create table foo\n"
+                "( column1 varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci )"
+                "character set=utf8"
+            ),
+            (
+                "Create table foo\n"
+                "( column1 varchar(255)  CHARACTER SET utf8mb3  COLLATE utf8mb3_general_ci )"
+                "character set=utf8"
+            ),
+        ]
+        tbl1 = self.parse_function(sqls[0])
+        tbl2 = self.parse_function(sqls[1])
+        diff = SchemaDiff(tbl1, tbl2).to_sql()
+        self.assertFalse(diff)
 
 
 class ModelTableTestCase(BaseModelTableTestCase):
