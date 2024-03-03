@@ -684,9 +684,9 @@ class CopyPayload(Payload):
 
     @wrap_hook
     def swap_table_block(self):
-        self.stats[
-            "swap_table_block"
-        ] = "Waiting on periodic database backup to complete. ETA: 3 hours."
+        self.stats["swap_table_block"] = (
+            "Waiting on periodic database backup to complete. ETA: 3 hours."
+        )
         return
 
     @retryable(num_tries=3)
