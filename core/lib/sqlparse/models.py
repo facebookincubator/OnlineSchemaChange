@@ -298,6 +298,7 @@ class Column:
                 if cur_attr and other_attr:
                     cur_attr = cur_attr.replace("utf8mb3", "utf8")
                     other_attr = other_attr.replace("utf8mb3", "utf8")
+
                     if cur_attr == other_attr:
                         continue
 
@@ -750,6 +751,17 @@ class Table:
                     other, attr
                 ) in ("utf8", "utf8mb3"):
                     continue
+
+            if attr == "collate":
+                cur_attr = getattr(self, attr)
+                other_attr = getattr(other, attr)
+
+                if cur_attr and other_attr:
+                    cur_attr = cur_attr.replace("utf8mb3", "utf8")
+                    other_attr = other_attr.replace("utf8mb3", "utf8")
+
+                    if cur_attr == other_attr:
+                        continue
 
             if attr == "row_format":
                 engineCheck = "engine"

@@ -408,9 +408,19 @@ class SchemaDiff:
         ):
             self.add_alter_type(ColAlterType.CHANGE_SET)
         if new_col.charset != old_col.charset:
-            self.add_alter_type(ColAlterType.CHANGE_COL_CHARSET)
+            if new_col.charset and isinstance(new_col.charset, str):
+                new_col.charset = new_col.charset.replace("utf8mb3", "utf8")
+            if old_col.charset and isinstance(old_col.charset, str):
+                old_col.charset = old_col.charset.replace("utf8mb3", "utf8")
+            if new_col.charset != old_col.charset:
+                self.add_alter_type(ColAlterType.CHANGE_COL_CHARSET)
         if new_col.collate != old_col.collate:
-            self.add_alter_type(ColAlterType.CHANGE_COL_COLLATE)
+            if new_col.collate and isinstance(new_col.collate, str):
+                new_col.collate = new_col.collate.replace("utf8mb3", "utf8")
+            if old_col.collate and isinstance(old_col.collate, str):
+                old_col.collate = old_col.collate.replace("utf8mb3", "utf8")
+            if new_col.collate != old_col.collate:
+                self.add_alter_type(ColAlterType.CHANGE_COL_COLLATE)
         if new_col.comment != old_col.comment:
             self.add_alter_type(ColAlterType.CHANGE_COL_COMMENT)
 
@@ -507,6 +517,18 @@ class SchemaDiff:
         for attr in self.attrs_to_check:
             tbl_option_old = getattr(self.left, attr)
             tbl_option_new = getattr(self.right, attr)
+            if (
+                tbl_option_new
+                and isinstance(tbl_option_new, str)
+                and "utf8mb3" in tbl_option_new
+            ):
+                tbl_option_new = tbl_option_new.replace("utf8mb3", "utf8")
+            if (
+                tbl_option_old
+                and isinstance(tbl_option_old, str)
+                and "utf8mb3" in tbl_option_old
+            ):
+                tbl_option_old = tbl_option_old.replace("utf8mb3", "utf8")
             if not is_equal(tbl_option_old, tbl_option_new):
                 # when tbl_option_new is None, do "alter table xxx attr=None" won't work
                 if attr == "comment" and tbl_option_new is None:

@@ -1541,6 +1541,22 @@ class HelpersTest(BaseHelpersTest):
         self.skipTestIfBaseClass("Need to implement base class")
         sql1 = (
             "Create table foo "
+            "( column1 varchar(50) CHARACTER SET utf8 COLLATE utf8_bin, "
+            " PRIMARY KEY (column1) ) CHARSET=utf8mb3 COLLATE=utf8_bin "
+        )
+        sql2 = (
+            "Create table foo "
+            "( column1 varchar(50) CHARACTER SET utf8mb3 COLLATE utf8mb3_bin, "
+            " PRIMARY KEY (column1) ) CHARSET=utf8 COLLATE=utf8mb3_bin "
+        )
+        tbl_1 = self.parse_function(sql1)
+        tbl_2 = self.parse_function(sql2)
+
+        tbl_diff = SchemaDiff(tbl_1, tbl_2, ignore_partition=True)
+        self.assertEqual(tbl_diff.to_sql(), None)
+
+        sql1 = (
+            "Create table foo "
             "( column1 int default 0, "
             " PRIMARY KEY (column1) )"
             "   PARTITION BY RANGE(column1) "
