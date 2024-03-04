@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+
+# pyre-ignore-all-errors
 """
 Copyright (c) 2017-present, Facebook, Inc.
 All rights reserved.
