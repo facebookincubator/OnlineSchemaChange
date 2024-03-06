@@ -1337,6 +1337,8 @@ class CopyPayload(Payload):
         )
         if utf8_override and "utf8mb4" in charset_collations:
             charset_collations["utf8mb4"] = utf8_override[0]["Value"]
+        if "utf8" not in charset_collations and "utf8mb3" in charset_collations:
+            charset_collations["utf8"] = charset_collations["utf8mb3"]
         return charset_collations
 
     def populate_charset_collation(self, schema_obj):
@@ -1344,6 +1346,8 @@ class CopyPayload(Payload):
         collation_charsets = self.get_collations()
         if schema_obj.charset is not None and schema_obj.collate is None:
             # "utf8" and "utf8mb3" are alias for table charset
+            # since 8.0.32, utf8 is no longer available in the default
+            # collations.
             if schema_obj.charset == "utf8mb3":
                 schema_obj.collate = default_collations.get("utf8", None)
             else:

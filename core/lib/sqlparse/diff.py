@@ -201,6 +201,12 @@ class SchemaDiff:
         for attr in self.attrs_to_check:
             tbl_option_old = getattr(self.left, attr)
             tbl_option_new = getattr(self.right, attr)
+            if attr in ("charset", "collate"):
+                if tbl_option_old and isinstance(tbl_option_old, str):
+                    tbl_option_old = tbl_option_old.replace("utf8mb3", "utf8")
+                if tbl_option_new and isinstance(tbl_option_new, str):
+                    tbl_option_new = tbl_option_new.replace("utf8mb3", "utf8")
+
             if not is_equal(tbl_option_old, tbl_option_new):
                 if attr == "constraint":
                     for key in set(self.left.fk_constraint.keys()) - set(
