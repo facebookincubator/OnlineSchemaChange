@@ -3239,6 +3239,8 @@ class CopyPayload(Payload):
         self._cleanup_payload.socket = self.socket
         self._cleanup_payload.get_conn_func = self.get_conn_func
         self._cleanup_payload.cleanup(self._current_db)
+        # clean the gaps in the range chain because we might be in a loop.
+        self._replayed_chg_ids = util.RangeChain()
         self.stats["time_in_cleanup"] = time.time() - cleanup_start_time
 
     def print_stats(self):
