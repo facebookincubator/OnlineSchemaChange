@@ -26,13 +26,7 @@ from osc.lib.sqlparse.diff import IndexAlterType
 from .. import constant, sql, util
 from ..error import OSCError
 from ..hook import wrap_hook
-from ..sqlparse import (
-    is_equal,
-    need_default_ts_bootstrap,
-    parse_create,
-    ParseError,
-    SchemaDiff,
-)
+from ..sqlparse import is_equal, need_default_ts_bootstrap, ParseError, SchemaDiff
 from .base import Payload
 from .cleanup import CleanupPayload
 
@@ -211,7 +205,6 @@ class CopyPayload(Payload):
             "compressed_outfile_extension", None
         )
         self.max_id_now = 0
-        self.parse_function = parse_create
 
     @property
     def current_db(self):
@@ -654,7 +647,7 @@ class CopyPayload(Payload):
         ddl = self.query(sql.show_create_table(table_name))
         if ddl:
             try:
-                return self.parse_function(ddl[0]["Create Table"])
+                return self.parse_function(ddl[0]["Create Table"], self.use_ast_parser)
             except ParseError as e:
                 raise OSCError(
                     "TABLE_PARSING_ERROR",
@@ -3277,7 +3270,7 @@ class CopyPayload(Payload):
     def run_ddl(self, db, sql):
         try:
             time_started = time.time()
-            self._new_table = self.parse_function(sql)
+            self._new_table = self.parse_function(sql, self.use_ast_parser)
             self._cleanup_payload.set_current_table(self.table_name)
             self._current_db = db
             self._current_db_dir = util.dirname_for_db(db)

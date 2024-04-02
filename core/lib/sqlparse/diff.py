@@ -60,6 +60,10 @@ class IndexAlterType(BaseAlterType):
     CHANGE_PK = "change_pk"  # copy
     BECOME_UNIQUE_INDEX = "become_unique_index"
     CHANGE_INDEX_VISIBILITY = "change_index_visibility"
+    CHANGE_VECTOR_INDEX_TYPE = "change_vector_index_type"
+    CHANGE_VECTOR_DIMENSION = "change_vector_dimension"
+    CHANGE_VECTOR_INDEX_ID = "change_vector_index_id"
+    CHANGE_VECTOR_INDEX_TABLE = "change_vector_index_table"
 
 
 class TableAlterType(BaseAlterType):
@@ -491,6 +495,10 @@ class SchemaDiff:
             "key_type",
             "using",
             "visibility",
+            "vector_index_type",
+            "vector_dimension",
+            "vector_trained_index_id",
+            "vector_trained_index_table",
         ]
         for attr in attrs:
             if not is_equal(
@@ -514,6 +522,14 @@ class SchemaDiff:
                     self.add_alter_type(IndexAlterType.CHANGE_INDEX_TYPE)
                 elif attr == "visibility":
                     self.add_alter_type(IndexAlterType.CHANGE_INDEX_VISIBILITY)
+                elif attr == "vector_index_type":
+                    self.add_alter_type(IndexAlterType.CHANGE_VECTOR_INDEX_TYPE)
+                elif attr == "vector_dimension":
+                    self.add_alter_type(IndexAlterType.CHANGE_VECTOR_DIMENSION)
+                elif attr == "vector_trained_index_id":
+                    self.add_alter_type(IndexAlterType.CHANGE_VECTOR_INDEX_ID)
+                elif attr == "vector_trained_index_table":
+                    self.add_alter_type(IndexAlterType.CHANGE_VECTOR_INDEX_TABLE)
 
     def _gen_tbl_attr_sql(self):
         """

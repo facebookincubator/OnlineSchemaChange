@@ -17,11 +17,12 @@ import os
 import time
 
 import MySQLdb
+from dba.osc.core.lib.sqlparse.fb_create import parse_create
 
 from .. import constant, db as db_lib, hook, sql, util
 from ..error import OSCError
 from ..mysql_version import MySQLVersion
-from ..sqlparse import parse_create, ParseError
+from ..sqlparse import ParseError
 
 log = logging.getLogger(__name__)
 
@@ -61,6 +62,9 @@ class Payload:
         self.is_slave_stopped_by_me = False
         self.num_finished_dbs = 0
         self._current_db = None
+        self.use_ast_parser = kwargs.get("use_ast_parser", True)
+        self.parse_function = parse_create
+        log.info("Use ast parser" if self.use_ast_parser else "Use old parser")
 
     @property
     def conn(self):
@@ -244,7 +248,7 @@ class Payload:
                     [line for line in fh.readlines() if not line.startswith("--")]
                 )
                 try:
-                    parsed_sql = parse_create(raw_sql)
+                    parsed_sql = self.parse_function(raw_sql, self.use_ast_parser)
                 except ParseError as e:
                     raise OSCError(
                         "INVALID_SYNTAX", {"filepath": ddl_file, "msg": str(e)}

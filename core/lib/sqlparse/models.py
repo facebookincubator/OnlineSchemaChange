@@ -140,6 +140,10 @@ class TableIndex:
         self.using = None
         self.column_list = []
         self.visibility = True
+        self.vector_index_type = None
+        self.vector_dimension = None
+        self.vector_trained_index_id = None
+        self.vector_trained_index_table = None
 
     def __str__(self):
         idx_str = []
@@ -150,6 +154,20 @@ class TableIndex:
         for col_str in self.column_list:
             col_list_str.append(str(col_str))
         idx_str.append("KEY LIST: {}".format(",".join(col_list_str)))
+        if self.vector_index_type is not None:
+            idx_str.append("FB_VECTOR_INDEX_TYPE: '{}'".format(self.vector_index_type))
+        if self.vector_dimension is not None:
+            idx_str.append("FB_VECTOR_DIMENSION: {}".format(self.vector_dimension))
+        if self.vector_trained_index_id is not None:
+            idx_str.append(
+                "FB_VECTOR_TRAINED_INDEX_ID: {}".format(self.vector_trained_index_id)
+            )
+        if self.vector_trained_index_table is not None:
+            idx_str.append(
+                "FB_VECTOR_TRAINED_INDEX_TABLE: {}".format(
+                    self.vector_trained_index_table
+                )
+            )
         if self.using:
             idx_str.append("USING: {}".format(self.using))
         idx_str.append("KEY_BLOCK_SIZE: {}".format(self.key_block_size))
@@ -165,6 +183,10 @@ class TableIndex:
             "key_type",
             "using",
             "visibility",
+            "vector_index_type",
+            "vector_dimension",
+            "vector_trained_index_id",
+            "vector_trained_index_table",
         ):
             if not is_equal(getattr(self, attr), getattr(other, attr)):
                 return False
@@ -193,6 +215,20 @@ class TableIndex:
         segments.append(
             "({})".format(", ".join([col.to_sql() for col in self.column_list]))
         )
+        if self.vector_index_type is not None:
+            segments.append("FB_VECTOR_INDEX_TYPE '{}'".format(self.vector_index_type))
+        if self.vector_dimension is not None:
+            segments.append("FB_VECTOR_DIMENSION {}".format(self.vector_dimension))
+        if self.vector_trained_index_id is not None:
+            segments.append(
+                "FB_VECTOR_TRAINED_INDEX_ID {}".format(self.vector_trained_index_id)
+            )
+        if self.vector_trained_index_table is not None:
+            segments.append(
+                "FB_VECTOR_TRAINED_INDEX_TABLE {}".format(
+                    self.vector_trained_index_table
+                )
+            )
         if self.using is not None:
             segments.append("USING {}".format(self.using))
         if self.key_block_size is not None:
