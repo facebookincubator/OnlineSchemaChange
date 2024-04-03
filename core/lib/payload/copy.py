@@ -170,6 +170,12 @@ class CopyPayload(Payload):
         )
         self.allow_unsafe_ts_bootstrap = kwargs.get("allow_unsafe_ts_bootstrap", False)
         self.is_full_table_dump = False
+
+        # Whether to use the server-native DUMP TABLE statement (FB-internal)
+        self.use_dump_table_stmt = kwargs.get("use_dump_table", False)
+        # If using DUMP TABLE, controls the number of worker threads.
+        self.dump_threads = kwargs.get("dump_threads", 1)
+
         self.replay_max_changes = kwargs.get(
             "replay_max_changes", constant.MAX_REPLAY_CHANGES
         )
@@ -1765,7 +1771,7 @@ class CopyPayload(Payload):
             "Changes with id <= {} committed before dump snapshot, "
             "and should be ignored.".format(current_max)
         )
-        # Only replay changes in this range (last_replayed_id, max_id_now]
+        # Only replay changes in the range (last_replayed_id, max_id_now]
         new_changes = self.query(
             sql.get_replay_row_ids(
                 self.IDCOLNAME,
@@ -1880,9 +1886,47 @@ class CopyPayload(Payload):
         log.info(progress)
 
     @wrap_hook
-    def select_table_into_outfile(self):
+    def dump_table_native(self):
+        """
+        Dump table using DUMP TABLE statement. Uses built-in parallelism.
+        """
+        log.info(
+            "Dumping using DUMP TABLE statement "
+            f"with {self.dump_threads} threads and "
+            f"chunk_size = {self.chunk_size} bytes."
+        )
+        dump_sql = sql.dump_table_stmt(
+            self.table_name,
+            self.outfile,
+            self.chunk_size,
+            self.dump_threads,
+            consistent=True,
+        )
+        result = self.query(dump_sql)
+        for r in result:
+            log.info(r)
+
+    @wrap_hook
+    def dump_table(self):
+        """
+        Dumps the source table into one or more chunk files using one of several
+        methods.
+        """
         log.info("== Stage 2: Dump ==")
         stage_start_time = time.time()
+        if self.use_dump_table_stmt:
+            # Dump via DUMP TABLE statement.
+            self.dump_table_native()
+        else:
+            # Dump via one or more SELECT INTO OUTFILE statements.
+            self.select_table_into_outfile()
+        log.info("Dump finished")
+        self.stats["time_in_dump"] = time.time() - stage_start_time
+
+    @wrap_hook
+    def select_table_into_outfile(self):
+        log.info("Dumping using SELECT INTO OUTFILE.")
+
         # We can not break the table into chunks when there's no existing pk
         # We'll have to use one big file for copy data
         if self.is_full_table_dump:
@@ -1909,8 +1953,6 @@ class CopyPayload(Payload):
                 self.log_dump_progress(outfile_suffix)
                 printed_chunk = progress_chunk
         self.commit()
-        log.info("Dump finished")
-        self.stats["time_in_dump"] = time.time() - stage_start_time
 
     @wrap_hook
     def drop_non_unique_indexes(self):
@@ -3288,7 +3330,7 @@ class CopyPayload(Payload):
             self.create_copy_table()
             self.create_triggers()
             self.start_snapshot()
-            self.select_table_into_outfile()
+            self.dump_table()
             self.drop_non_unique_indexes()
             self.load_data()
             self.recreate_non_unique_indexes()

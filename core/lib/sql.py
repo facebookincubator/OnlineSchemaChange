@@ -497,6 +497,26 @@ def select_full_table_into_file_by_chunk(
     )
 
 
+def dump_table_stmt(
+    table_name: str,
+    outfile_base_name: str,
+    chunk_size_bytes: int,
+    threads: int = 1,
+    consistent: bool = True,
+) -> str:
+    """
+    Generate a DUMP TABLE statement for the given table.
+    """
+    consistent_snapshot = ", CONSISTENT SNAPSHOT" if consistent else ""
+    return "DUMP TABLE {} INTO '{}' WITH (THREADS = {}, CHUNK_SIZE = {} KB{})".format(
+        escape(table_name),
+        outfile_base_name,  # DUMP TABLE will automatically suffix with chunk ID.
+        threads,
+        chunk_size_bytes // 1024,
+        consistent_snapshot,
+    )
+
+
 def load_data_infile(
     table_name, col_list, ignore: bool = False, enable_outfile_compression: bool = False
 ) -> str:
