@@ -211,6 +211,7 @@ class CopyPayload(Payload):
             "compressed_outfile_extension", None
         )
         self.max_id_now = 0
+        self.mismatch_pk_charset = {}
 
     @property
     def current_db(self):
@@ -1099,7 +1100,7 @@ class CopyPayload(Payload):
             ),
         )
 
-        if self.should_disable_bulk_load() and self.is_myrocks_table:
+        if self.is_myrocks_table and self.should_disable_bulk_load():
             self.chunk_size = constant.CHUNK_BYTES
             self.checksum_chunk_size = constant.CHUNK_BYTES
             log.info(
@@ -2054,6 +2055,8 @@ class CopyPayload(Payload):
         elif self.may_have_dup_unique_keys():
             reason = "because there may be duplicated unique keys"
         else:
+            pk_collate_msg = "because we are changing PK column charset/collate"
+            casting_possible = False
             new_cols = {col.name: col for col in self._new_table.column_list}
             for idx, col_name in enumerate(self._pk_for_filter):
                 if (
@@ -2061,8 +2064,17 @@ class CopyPayload(Payload):
                     or new_cols[col_name].collate
                     != self._pk_for_filter_def[idx].collate
                 ):
-                    reason = "because we are changing PK column charset/collate"
+                    if (
+                        new_cols[col_name].column_type == "VARCHAR"
+                        and self._pk_for_filter_def[idx].column_type == "VARBINARY"
+                    ):
+                        casting_possible = True
+
+                    reason = pk_collate_msg
                     break
+            if reason == pk_collate_msg and casting_possible:
+                for col in self._new_table.column_list:
+                    self.mismatch_pk_charset[col.name] = new_cols[col.name].charset
         if reason:
             log.warning("Disable rocksdb_bulk_load, " + reason)
             return True
@@ -2379,6 +2391,7 @@ class CopyPayload(Payload):
             self.delta_table_name,
             self.IDCOLNAME,
             self._pk_for_filter,
+            self.mismatch_pk_charset,
         )
         update_sql = sql.replay_update_row(
             self.old_non_pk_column_list,
@@ -2387,6 +2400,7 @@ class CopyPayload(Payload):
             self.eliminate_dups,
             self.IDCOLNAME,
             self._pk_for_filter,
+            self.mismatch_pk_charset,
         )
         insert_sql = sql.replay_insert_row(
             self.old_column_list,

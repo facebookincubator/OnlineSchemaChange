@@ -132,7 +132,9 @@ def column_name_with_tbl_prefix(column_list, prefix) -> str:
     )
 
 
-def get_match_clause(left_table_name, right_table_name, columns, separator):
+def get_match_clause(
+    left_table_name, right_table_name, columns, separator, mismatch_pk_charset=None
+):
     """
     Given a left/right name and a list of columns, generate a where clause
     string for trigger creation/replaying changes
@@ -153,12 +155,38 @@ def get_match_clause(left_table_name, right_table_name, columns, separator):
     SQL
     @rtype :  string
     """
-    return separator.join(
-        "`{}`.`{}` = `{}`.`{}`".format(
-            escape(left_table_name), escape(col), escape(right_table_name), escape(col)
+    if not mismatch_pk_charset:
+        return separator.join(
+            "`{}`.`{}` = `{}`.`{}`".format(
+                escape(left_table_name),
+                escape(col),
+                escape(right_table_name),
+                escape(col),
+            )
+            for col in columns
         )
-        for col in columns
-    )
+    else:
+        return separator.join(
+            "`{}`.`{}` = {}`{}`.`{}`{}".format(
+                escape(left_table_name),
+                escape(col),
+                (
+                    "CONVERT("
+                    if col in mismatch_pk_charset
+                    and mismatch_pk_charset[col] is not None
+                    else ""
+                ),
+                escape(right_table_name),
+                escape(col),
+                (
+                    f" using `{mismatch_pk_charset[col]}`)"
+                    if col in mismatch_pk_charset
+                    and mismatch_pk_charset[col] is not None
+                    else ""
+                ),
+            )
+            for col in columns
+        )
 
 
 def select_as(var_name, as_name) -> str:
@@ -555,7 +583,9 @@ def get_max_id_from(column, table_name) -> str:
     )
 
 
-def replay_delete_row(new_table_name, delta_table_name, id_col_name, pk_list) -> str:
+def replay_delete_row(
+    new_table_name, delta_table_name, id_col_name, pk_list, mismatch_pk_charset
+) -> str:
     return (
         "DELETE {new} FROM `{new}`, `{delta}` WHERE "
         "`{delta}`.`{id_col}` IN %s AND {join_clause}"
@@ -565,7 +595,11 @@ def replay_delete_row(new_table_name, delta_table_name, id_col_name, pk_list) ->
             "delta": escape(delta_table_name),
             "id_col": escape(id_col_name),
             "join_clause": get_match_clause(
-                new_table_name, delta_table_name, pk_list, separator=" AND "
+                new_table_name,
+                delta_table_name,
+                pk_list,
+                separator=" AND ",
+                mismatch_pk_charset=mismatch_pk_charset,
             ),
         }
     )
@@ -597,6 +631,7 @@ def replay_update_row(
     ignore: str,
     id_col_name,
     pk_list,
+    mismatch_pk_charset,
 ) -> str:
     ignore = "IGNORE" if ignore else ""
     return (
@@ -613,7 +648,11 @@ def replay_update_row(
             ),
             "id_col": escape(id_col_name),
             "join_clause": get_match_clause(
-                new_table_name, delta_table_name, pk_list, separator=" AND "
+                new_table_name,
+                delta_table_name,
+                pk_list,
+                separator=" AND ",
+                mismatch_pk_charset=mismatch_pk_charset,
             ),
         }
     )

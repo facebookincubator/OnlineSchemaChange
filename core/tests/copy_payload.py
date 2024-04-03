@@ -14,6 +14,7 @@ import unittest
 from unittest.mock import MagicMock, Mock
 
 import MySQLdb
+from osc.lib import sql
 
 from ..lib import constant
 from ..lib.error import OSCError
@@ -450,6 +451,48 @@ class CopyPayloadTestCase(unittest.TestCase):
         self.assertEqual(payload._cleanup_payload.to_drop, [])
         self.assertEqual(len(payload._cleanup_payload.files_to_clean), 0)
         self.assertEqual(err_context.exception.err_key, "GENERIC_MYSQL_ERROR")
+
+    def test_should_disable_bulk_load(self):
+        payload = CopyPayload()
+        table_obj = parse_create(
+            " CREATE TABLE __osc_chg_tbl "
+            "( `fid` varbinary(36) NOT NULL COMMENT 'GUID for file' primary key,  "
+            "col1 varchar(10), "
+            "col2 varchar(10)) "
+            "  ENGINE = RocksDB "
+        )
+        table_obj_new = parse_create(
+            " CREATE TABLE __osc_new_tbl "
+            "( `fid` varchar(36) CHARACTER SET latin1 COLLATE latin1_bin NOT NULL COMMENT 'GUID for file' primary key,  "
+            "col1 varchar(10) CHARACTER SET latin2 COLLATE latin1_bin, "
+            "col2 varchar(100) CHARACTER SET latin3 COLLATE latin1_bin) "
+            "  ENGINE = RocksDB  "
+        )
+        payload._old_table = table_obj
+        payload._new_table = table_obj_new
+
+        # populate some pk structures
+        payload.decide_pk_for_filter()
+
+        self.assertTrue(payload.should_disable_bulk_load())
+        self.assertEqual(payload.mismatch_pk_charset["fid"], "latin1")
+        self.assertEqual(payload.mismatch_pk_charset["col1"], "latin2")
+        self.assertEqual(payload.mismatch_pk_charset["col2"], "latin3")
+
+        self.assertEqual(payload.mismatch_pk_charset["col2"], "latin3")
+
+        clause = sql.replay_delete_row(
+            table_obj_new.name,
+            table_obj.name,
+            "_osc_ID",
+            ["fid"],
+            payload.mismatch_pk_charset,
+        )
+
+        self.assertEqual(
+            clause,
+            "DELETE __osc_new_tbl FROM `__osc_new_tbl`, `__osc_chg_tbl` WHERE `__osc_chg_tbl`.`_osc_ID` IN %s AND `__osc_new_tbl`.`fid` = CONVERT(`__osc_chg_tbl`.`fid` using `latin1`)",
+        )
 
     def test_file_exists(self):
         payload = self.payload_setup()
