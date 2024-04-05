@@ -27,13 +27,13 @@ from pyparsing import (
     Optional,
     ParseException,
     ParseResults,
+    pyparsing_common,
     QuotedString,
     Regex,
     replaceWith,
     SkipTo,
     StringEnd,
     StringStart,
-    upcaseTokens,
     White,
     Word,
     ZeroOrMore,
@@ -42,6 +42,8 @@ from pyparsing import (
 from . import models
 
 log = logging.getLogger(__name__)
+
+upcaseTokens = pyparsing_common.upcaseTokens
 
 
 __all__ = ["parse_create", "ParseError", "PartitionParseError"]
