@@ -858,7 +858,7 @@ class CopyPayload(Payload):
         # MyRocks doesn't support foreign key
         if self.is_myrocks_table:
             log.info(
-                "SKip foreign key check because MyRocks doesn't support " "this yet"
+                "Skip foreign key check because MyRocks doesn't support " "this yet"
             )
             return True
         foreign_keys = self.query(
@@ -1100,12 +1100,10 @@ class CopyPayload(Payload):
             ),
         )
 
-        if self.is_myrocks_table and self.should_disable_bulk_load():
+        if self.is_myrocks_table and self.should_disable_bulk_load()[0]:
             self.chunk_size = constant.CHUNK_BYTES
             self.checksum_chunk_size = constant.CHUNK_BYTES
-            log.info(
-                f"since bulk load has been disabled, we reduce the chunk size: {constant.CHUNK_BYTES}."
-            )
+            log.info(f"reduce the chunk size: {constant.CHUNK_BYTES}.")
 
         if result:
             tbl_avg_length = result[0]["AVG_ROW_LENGTH"]
@@ -2016,27 +2014,42 @@ class CopyPayload(Payload):
                 raise
 
     def change_rocksdb_bulk_load(self, enable=True):
-        if self.should_disable_bulk_load():
+        should_disable_bulk_load, use_bulk_load_with_pk_charset = (
+            self.should_disable_bulk_load()
+        )
+        if should_disable_bulk_load and not use_bulk_load_with_pk_charset:
             return
         v = 1 if enable else 0
         log.info("Bulk load is enabled" if enable else "Bulk load is disabled")
         #  rocksdb_bulk_load and rocksdb_bulk_load_allow_sk have the
         #  following sequence requirement so setting values accordingly.
         #  SET SESSION rocksdb_bulk_load_allow_sk=1;
+        #  SET SESSION rocksdb_bulk_load_allow_unsorted = 1;
         #  SET SESSION rocksdb_bulk_load=1;
         #  ... (bulk loading)
         #  SET SESSION rocksdb_bulk_load=0;
         #  SET SESSION rocksdb_bulk_load_allow_sk=0;
+        #  SET SESSION rocksdb_bulk_load_allow_unsorted = 0;
         try:
             if self.rocksdb_bulk_load_allow_sk and enable:
                 self.execute_sql(
                     sql.set_session_variable("rocksdb_bulk_load_allow_sk"), (v,)
                 )
+                if use_bulk_load_with_pk_charset:
+                    self.execute_sql(
+                        sql.set_session_variable("rocksdb_bulk_load_allow_unsorted"),
+                        (v,),
+                    )
             self.execute_sql(sql.set_session_variable("rocksdb_bulk_load"), (v,))
             if self.rocksdb_bulk_load_allow_sk and not enable:
                 self.execute_sql(
                     sql.set_session_variable("rocksdb_bulk_load_allow_sk"), (v,)
                 )
+                if use_bulk_load_with_pk_charset:
+                    self.execute_sql(
+                        sql.set_session_variable("rocksdb_bulk_load_allow_unsorted"),
+                        (v,),
+                    )
 
         except MySQLdb.OperationalError as e:
             errnum, errmsg = e.args
@@ -2050,6 +2063,7 @@ class CopyPayload(Payload):
         reason = ""
         # rocksdb_bulk_load relies on data being dumping in the same sequence
         # as new pk. If we are changing pk, then we cannot ensure that
+        use_bulk_load_with_pk_charset = False
         if self._old_table.primary_key != self._new_table.primary_key:
             reason = "because we are changing PK"
         elif self.may_have_dup_unique_keys():
@@ -2071,14 +2085,21 @@ class CopyPayload(Payload):
                         casting_possible = True
 
                     reason = pk_collate_msg
+                    use_bulk_load_with_pk_charset = True
+                    log.warning("Can enable use_bulk_load_with_pk_charset")
                     break
             if reason == pk_collate_msg and casting_possible:
                 for col in self._new_table.column_list:
                     self.mismatch_pk_charset[col.name] = new_cols[col.name].charset
         if reason:
-            log.warning("Disable rocksdb_bulk_load, " + reason)
-            return True
-        return False
+            log.warning(
+                "in disable rocksdb_bulk_load, "
+                + reason
+                + ". use_bulk_load_with_pk_charset="
+                + str(use_bulk_load_with_pk_charset)
+            )
+            return (True, use_bulk_load_with_pk_charset)
+        return (False, False)
 
     def may_have_dup_unique_keys(self):
         diff = SchemaDiff(self._old_table, self._new_table)
