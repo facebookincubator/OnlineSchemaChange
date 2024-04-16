@@ -110,6 +110,11 @@ class CommandBase:
             "making schema changes for all the given "
             "databases ",
         )
+        parser.add_argument(
+            "--use-ast-parser",
+            action="store_true",
+            help="Use ast parser to generate sql",
+        )
 
     def add_file_list_parser(self, parser):
         parser.add_argument(
