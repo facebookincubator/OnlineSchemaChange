@@ -217,7 +217,7 @@ class OSCError(Exception):
                 "see also: --skip-checksum-for-modified "
                 "3. it is a bug in OSC"
             ),
-            "retryable": True,
+            "retryable": False,
         },
         "OFFLINE_NOT_SUPPORTED": {
             "code": 135,
