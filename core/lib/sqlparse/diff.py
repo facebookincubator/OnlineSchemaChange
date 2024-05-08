@@ -47,6 +47,7 @@ class ColAlterType(BaseAlterType):
     CHANGE_COL_COMMENT = "change_col_comment"
     ADD_TIMESTAMP_COL = "add_timestamp_col"
     CHANGE_UNSIGNED = "change_unsigned"
+    CHANGE_COL_VECTOR_DIMENSION = "change_col_vector_dimension"  # copy
 
 
 class IndexAlterType(BaseAlterType):
@@ -434,6 +435,8 @@ class SchemaDiff:
                 self.add_alter_type(ColAlterType.CHANGE_COL_COLLATE)
         if new_col.comment != old_col.comment:
             self.add_alter_type(ColAlterType.CHANGE_COL_COMMENT)
+        if new_col.vector_dimension != old_col.vector_dimension:
+            self.add_alter_type(ColAlterType.CHANGE_COL_VECTOR_DIMENSION)
 
     def _gen_idx_sql(self):
         """

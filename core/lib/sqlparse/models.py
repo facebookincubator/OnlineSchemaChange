@@ -160,11 +160,11 @@ class TableIndex:
             idx_str.append("FB_VECTOR_DIMENSION: {}".format(self.vector_dimension))
         if self.vector_trained_index_id is not None:
             idx_str.append(
-                "FB_VECTOR_TRAINED_INDEX_ID: {}".format(self.vector_trained_index_id)
+                "FB_VECTOR_TRAINED_INDEX_ID: '{}'".format(self.vector_trained_index_id)
             )
         if self.vector_trained_index_table is not None:
             idx_str.append(
-                "FB_VECTOR_TRAINED_INDEX_TABLE: {}".format(
+                "FB_VECTOR_TRAINED_INDEX_TABLE: '{}'".format(
                     self.vector_trained_index_table
                 )
             )
@@ -221,11 +221,11 @@ class TableIndex:
             segments.append("FB_VECTOR_DIMENSION {}".format(self.vector_dimension))
         if self.vector_trained_index_id is not None:
             segments.append(
-                "FB_VECTOR_TRAINED_INDEX_ID {}".format(self.vector_trained_index_id)
+                "FB_VECTOR_TRAINED_INDEX_ID '{}'".format(self.vector_trained_index_id)
             )
         if self.vector_trained_index_table is not None:
             segments.append(
-                "FB_VECTOR_TRAINED_INDEX_TABLE {}".format(
+                "FB_VECTOR_TRAINED_INDEX_TABLE '{}'".format(
                     self.vector_trained_index_table
                 )
             )
@@ -258,6 +258,7 @@ class Column:
         self.zerofill = None
         self.is_default_bit = False
         self.auto_increment = None
+        self.vector_dimension = None
 
     def __str__(self):
         col_str = []
@@ -274,6 +275,8 @@ class Column:
         col_str.append("ZEROFILL: {}".format(self.zerofill))
         col_str.append("UNSIGNED: {}".format(self.unsigned))
         col_str.append("COMMENT: {}".format(self.comment))
+        if self.vector_dimension is not None:
+            col_str.append("FB_VECTOR_DIMENSION: {}".format(self.vector_dimension))
         return " ".join(col_str)
 
     @property
@@ -301,6 +304,7 @@ class Column:
             "unsigned",
             "is_default_bit",
             "auto_increment",
+            "vector_dimension",
         ):
 
             # Ignore display width of *int types, because of the new default in 8.0.20.
@@ -395,6 +399,10 @@ class Column:
                 column_segment.append("DEFAULT {}".format(self.default))
         if self.auto_increment is not None:
             column_segment.append("AUTO_INCREMENT")
+        if self.vector_dimension is not None:
+            column_segment.append(
+                "FB_VECTOR_DIMENSION {}".format(self.vector_dimension)
+            )
         if self.comment is not None:
             column_segment.append("COMMENT {}".format(self.comment))
 
