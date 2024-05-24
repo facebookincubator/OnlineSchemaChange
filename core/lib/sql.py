@@ -811,6 +811,13 @@ def dump_current_chunk(
     )
 
 
+def select_test(left_vars) -> str:
+    """
+    SQL component for selecting left session variable's value
+    """
+    return "SELECT {}".format(left_vars)
+
+
 def checksum_by_chunk_with_assign(
     table_name,
     columns,
