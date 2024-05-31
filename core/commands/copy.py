@@ -333,6 +333,12 @@ class Copy(CommandBase):
             help="Enable dump/load data with wsenv if specified",
         )
         parser.add_argument(
+            "--use-dump-table",
+            action="store_true",
+            help="Use DUMP TABLE statement when dumping. Applies to "
+            "OSC_TRADITIONAL deployment method only.",
+        )
+        parser.add_argument(
             "--enable-outfile-compression",
             action="store_true",
             dest="enable_outfile_compression",

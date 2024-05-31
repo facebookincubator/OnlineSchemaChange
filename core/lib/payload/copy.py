@@ -400,7 +400,7 @@ class CopyPayload(Payload):
         """
         Full file path of the outfile for data dumping/loading. It's the prefix
         of outfile chunks. A single outfile chunk will look like
-        '@datadir/__osc_tbl_@TABLE_NAME.1'
+        '@datadir/__osc_tbl_@TABLE_NAME.@n'
         """
         return os.path.join(self.outfile_dir, constant.OUTFILE_TABLE + self.table_name)
 
@@ -1280,6 +1280,11 @@ class CopyPayload(Payload):
         self.ts_bootstrap_check()
         self.drop_columns_check()
 
+        # Check things that require myrocks
+        if not self.is_myrocks_table:
+            if self.use_dump_table_stmt:
+                raise OSCError("MYROCKS_REQUIRED", {"reason": "DUMP TABLE statement"})
+
     def drop_columns_check(self):
         # We only allow dropping columns with the flag --allow-drop-column.
         if self.dropped_column_name_list:
@@ -1902,8 +1907,23 @@ class CopyPayload(Payload):
             consistent=True,
         )
         result = self.query(dump_sql)
+        if not result:
+            raise OSCError(
+                "OSC_INTERNAL_ERROR",
+                {"msg": "Missing result from DUMP TABLE statement."},
+            )
+
         for r in result:
             log.info(r)
+
+        num_chunks = result[0]["num_chunks"]
+
+        # Update the last suffix ID for loading.
+        self.outfile_suffix_end = num_chunks - 1
+
+        # Add the list of chunk file names to be cleaned up during load time.
+        for i in range(num_chunks):
+            self._cleanup_payload.add_file_entry(self._outfile_name(chunk_id=i))
 
     @wrap_hook
     def dump_table(self):

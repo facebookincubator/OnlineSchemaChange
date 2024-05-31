@@ -438,6 +438,11 @@ class OSCError(Exception):
             "retryable": True,
             "internal": True,
         },
+        "MYROCKS_REQUIRED": {
+            "code": 154,
+            "desc": "MyRocks required due to: {reason}",
+            "retryable": False,
+        },
         # reserved for special internal errors
         "ASSERTION_ERROR": {
             "code": 249,
