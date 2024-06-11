@@ -212,6 +212,7 @@ class CopyPayload(Payload):
         )
         self.max_id_now = 0
         self.mismatch_pk_charset = {}
+        self.last_gc_collected = time.time()
 
     @property
     def current_db(self):
@@ -2357,6 +2358,12 @@ class CopyPayload(Payload):
             else:
                 continue
 
+    def perform_gc_collection(self):
+        if time.time() - self.last_gc_collected > constant.GC_COLLECT_TIME_INTERVAL:
+            gc_count = gc.collect(2)
+            self.last_gc_collected = time.time()
+            log.debug("GC collected {} objects".format(gc_count))
+
     def replay_changes(
         self, single_trx=False, holding_locks=False, delta_id_limit=None
     ):
@@ -2499,8 +2506,7 @@ class CopyPayload(Payload):
             self.commit()
         self.last_replayed_id = max_id_now
 
-        gc_count = gc.collect(2)
-        log.info("GC collected {} objects".format(gc_count))
+        self.perform_gc_collection()
 
         end_time = time.time()
         self.current_catchup_end_time = int(end_time)
@@ -2605,7 +2611,7 @@ class CopyPayload(Payload):
                 )
             )
             raise OSCError("CHECKSUM_MISMATCH")
-        log.info("{} checksum chunks in total".format(len(old_table_checksum)))
+        log.debug("{} checksum chunks in total".format(len(old_table_checksum)))
 
         checksum_xor = 0
         # Also, generate an xor of all the checksum entries for a quick sanity test
@@ -2822,9 +2828,7 @@ class CopyPayload(Payload):
                 use_where = True
 
                 # tl;dr: Python memory management needs help.
-                gc_count = gc.collect(2)
-                log.info("GC collected {} objects".format(gc_count))
-
+                self.perform_gc_collection()
         return checksum_result
 
     def need_checksum(self):
