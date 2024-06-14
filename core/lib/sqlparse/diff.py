@@ -254,6 +254,10 @@ class SchemaDiff:
     def add_alter_type(self, ddl_alter_type):
         self._alter_types.add(ddl_alter_type)
 
+    def clear_diff(self):
+        self.left = self.right
+        self._alter_types = []
+
     def _gen_col_sql(self):
         """
         Generate the column section for ALTER TABLE statement
