@@ -658,11 +658,14 @@ def replay_update_row(
     )
 
 
-def get_chg_row(id_col_name, dml_col_name, tmp_table_include_id) -> str:
-    return "SELECT `{id}`, `{dml_type}` FROM `{table}` WHERE `{id}` = %s ".format(
+def get_chg_row(
+    id_col_name, dml_col_name, tmp_table_include_id, primary_key_list
+) -> str:
+    return "SELECT `{id}`, `{dml_type}`, {pk_list} FROM `{table}` WHERE `{id}` = %s ".format(
         **{
             "id": escape(id_col_name),
             "dml_type": escape(dml_col_name),
+            "pk_list": list_to_col_str(primary_key_list),
             "table": escape(tmp_table_include_id),
         }
     )
@@ -691,6 +694,7 @@ def get_replay_row_ids(
     id_col_name,
     dml_col_name,
     tmp_table_include_id,
+    primary_key_list,
     timeout_ms=None,
     is_mysql8: bool = False,
 ) -> str:
@@ -702,7 +706,7 @@ def get_replay_row_ids(
     else:
         statement_timeout_sql = ""
     return (
-        "SELECT {timeout} `{id}`, `{dml_type}` "
+        "SELECT {timeout} `{id}`, `{dml_type}`, {pk_list} "
         "FROM `{table}` "
         "WHERE `{id}` > %s AND `{id}` <= %s "
         "ORDER BY `{id}`"
@@ -711,6 +715,7 @@ def get_replay_row_ids(
             "timeout": statement_timeout_sql,
             "id": escape(id_col_name),
             "dml_type": escape(dml_col_name),
+            "pk_list": list_to_col_str(primary_key_list),
             "table": escape(tmp_table_include_id),
         }
     )

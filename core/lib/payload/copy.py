@@ -65,6 +65,7 @@ class CopyPayload(Payload):
         self._old_table = None
         self._replayed_chg_ids = util.RangeChain()
         self.select_chunk_size = 0
+        self.use_batch_updates = False
         self.select_checksum_chunk_size = 0
         self.bypass_replay_timeout = False
         self.is_ttl_disabled_by_me = False
@@ -226,11 +227,19 @@ class CopyPayload(Payload):
         """
         List of column names representing the primary key in
         the old schema.
-        If will be used to check whether the old schema has a primary key by
+        It will be used to check whether the old schema has a primary key by
         comparing the length to zero. Also will be used in construct the
         condition part of the replay query
         """
         return [col.name for col in self._old_table.primary_key.column_list]
+
+    @property
+    def new_pk_list(self):
+        """
+        List of column names representing the primary key in
+        the new schema.
+        """
+        return [col.name for col in self._new_table.primary_key.column_list]
 
     @property
     def dropped_column_name_list(self):
@@ -1782,6 +1791,7 @@ class CopyPayload(Payload):
                 self.IDCOLNAME,
                 self.DMLCOLNAME,
                 self.delta_table_name,
+                self.new_pk_list,
                 None,
                 self.mysql_version.is_mysql8,
             ),
@@ -2306,7 +2316,12 @@ class CopyPayload(Payload):
         )
         for chg_id in self._replayed_chg_ids.missing_points():
             row = self.query(
-                sql.get_chg_row(self.IDCOLNAME, self.DMLCOLNAME, self.delta_table_name),
+                sql.get_chg_row(
+                    self.IDCOLNAME,
+                    self.DMLCOLNAME,
+                    self.delta_table_name,
+                    self.new_pk_list,
+                ),
                 (chg_id,),
             )
             if bool(row):
@@ -2319,6 +2334,9 @@ class CopyPayload(Payload):
         )
         return delta
 
+    def enable_batch_updates(self):
+        return False
+
     def divide_changes_to_group(self, chg_rows):
         """
         Put consecutive changes with the same type into a group so that we can
@@ -2329,6 +2347,7 @@ class CopyPayload(Payload):
         """
         id_group = []
         type_now = None
+        tracked_primary_keys = set()
         for idx, chg in enumerate(chg_rows):
             # Start of the current group
             if type_now is None:
@@ -2338,22 +2357,57 @@ class CopyPayload(Payload):
             # Dump when we are at the end of the changes
             if idx == len(chg_rows) - 1:
                 yield type_now, id_group
+                tracked_primary_keys = set()
                 return
-            # update type cannot be grouped
-            elif type_now == self.DML_TYPE_UPDATE:
-                yield type_now, id_group
-                type_now = None
-                id_group = []
+
+            if self.use_batch_updates:
+                if (
+                    idx + 1 <= len(chg_rows) - 1
+                    and chg_rows[idx + 1][self.DMLCOLNAME] == self.DML_TYPE_UPDATE
+                ):
+                    future_key_value = ""
+                    for col in self.new_pk_list:
+                        future_key_value += str(chg_rows[idx + 1][col])
+                        # __osc__ is the delimiter
+                        future_key_value += ";__osc__;"
+                    # If we have an existing update in the tracked primary keys,
+                    # end the batch right now.
+                    if future_key_value in tracked_primary_keys:
+                        yield type_now, id_group
+                        type_now = None
+                        id_group = []
+                        tracked_primary_keys = set()
+                        continue
+
             # The next change is a different type, dump what we have now
-            elif chg_rows[idx + 1][self.DMLCOLNAME] != type_now:
+            if chg_rows[idx + 1][self.DMLCOLNAME] != type_now:
                 yield type_now, id_group
                 type_now = None
                 id_group = []
+                tracked_primary_keys = set()
             # Reach the max group size, let's submit the query for now
             elif len(id_group) >= self.replay_group_size:
                 yield type_now, id_group
                 type_now = None
                 id_group = []
+                tracked_primary_keys = set()
+            # update type cannot be grouped unless these are
+            # consecutive updates on different new table
+            # primary keys
+            elif type_now == self.DML_TYPE_UPDATE:
+                primary_key_value = ""
+                if self.use_batch_updates:
+                    for col in self.new_pk_list:
+                        primary_key_value += str(chg[col])
+                        # __osc__ is the delimiter
+                        primary_key_value += ";__osc__;"
+                    if primary_key_value not in tracked_primary_keys:
+                        tracked_primary_keys.add(primary_key_value)
+                        continue
+                yield type_now, id_group
+                type_now = None
+                id_group = []
+                tracked_primary_keys = set()
             # The next element will be the same as what we are now
             else:
                 continue
@@ -2420,6 +2474,7 @@ class CopyPayload(Payload):
                 self.IDCOLNAME,
                 self.DMLCOLNAME,
                 self.delta_table_name,
+                self.new_pk_list,
                 replay_ms,
                 self.mysql_version.is_mysql8,
             ),
@@ -2913,6 +2968,9 @@ class CopyPayload(Payload):
         log.info("== Stage 4: Checksum ==")
         if not self.need_checksum():
             return
+
+        self.use_batch_updates = self.enable_batch_updates()
+        log.info("batch update catchup enabled: %d", self.use_batch_updates)
 
         stage_start_time = time.time()
         if self.eliminate_dups:
