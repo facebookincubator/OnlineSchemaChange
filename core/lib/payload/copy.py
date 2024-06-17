@@ -902,7 +902,14 @@ class CopyPayload(Payload):
         """
         result = self.query(sql.show_table_stats(self._current_db), (self.table_name,))
         if result:
-            return result[0]["Data_length"] + result[0]["Index_length"]
+            record = result[0]
+            table_size = record["Data_length"] + record["Index_length"]
+            log.info(
+                f"Table {self.table_name} size: {table_size} "
+                f"(data {record['Data_length']}, index {record['Index_length']}), "
+                f"rows: {record['Rows']}"
+            )
+            return table_size
         return 0
 
     def get_table_size_for_myrocks(self, table_name):
@@ -924,6 +931,7 @@ class CopyPayload(Payload):
         )
 
         if result:
+            log.info(f"MyRocks uncompressed PK size: {result[0]['raw_size']}")
             return result[0]["raw_size"] or 0
         return 0
 
@@ -1133,15 +1141,21 @@ class CopyPayload(Payload):
                 self.select_checksum_chunk_size = 1
 
             log.info(
-                "TABLE contains {} rows, table_avg_row_len: {} bytes,"
-                "chunk_size: {} bytes checksum chunk_size {} bytes, ".format(
+                "Table contains {} rows, data size: {}, index size: {} "
+                "(total size: {}), table_avg_row_len: {} bytes,"
+                "chunk_size: {} bytes, checksum chunk_size {} bytes.".format(
                     result[0]["TABLE_ROWS"],
+                    result[0]["DATA_LENGTH"],
+                    result[0]["INDEX_LENGTH"],
+                    result[0]["DATA_LENGTH"] + result[0]["INDEX_LENGTH"],
                     tbl_avg_length,
                     self.chunk_size,
                     self.checksum_chunk_size,
                 )
             )
-            log.info("Outfile will contain {} rows each".format(self.select_chunk_size))
+            log.info(
+                "Outfile will contain {} rows each.".format(self.select_chunk_size)
+            )
             self.eta_chunks = max(
                 int(result[0]["TABLE_ROWS"] / self.select_chunk_size), 1
             )
@@ -2015,8 +2029,11 @@ class CopyPayload(Payload):
             self._cleanup_payload.remove_file_entry(filepath)
 
     # chunk_id can be used for tracking by hooks etc.
-    def load_chunk_file(self, filepath, sql_string: str, chunk_id: int):
-        self.execute_sql(sql_string, (filepath,))
+    def load_chunk_file(self, filepath, sql_string: str, chunk_id: int) -> None:
+        affected_rows = self.execute_sql(sql_string, (filepath,))
+        log.debug(
+            f"Loaded {affected_rows} rows from file {filepath} (chunk {chunk_id})"
+        )
 
     def change_explicit_commit(self, enable=True):
         """
@@ -2175,11 +2192,13 @@ class CopyPayload(Payload):
             # Enable rocksdb explicit commit before loading data
             self.change_explicit_commit(enable=True)
 
+        # Print out information after every 5% chunks have been loaded
+        chunk_pct_for_progress = 5
+        progress_freq = int(self.outfile_suffix_end * chunk_pct_for_progress / 100.0)
         for suffix in range(self.outfile_suffix_start, self.outfile_suffix_end + 1):
             self.load_chunk(column_list, suffix)
-            # Print out information after every 5% chunks have been loaded
-            # We won't show progress if the number of chunks is less than 50
-            if suffix % max(5, int(self.outfile_suffix_end / 5)) == 0:
+            # We won't show progress if the number of chunks is less than 100
+            if suffix % max(5, progress_freq) == 0:
                 self.log_load_progress(suffix)
 
         if self.is_myrocks_table:

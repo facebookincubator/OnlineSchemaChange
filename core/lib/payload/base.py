@@ -33,16 +33,16 @@ class Payload:
     """
 
     def __init__(self, **kwargs):
-        self.outfile_dir = ""
-        self.repl_status = ""
+        self.outfile_dir: str = ""
+        self.repl_status: str = ""
         self._mysql_vars = {}
-        self.session_timeout = 1200
+        self.session_timeout: int = 1200
         self.sql_list = []
-        self.force = False
-        self.standardize = False
-        self.dry_run = False
-        self.mysql_engine = ""
-        self._conn = None
+        self.force: bool = False
+        self.standardize: bool = False
+        self.dry_run: bool = False
+        self.mysql_engine: str = ""
+        self._conn: db_lib.MySQLSocketConnection = None
         self._sql_now = None
         self._sql_args_now = None
         self.ddl_file_list = kwargs.get("ddl_file_list", None)
@@ -51,8 +51,8 @@ class Payload:
             "hook_map", collections.defaultdict(lambda: hook.NoopHook())
         )
         self.socket = kwargs.get("socket", "")
-        self.mysql_user = kwargs.get("mysql_user", "")
-        self.mysql_pass = kwargs.get("mysql_password", "")
+        self.mysql_user: str = kwargs.get("mysql_user", "")
+        self.mysql_pass: str = kwargs.get("mysql_password", "")
         self.charset = kwargs.get("charset", None)
         self.db_list = kwargs.get("database", [])
         self.mysql_engine = kwargs.get("mysql_engine", None)
@@ -67,7 +67,7 @@ class Payload:
         log.info("Use ast parser" if self.use_ast_parser else "Use old parser")
 
     @property
-    def conn(self):
+    def conn(self) -> db_lib.MySQLSocketConnection:
         """
         Access to database connection handler, which is a private var
         We do not expect reconnecting or override the connection during the
@@ -76,7 +76,7 @@ class Payload:
         """
         return self._conn
 
-    def init_conn(self, dbname=""):
+    def init_conn(self, dbname: str = "") -> bool:
         """
         Initialize database connection handler
         """
@@ -87,7 +87,7 @@ class Payload:
         else:
             return True
 
-    def get_conn(self, dbname=""):
+    def get_conn(self, dbname="") -> db_lib.MySQLSocketConnection:
         """
         Create the connection to MySQL instance, there will be only one
         connection during the whole schema change
@@ -116,7 +116,7 @@ class Payload:
                 {"stage": "Connecting to MySQL", "errnum": errcode, "errmsg": errmsg},
             )
 
-    def close_conn(self):
+    def close_conn(self) -> bool:
         """
         Close the connection after all schema changes have finished
         """
@@ -129,7 +129,7 @@ class Payload:
             log.error("Failed to close MySQL connection to local instance")
             raise
 
-    def use_db(self, db):
+    def use_db(self, db) -> None:
         """
         Switch db
         """
@@ -189,7 +189,7 @@ class Payload:
         log.debug("Running the following SQL on MySQL: [{}] Args: {}".format(sql, args))
         return self._conn.query(sql, args)
 
-    def execute_sql(self, sql, args=None):
+    def execute_sql(self, sql, args=None) -> int:
         """
         Execute the given sql against MySQL without caring about the result
         output

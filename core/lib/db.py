@@ -29,7 +29,7 @@ def default_get_mysql_connection(
     timeout=60,
     connect_timeout=10,
     charset=None,
-):
+) -> MySQLdb.Connection:
     """
     Default method for connection to a MySQL instance.
     You can override this behaviour by define/import in cli.py and pass it to
@@ -79,7 +79,7 @@ class MySQLSocketConnection:
         self.user = user
         self.password = password
         self.db = dbname
-        self.conn = None
+        self.conn: MySQLdb.Connection | None = None
         self.socket = socket
         self.connect_timeout = connect_timeout
         self.charset = charset
@@ -162,10 +162,12 @@ class MySQLSocketConnection:
         cursor.execute("%s %s" % (self.query_header, sql), args)
         return cursor.fetchall()
 
-    def execute(self, sql, args=None):
+    def execute(self, sql: str, args=None) -> int:
         """
         Execute the given sql against current open connection
-        without caring about the result output
+        without caring about the result set.
+
+        Returns the number of affected rows.
         """
         # Turning MySQLdb.Warning into exception, so that we can catch it
         # and maintain the same log output format
