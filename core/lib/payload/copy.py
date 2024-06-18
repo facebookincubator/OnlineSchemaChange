@@ -2384,6 +2384,12 @@ class CopyPayload(Payload):
                     idx + 1 <= len(chg_rows) - 1
                     and chg_rows[idx + 1][self.DMLCOLNAME] == self.DML_TYPE_UPDATE
                 ):
+                    primary_key_value = ""
+                    if type_now == self.DML_TYPE_UPDATE:
+                        for col in self.new_pk_list:
+                            primary_key_value += str(chg[col])
+                            # __osc__ is the delimiter
+                            primary_key_value += ";__osc__;"
                     future_key_value = ""
                     for col in self.new_pk_list:
                         future_key_value += str(chg_rows[idx + 1][col])
@@ -2391,7 +2397,10 @@ class CopyPayload(Payload):
                         future_key_value += ";__osc__;"
                     # If we have an existing update in the tracked primary keys,
                     # end the batch right now.
-                    if future_key_value in tracked_primary_keys:
+                    if (
+                        future_key_value in tracked_primary_keys
+                        or future_key_value == primary_key_value
+                    ):
                         yield type_now, id_group
                         type_now = None
                         id_group = []
