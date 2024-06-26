@@ -1991,6 +1991,7 @@ class CopyPayload(Payload):
                 use_where = True
                 outfile_suffix += 1
             self.check_disk_free_space_reserved()
+            self.perform_gc_collection()
             progress_pct = int((float(outfile_suffix) / self.eta_chunks) * 100)
             progress_chunk = int(progress_pct / 10)
             if progress_chunk > printed_chunk and self.eta_chunks > 10:
@@ -2197,6 +2198,7 @@ class CopyPayload(Payload):
         progress_freq = int(self.outfile_suffix_end * chunk_pct_for_progress / 100.0)
         for suffix in range(self.outfile_suffix_start, self.outfile_suffix_end + 1):
             self.load_chunk(column_list, suffix)
+            self.perform_gc_collection()
             # We won't show progress if the number of chunks is less than 100
             if suffix % max(5, progress_freq) == 0:
                 self.log_load_progress(suffix)
