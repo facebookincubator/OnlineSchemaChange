@@ -175,7 +175,7 @@ class CopyPayload(Payload):
         # Whether to use the server-native DUMP TABLE statement (FB-internal)
         self.use_dump_table_stmt = kwargs.get("use_dump_table", False)
         # If using DUMP TABLE, controls the number of worker threads.
-        self.dump_threads = kwargs.get("dump_threads", 1)
+        self.dump_threads = kwargs.get("dump_threads", constant.DUMP_THREADS)
 
         self.replay_max_changes = kwargs.get(
             "replay_max_changes", constant.MAX_REPLAY_CHANGES

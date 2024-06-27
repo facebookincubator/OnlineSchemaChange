@@ -339,6 +339,12 @@ class Copy(CommandBase):
             "OSC_TRADITIONAL deployment method only.",
         )
         parser.add_argument(
+            "--dump-threads",
+            type=int,
+            default=constant.DUMP_THREADS,
+            help="Number of worker threads to use in DUMP TABLE",
+        )
+        parser.add_argument(
             "--enable-outfile-compression",
             action="store_true",
             dest="enable_outfile_compression",
