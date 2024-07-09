@@ -15,6 +15,8 @@ import sys
 import warnings
 
 import MySQLdb
+import MySQLdb.connections
+import MySQLdb.cursors
 
 from . import sql
 
@@ -29,7 +31,7 @@ def default_get_mysql_connection(
     timeout=60,
     connect_timeout=10,
     charset=None,
-) -> MySQLdb.Connection:
+) -> MySQLdb.connections.Connection:
     """
     Default method for connection to a MySQL instance.
     You can override this behaviour by define/import in cli.py and pass it to
@@ -79,7 +81,7 @@ class MySQLSocketConnection:
         self.user = user
         self.password = password
         self.db = dbname
-        self.conn: MySQLdb.Connection | None = None
+        self.conn: MySQLdb.connections.Connection | None = None
         self.socket = socket
         self.connect_timeout = connect_timeout
         self.charset = charset
@@ -139,7 +141,7 @@ class MySQLSocketConnection:
         """
         self.conn.query("SET SESSION SQL_LOG_BIN=1;")
 
-    def affected_rows(self):
+    def affected_rows(self) -> int:
         """
         Return the number of affected rows of the last query ran in this
         connection
@@ -150,7 +152,9 @@ class MySQLSocketConnection:
         """
         Run the sql query, and return the result set
         """
-        cursor = self.conn.cursor(MySQLdb.cursors.DictCursor)
+        cursor: MySQLdb.cursors.DictCursor = self.conn.cursor(
+            MySQLdb.cursors.DictCursor
+        )
         cursor.execute("%s %s" % (self.query_header, sql), args)
         return cursor.fetchall()
 
@@ -158,7 +162,7 @@ class MySQLSocketConnection:
         """
         Run the sql query, and return the result set
         """
-        cursor = self.conn.cursor(MySQLdb.cursors.Cursor)
+        cursor: MySQLdb.cursors.Cursor = self.conn.cursor(MySQLdb.cursors.Cursor)
         cursor.execute("%s %s" % (self.query_header, sql), args)
         return cursor.fetchall()
 

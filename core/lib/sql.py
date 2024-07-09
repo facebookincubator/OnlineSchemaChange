@@ -881,13 +881,13 @@ def checksum_by_chunk_with_assign(
 
 
 def checksum_by_chunk(
-    table_name,
+    table_name: str,
     columns,
     pk_list,
     range_start_values,
     range_end_values,
-    chunk_size,
-    using_where,
+    chunk_size: int,
+    using_where: bool,
     force_index: str = "PRIMARY",
 ) -> str:
     if using_where:
