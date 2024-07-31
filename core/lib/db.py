@@ -14,6 +14,8 @@ import os
 import sys
 import warnings
 
+from typing import Any
+
 import MySQLdb
 import MySQLdb.connections
 import MySQLdb.cursors
@@ -126,7 +128,7 @@ class MySQLSocketConnection:
         """
         self.conn.query("USE `{0}`".format(database_name))
 
-    def set_no_binlog(self):
+    def set_no_binlog(self) -> None:
         """
         Disable session binlog events. As we run the schema change separately
         on instance, we usually don't want the changes to be populated through
@@ -134,7 +136,7 @@ class MySQLSocketConnection:
         """
         self.conn.query("SET SESSION SQL_LOG_BIN=0;")
 
-    def set_binlog(self):
+    def set_binlog(self) -> None:
         """
         Enable session binlog events. Providing an option to run schema change
         via replication when applicable.
@@ -148,9 +150,16 @@ class MySQLSocketConnection:
         """
         return self.conn.affected_rows
 
-    def query(self, sql, args=None):
+    def query(
+        self, sql: str, args: tuple[Any, ...] | None = None
+    ) -> tuple[dict[str, Any], ...]:
         """
-        Run the sql query, and return the result set
+        Run the sql query, and return the result set as a tuple of dicts. See
+        https://mysqlclient.readthedocs.io/user_guide.html#using-and-extending
+
+        This stores the column names for each row in the result set, which can
+        consume a lot of memory, so be judicious in its use and consider using
+        self.query_array instead.
         """
         cursor: MySQLdb.cursors.DictCursor = self.conn.cursor(
             MySQLdb.cursors.DictCursor
@@ -158,9 +167,15 @@ class MySQLSocketConnection:
         cursor.execute("%s %s" % (self.query_header, sql), args)
         return cursor.fetchall()
 
-    def query_array(self, sql, args=None):
+    def query_array(
+        self, sql: str, args: tuple[Any, ...] = None
+    ) -> tuple[tuple[Any, ...], ...]:
         """
-        Run the sql query, and return the result set
+        Run the sql query, and return the result set as a tuple of tuples. See
+        https://mysqlclient.readthedocs.io/user_guide.html#using-and-extending
+
+        This can save memory compared to self.query because it does not store
+        the column names for each row in the result set.
         """
         cursor: MySQLdb.cursors.Cursor = self.conn.cursor(MySQLdb.cursors.Cursor)
         cursor.execute("%s %s" % (self.query_header, sql), args)

@@ -770,9 +770,21 @@ def checksum_full_table(table_name, columns) -> str:
     Generate SQL for checksuming data from given columns in table
     """
     checksum_sql = "SELECT count(*) as cnt, {} from `{}`"
-    bit_xor_old_cols = ["bit_xor(crc32(`{}`))".format(escape(i.name)) for i in columns]
+    bit_xor_old_cols = ["bit_xor(crc32(`{}`))".format(escape(col)) for col in columns]
     checksum_sql = checksum_sql.format(", ".join(bit_xor_old_cols), escape(table_name))
     return checksum_sql
+
+
+def checksum_full_table_native(table_name, columns) -> str:
+    """
+    Generate SQL for checksuming data from given columns in table using
+    CHECKSUM TABLE.
+
+    NOTE: This uses FB-only extensions to CHECKSUM TABLE that allow selection
+    of columns.
+    """
+    old_cols = [f"`{escape(col)}`" for col in columns]
+    return f"CHECKSUM TABLE `{escape(table_name)}` ({', '.join(old_cols)})"
 
 
 def dump_current_chunk(
@@ -953,14 +965,14 @@ def checksum_by_replay_chunk(
         "AND NOT EXISTS ( "
         "SELECT 1 FROM `{delta}` as `t` WHERE {exist_join} "
         "AND `t`.{id} < `{delta}`.`{id}` )) as chg "
-        "LEFT JOIN `{old_table}` "
+        "LEFT JOIN `{table}` "
         "ON {join_clause} "
     ).format(
         **{
             "id": escape(id_col_name),
             "col_list": checksum_col_list,
             "delta": escape(delta_table_name),
-            "old_table": escape(table_name),
+            "table": escape(table_name),
             "id_limit": id_limit,
             "max_replayed": max_replayed,
             "join_clause": get_match_clause(

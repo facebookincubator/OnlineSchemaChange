@@ -61,7 +61,7 @@ class Copy(CommandBase):
             "--detailed-mismatch-info",
             action="store_true",
             help="Use a slower but more accurate checksum "
-            "output if there's a checksum mismatch",
+            "output if there's a checksum mismatch. Requires a primary key.",
         )
         parser.add_argument(
             "--dump-after-checksum",
@@ -69,6 +69,11 @@ class Copy(CommandBase):
             help="Dump the data onto disk after calculating "
             "checksum for each chunk. Use this when you're "
             "investigating a checksum mismatch issue",
+        )
+        parser.add_argument(
+            "--use-checksum-statement",
+            action="store_true",
+            help="Use native CHECKSUM TABLE statement for checksums.",
         )
         parser.add_argument(
             "--allow-new-pk",

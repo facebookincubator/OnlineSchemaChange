@@ -16,6 +16,8 @@ import logging
 import os
 import time
 
+from typing import Any
+
 import MySQLdb
 from dba.osc.core.lib.sqlparse.fb_create import parse_create
 
@@ -180,13 +182,32 @@ class Payload:
             return result[0]["pm"] or False
         return False
 
-    def query(self, sql, args=None):
+    def query_array(
+        self, sql: str, args: tuple[Any, ...] | None = None
+    ) -> tuple[tuple[Any, ...], ...]:
         """
-        Execute sql again MySQL instance and return the result
+        Execute sql again MySQL instance and return the result as a tuple of
+        tuples (uses Cursor underneath.)
         """
         self._sql_now = sql
         self._sql_args_now = args
-        log.debug("Running the following SQL on MySQL: [{}] Args: {}".format(sql, args))
+        log.debug(
+            "Running the following query on MySQL: [{}] Args: {}".format(sql, args)
+        )
+        return self._conn.query_array(sql, args)
+
+    def query(
+        self, sql: str, args: tuple[Any, ...] | None = None
+    ) -> tuple[dict[str, Any], ...]:
+        """
+        Execute sql again MySQL instance and return the result as a tuple of
+        dicts (uses DictCursor underneath.)
+        """
+        self._sql_now = sql
+        self._sql_args_now = args
+        log.debug(
+            "Running the following query on MySQL: [{}] Args: {}".format(sql, args)
+        )
         return self._conn.query(sql, args)
 
     def execute_sql(self, sql, args=None) -> int:
@@ -196,7 +217,9 @@ class Payload:
         """
         self._sql_now = sql
         self._sql_args_now = args
-        log.debug("Running the following SQL on MySQL: [{}] Args: {}".format(sql, args))
+        log.debug(
+            "Executing the following query on MySQL: [{}] Args: {}".format(sql, args)
+        )
         return self._conn.execute(sql, args)
 
     def fetch_mysql_vars(self):

@@ -98,7 +98,9 @@ class CopyPayload(Payload):
         self.allow_drop_column = kwargs.get("allow_drop_column", False)
         self.detailed_mismatch_info = kwargs.get("detailed_mismatch_info", False)
         self.dump_after_checksum = kwargs.get("dump_after_checksum", False)
-        self.eliminate_dups = kwargs.get("eliminate_dups", False)
+        # Whether to ignore unique key violations and silently drop such rows.
+        # This implies checksum will be skipped, since it cannot match.
+        self.eliminate_dups: bool = kwargs.get("eliminate_dups", False)
         self.rm_partition = kwargs.get("rm_partition", False)
         self.force_cleanup = kwargs.get("force_cleanup", False)
         self.skip_cleanup_after_kill = kwargs.get("skip_cleanup_after_kill", False)
@@ -156,6 +158,8 @@ class CopyPayload(Payload):
             "skip_checksum_for_modified", False
         )
         self.skip_delta_checksum = kwargs.get("skip_delta_checksum", False)
+        # Whether to use the server-native CHECKSUM TABLE statement.
+        self.use_checksum_statement: bool = kwargs.get("use_checksum_statement", False)
         self.skip_named_lock = kwargs.get("skip_named_lock", False)
         self.skip_affected_rows_check = kwargs.get("skip_affected_rows_check", False)
         # Debugging only
@@ -173,9 +177,9 @@ class CopyPayload(Payload):
         self.is_full_table_dump = False
 
         # Whether to use the server-native DUMP TABLE statement (FB-internal)
-        self.use_dump_table_stmt = kwargs.get("use_dump_table", False)
+        self.use_dump_table_stmt: bool = kwargs.get("use_dump_table", False)
         # If using DUMP TABLE, controls the number of worker threads.
-        self.dump_threads = kwargs.get("dump_threads", constant.DUMP_THREADS)
+        self.dump_threads: int = kwargs.get("dump_threads", constant.DUMP_THREADS)
 
         self.replay_max_changes = kwargs.get(
             "replay_max_changes", constant.MAX_REPLAY_CHANGES
@@ -1658,7 +1662,7 @@ class CopyPayload(Payload):
 
     def start_transaction(self):
         """
-        Start a transaction.
+        Start a transaction. TODO: use a context manager.
         """
         self.execute_sql(sql.start_transaction)
         self.under_transaction = True
@@ -2732,7 +2736,7 @@ class CopyPayload(Payload):
 
         self.current_checksum_record = checksum_xor
 
-    def checksum_full_table(self):
+    def checksum_full_table(self) -> None:
         """
         Running checksum in single query, this will be used only for tables
         which don't have primary in the old schema. See checksum_by_chunk
@@ -2740,18 +2744,48 @@ class CopyPayload(Payload):
         """
         # Calculate checksum for old table
         old_checksum = self.query(
-            sql.checksum_full_table(self.table_name, self._old_table.column_list)
+            sql.checksum_full_table(self.table_name, self.old_column_list)
         )
 
         # Calculate checksum for new table
         new_checksum = self.query(
-            sql.checksum_full_table(self.new_table_name, self._old_table.column_list)
+            sql.checksum_full_table(self.new_table_name, self.old_column_list)
         )
         self.commit()
 
         # Compare checksum
         if old_checksum and new_checksum:
             self.compare_checksum(old_checksum, new_checksum)
+
+    def checksum_full_table_native(self) -> None:
+        """
+        Running checksum in a single query, using CHECKSUM TABLE, which should
+        be faster than using aggregation functions (like BIT_XOR) and safer
+        (avoids XOR pitfalls with even number of rows).
+        """
+        checksums = []
+        for table in [self.table_name, self.new_table_name]:
+            log.info(f"Calculating checksum for {table}")
+            checksums.append(
+                # Take the first row only as only one is expected.
+                self.query(sql.checksum_full_table_native(table, self.old_column_list))[
+                    0
+                ]
+            )
+
+        self.commit()
+
+        checksum_old = checksums[0]["Checksum"]
+        checksum_new = checksums[1]["Checksum"]
+
+        if checksum_old != checksum_new:
+            log.error(
+                "Checksum mismatch: "
+                f"OLD={checksum_old}, NEW={checksum_new}. "
+                "Run with --detailed-mismatch-info to get more detailed "
+                "diagnostics (if table has PK)."
+            )
+            raise OSCError("CHECKSUM_MISMATCH")
 
     def checksum_for_single_chunk(self, table_name, use_where, idx_for_checksum):
         """
@@ -3012,7 +3046,7 @@ class CopyPayload(Payload):
 
         stage_start_time = time.time()
         if self.eliminate_dups:
-            log.warning("Skip checksum, because --eliminate-duplicate " "specified")
+            log.warning("Skip checksum, because --eliminate-duplicate specified")
             return
 
         # Replay outside of transaction so that we won't hit max allowed
@@ -3020,20 +3054,24 @@ class CopyPayload(Payload):
         log.info("= Stage 4.1: Catch up before generating checksum =")
         self.replay_till_good2go(checksum=False)
 
-        log.info("= Stage 4.2: Comparing checksum =")
+        log.info("= Stage 4.2: Generating checksum =")
         self.start_transaction()
         # To fill the gap between old and new table since last replay
         log.info("Replay changes to bring two tables to a comparable state")
         self.checksum_required_for_replay = True
         self.replay_changes(single_trx=True)
 
+        if self.use_checksum_statement:
+            log.info("Doing full table checksum in single pass (CHECKSUM TABLE method)")
+            return self.checksum_full_table_native()
         # if we don't have a PK on old schema, then we are not able to checksum
         # by chunk. We'll do a full table scan for checksum instead
-        if self.is_full_table_dump:
+        elif self.is_full_table_dump:
+            log.info("Doing full table checksum in single pass (SQL method)")
             return self.checksum_full_table()
 
         if not self.detailed_mismatch_info:
-            log.info("Checksuming data from old table")
+            log.info("Checksumming data from old table")
             old_table_checksum = self.checksum_by_chunk(
                 self.table_name, dump_after_checksum=self.dump_after_checksum
             )
@@ -3048,7 +3086,7 @@ class CopyPayload(Payload):
                 self.new_table_name, dump_after_checksum=self.dump_after_checksum
             )
 
-            log.info("Compare checksum")
+            log.info("Comparing checksum")
             self.compare_checksum(old_table_checksum, new_table_checksum)
         else:
             self.detailed_checksum()
