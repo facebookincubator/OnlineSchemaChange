@@ -15,75 +15,97 @@ from ..lib.mysql_version import MySQLVersion
 
 
 class MySQLVersionTest(unittest.TestCase):
-    def test_fb_fork(self):
-        """
-        Tests for a Facebook log build
-        """
-        v_str = "5.1.2-fb-log"
-        v_obj = MySQLVersion(v_str)
-        self.assertTrue(v_obj.is_fb)
-        self.assertTrue(v_obj.major == 5)
-        self.assertTrue(v_obj.minor == 1)
-        self.assertTrue(v_obj.release == 2)
-        self.assertTrue(v_obj.build == "log")
+    PROD_VERSION = "8.0.32-202407011440.prod"
+    DEV_VERSION = "8.0.32-202407051440.dev.alexbud"
 
-    def test_community_no_build(self):
-        """
-        Tests for a community version
-        """
-        v_str = "5.6.30"
-        v_obj = MySQLVersion(v_str)
-        self.assertFalse(v_obj.is_fb)
-        self.assertTrue(v_obj.major == 5)
-        self.assertTrue(v_obj.minor == 6)
-        self.assertTrue(v_obj.release == 30)
-        self.assertTrue(v_obj.build == "")
+    def test_major(self):
+        self.assertEqual(MySQLVersion(self.PROD_VERSION).major, 8)
+        self.assertEqual(MySQLVersion(self.DEV_VERSION).major, 8)
 
-    def test_community_debug_build(self):
-        """
-        Tests for a community version with log enabled
-        """
-        v_str = "5.6.30-log"
-        v_obj = MySQLVersion(v_str)
-        self.assertFalse(v_obj.is_fb)
-        self.assertTrue(v_obj.major == 5)
-        self.assertTrue(v_obj.minor == 6)
-        self.assertTrue(v_obj.release == 30)
+    def test_minor(self):
+        self.assertEqual(MySQLVersion(self.PROD_VERSION).minor, 0)
+        self.assertEqual(MySQLVersion(self.DEV_VERSION).minor, 0)
+
+    def test_release(self):
+        self.assertEqual(MySQLVersion(self.PROD_VERSION).release, 32)
+        self.assertEqual(MySQLVersion(self.DEV_VERSION).release, 32)
+
+    def test_build(self):
+        self.assertEqual(MySQLVersion(self.PROD_VERSION).build, "202407011440")
+        self.assertEqual(MySQLVersion(self.DEV_VERSION).build, "202407051440")
+
+    def test_eq(self):
+        self.assertEqual(
+            MySQLVersion(self.PROD_VERSION), MySQLVersion(self.PROD_VERSION)
+        )
+        self.assertEqual(MySQLVersion(self.DEV_VERSION), MySQLVersion(self.DEV_VERSION))
 
     def test_lt_gt_major_difference(self):
-        left = "5.6.30-log"
-        right = "8.0.1-log"
-        v_left = MySQLVersion(left)
-        v_right = MySQLVersion(right)
-        self.assertTrue(v_left < v_right)
-        self.assertTrue(v_left <= v_right)
-        self.assertTrue(v_right > v_left)
-        self.assertTrue(v_right >= v_left)
+        left = MySQLVersion("5.6.1-202407011440.prod")
+        right = MySQLVersion("8.0.32-202407011440.prod")
+        self.assertTrue(left < right)
+        self.assertTrue(left <= right)
+        self.assertTrue(right > left)
+        self.assertTrue(right >= left)
 
     def test_lt_gt_minor_difference(self):
-        left = "5.6.30-log"
-        right = "5.7.1-log"
-        v_left = MySQLVersion(left)
-        v_right = MySQLVersion(right)
-        self.assertTrue(v_left < v_right)
-        self.assertTrue(v_left <= v_right)
-        self.assertTrue(v_right > v_left)
-        self.assertTrue(v_right >= v_left)
+        left = MySQLVersion("5.6.10-202407011440.prod")
+        right = MySQLVersion("5.7.2-202407011440.prod")
+        self.assertTrue(left < right)
+        self.assertTrue(left <= right)
+        self.assertTrue(right > left)
+        self.assertTrue(right >= left)
 
     def test_lt_gt_release_difference(self):
-        left = "5.6.30-log"
-        right = "5.6.50-log"
-        v_left = MySQLVersion(left)
-        v_right = MySQLVersion(right)
-        self.assertTrue(v_left < v_right)
-        self.assertTrue(v_left <= v_right)
-        self.assertTrue(v_right > v_left)
-        self.assertTrue(v_right >= v_left)
+        left = MySQLVersion("5.6.1-202407011440.prod")
+        right = MySQLVersion("5.6.10-202407011440.prod")
+        self.assertTrue(left < right)
+        self.assertTrue(left <= right)
+        self.assertTrue(right > left)
+        self.assertTrue(right >= left)
+
+    def test_lt_gt_build_difference(self):
+        # Year
+        left = MySQLVersion("5.6.1-202307011440.prod")
+        right = MySQLVersion("5.6.1-202407011440.prod")
+        self.assertTrue(left < right)
+        self.assertTrue(left <= right)
+        self.assertTrue(right > left)
+        self.assertTrue(right >= left)
+
+        # Month
+        left = MySQLVersion("5.6.1-202407011440.prod")
+        right = MySQLVersion("5.6.1-202408011440.prod")
+        self.assertTrue(left < right)
+        self.assertTrue(left <= right)
+        self.assertTrue(right > left)
+        self.assertTrue(right >= left)
+
+        # Day
+        left = MySQLVersion("5.6.1-202407011440.prod")
+        right = MySQLVersion("5.6.1-202407051440.prod")
+        self.assertTrue(left < right)
+        self.assertTrue(left <= right)
+        self.assertTrue(right > left)
+        self.assertTrue(right >= left)
+
+        # Hour
+        left = MySQLVersion("5.6.1-202407011340.prod")
+        right = MySQLVersion("5.6.1-202407011440.prod")
+        self.assertTrue(left < right)
+        self.assertTrue(left <= right)
+        self.assertTrue(right > left)
+        self.assertTrue(right >= left)
+
+        # Minute
+        left = MySQLVersion("5.6.1-202407011439.prod")
+        right = MySQLVersion("5.6.1-202407011440.prod")
+        self.assertTrue(left < right)
+        self.assertTrue(left <= right)
+        self.assertTrue(right > left)
+        self.assertTrue(right >= left)
 
     def test_le_ge(self):
-        left = "5.6.30-log"
-        right = "5.6.30-log"
-        v_left = MySQLVersion(left)
-        v_right = MySQLVersion(right)
-        self.assertTrue(v_left <= v_right)
-        self.assertTrue(v_right >= v_left)
+        v = MySQLVersion("5.7.2-202407011440.prod")
+        self.assertTrue(v <= v)
+        self.assertTrue(v >= v)

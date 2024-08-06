@@ -876,37 +876,26 @@ class CopyPayloadTestCase(unittest.TestCase):
         payload.replay_insert_row(row, 1)
 
     def test_is_rbr_safe_stmt(self):
-        # is_trigger_rbr_safe should always be True if STATEMENT binlog_format
+        # is_trigger_rbr_safe should be True if STATEMENT binlog_format
         # is being used
         payload = self.payload_setup()
         payload.mysql_vars["binlog_format"] = "STATEMENT"
-        payload.mysql_version = MySQLVersion("5.1.1")
         self.assertTrue(payload.is_trigger_rbr_safe)
 
-    def test_is_rbr_safe_row_fb(self):
-        # is_trigger_rbr_safe should always be True if Facebook version
-        # is being used and sql_log_bin_triggers is OFF
+    def test_is_rbr_safe_row(self):
+        # is_trigger_rbr_safe should be True if RBR is being used and
+        # sql_log_bin_triggers is OFF
         payload = self.payload_setup()
         payload.mysql_vars["binlog_format"] = "ROW"
         payload.mysql_vars["sql_log_bin_triggers"] = "OFF"
-        payload.mysql_version = MySQLVersion("5.1.1-fb")
         self.assertTrue(payload.is_trigger_rbr_safe)
 
-    def test_is_rbr_safe_row_fb_but_logs_on(self):
-        # is_trigger_rbr_safe should False if we are using a Facebook version
-        # but sql_log_bin_triggers is still enabled
+    def test_is_rbr_safe_row_but_logs_on(self):
+        # is_trigger_rbr_safe should return False if RBR is used and
+        # sql_log_bin_triggers is enabled
         payload = self.payload_setup()
         payload.mysql_vars["binlog_format"] = "ROW"
         payload.mysql_vars["sql_log_bin_triggers"] = "ON"
-        payload.mysql_version = MySQLVersion("5.1.1-fb")
-        self.assertFalse(payload.is_trigger_rbr_safe)
-
-    def test_is_rbr_safe_row_other_forks(self):
-        # is_trigger_rbr_safe should False if we are using a Facebook version
-        # but sql_log_bin_triggers is still enabled
-        payload = self.payload_setup()
-        payload.mysql_vars["binlog_format"] = "ROW"
-        payload.mysql_version = MySQLVersion("5.5.30-percona")
         self.assertFalse(payload.is_trigger_rbr_safe)
 
     def test_divide_changes_all_the_same_type(self):
@@ -1086,26 +1075,6 @@ class CopyPayloadTestCase(unittest.TestCase):
         with self.assertRaises(OSCError) as err_context:
             payload.wait_until_slow_query_finish()
         self.assertEqual(err_context.exception.err_key, "LONG_RUNNING_TRX")
-
-    def test_high_pri_ddl_does_not_wait_for_slow_query(self):
-        payload = self.payload_setup()
-        payload.stop_slave_sql = Mock()
-        payload.ddl_guard = Mock()
-        payload.mysql_version = MySQLVersion("8.0.1-fb-1")
-        payload.get_conn = Mock()
-        payload.execute_sql = Mock()
-        payload.wait_until_slow_query_finish = Mock()
-        payload.create_triggers()
-        self.assertTrue(payload.is_high_pri_ddl_supported)
-        payload.wait_until_slow_query_finish.assert_not_called()
-
-        # If high pri ddl is not supported, we should call wait_until_slow_query_finish
-        payload.get_long_trx = Mock(return_value=False)
-        payload.mysql_version = MySQLVersion("8.0.1-test-1")
-        payload.wait_until_slow_query_finish = Mock(return_value=True)
-        self.assertFalse(payload.is_high_pri_ddl_supported)
-        payload.create_triggers()
-        payload.wait_until_slow_query_finish.assert_called_once()
 
     def test_auto_table_collation_population(self):
         payload = self.payload_setup()

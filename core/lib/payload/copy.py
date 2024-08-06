@@ -586,13 +586,7 @@ class CopyPayload(Payload):
         """
         # We only need to check this if RBR is enabled
         if self.mysql_vars["binlog_format"] == "ROW":
-            if self.mysql_version.is_fb:
-                if not self.is_var_enabled("sql_log_bin_triggers"):
-                    return True
-                else:
-                    return False
-            else:
-                return False
+            return not self.is_var_enabled("sql_log_bin_triggers")
         else:
             return True
 

@@ -60,7 +60,7 @@ class Payload:
         self.mysql_engine = kwargs.get("mysql_engine", None)
         self.sudo = kwargs.get("sudo", False)
         self.skip_named_lock = kwargs.get("skip_named_lock", False)
-        self.mysql_vars = {}
+        self.mysql_vars: dict[str, str] = {}
         self.is_slave_stopped_by_me = False
         self.num_finished_dbs = 0
         self._current_db = None
@@ -150,7 +150,7 @@ class Payload:
         """
         Parse the mysql_version string into a version object
         """
-        self.mysql_version = MySQLVersion(self.mysql_vars["version"])
+        self.mysql_version = MySQLVersion(self.mysql_vars["version_comment"])
 
     def check_replication_type(self):
         """
@@ -326,13 +326,9 @@ class Payload:
         Only fb-mysql supports having DDL killing blocking queries by
         setting high_priority_ddl=1
         """
-        if self.mysql_version.is_fb:
-            if self.mysql_version >= MySQLVersion("5.6.35"):
-                return True
-            else:
-                return False
-        else:
-            return False
+
+        # 8.0 migration is completely done. No need to check for 5.x
+        return True
 
     @property
     def get_block_no_pk_creation_variable(self):
@@ -346,8 +342,7 @@ class Payload:
         if self.mysql_version.is_mysql8:
             return "sql_require_primary_key", "session", "session"
         else:
-            if self.mysql_version.is_fb:
-                return "block_create_no_primary_key", "session", "global"
+            return "block_create_no_primary_key", "session", "global"
 
         return None, None, None
 
