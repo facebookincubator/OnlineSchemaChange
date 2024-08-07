@@ -2760,11 +2760,15 @@ class CopyPayload(Payload):
         checksums = []
         for table in [self.table_name, self.new_table_name]:
             log.info(f"Calculating checksum for {table}")
+            # Sort the column names so that the old and new tables can be
+            # compared in case there was a reordering of columns in the new
+            # schema.
+            sql_query = sql.checksum_full_table_native(
+                table, sorted(self.old_column_list)
+            )
             checksums.append(
                 # Take the first row only as only one is expected.
-                self.query(sql.checksum_full_table_native(table, self.old_column_list))[
-                    0
-                ]
+                self.query(sql_query)[0]
             )
 
         self.commit()

@@ -767,7 +767,7 @@ def analyze_table(table_name) -> str:
 
 def checksum_full_table(table_name, columns) -> str:
     """
-    Generate SQL for checksuming data from given columns in table
+    Generate SQL for checksumming data from given columns in table.
     """
     checksum_sql = "SELECT count(*) as cnt, {} from `{}`"
     bit_xor_old_cols = ["bit_xor(crc32(`{}`))".format(escape(col)) for col in columns]
@@ -777,7 +777,7 @@ def checksum_full_table(table_name, columns) -> str:
 
 def checksum_full_table_native(table_name, columns) -> str:
     """
-    Generate SQL for checksuming data from given columns in table using
+    Generate SQL for checksumming data from given columns in table using
     CHECKSUM TABLE.
 
     NOTE: This uses FB-only extensions to CHECKSUM TABLE that allow selection
