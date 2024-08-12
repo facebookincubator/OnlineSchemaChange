@@ -259,6 +259,7 @@ class Column:
         self.is_default_bit = False
         self.auto_increment = None
         self.vector_dimension = None
+        self.visibility = True
 
     def __str__(self):
         col_str = []
@@ -277,6 +278,7 @@ class Column:
         col_str.append("COMMENT: {}".format(self.comment))
         if self.vector_dimension is not None:
             col_str.append("FB_VECTOR_DIMENSION: {}".format(self.vector_dimension))
+        col_str.append("VISIBILITY: {}".format(self.visibility))
         return " ".join(col_str)
 
     @property
@@ -305,6 +307,7 @@ class Column:
             "is_default_bit",
             "auto_increment",
             "vector_dimension",
+            "visibility",
         ):
 
             # Ignore display width of *int types, because of the new default in 8.0.20.
@@ -403,6 +406,8 @@ class Column:
             column_segment.append(
                 "FB_VECTOR_DIMENSION {}".format(self.vector_dimension)
             )
+        if not self.visibility:
+            column_segment.append("INVISIBLE")
         if self.comment is not None:
             column_segment.append("COMMENT {}".format(self.comment))
 
