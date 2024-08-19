@@ -452,7 +452,7 @@ class CopyPayloadTestCase(unittest.TestCase):
         self.assertEqual(len(payload._cleanup_payload.files_to_clean), 0)
         self.assertEqual(err_context.exception.err_key, "GENERIC_MYSQL_ERROR")
 
-    def test_should_disable_bulk_load(self):
+    def test_get_bulk_load_parameters(self):
         payload = CopyPayload()
         table_obj = parse_create(
             " CREATE TABLE __osc_chg_tbl "
@@ -474,7 +474,11 @@ class CopyPayloadTestCase(unittest.TestCase):
         # populate some pk structures
         payload.decide_pk_for_filter()
 
-        self.assertTrue(payload.should_disable_bulk_load())
+        params = payload.get_bulk_load_parameters()
+
+        self.assertFalse(params.should_disable_bulk_load)
+        self.assertTrue(params.use_bulk_load_with_pk_charset)
+        self.assertFalse(params.use_bulk_load_with_uk_check)
         self.assertEqual(payload.mismatch_pk_charset["fid"], "latin1")
         self.assertEqual(payload.mismatch_pk_charset["col1"], "latin2")
         self.assertEqual(payload.mismatch_pk_charset["col2"], "latin3")
@@ -493,6 +497,29 @@ class CopyPayloadTestCase(unittest.TestCase):
             clause,
             "DELETE __osc_new_tbl FROM `__osc_new_tbl`, `__osc_chg_tbl` WHERE `__osc_chg_tbl`.`_osc_ID` IN %s AND `__osc_new_tbl`.`fid` = CONVERT(`__osc_chg_tbl`.`fid` using `latin1`)",
         )
+
+        table_obj = parse_create(
+            " CREATE TABLE __osc_chg_tbl "
+            "( `fid` varbinary(36) NOT NULL COMMENT 'GUID for file' primary key,  "
+            "col1 varchar(10), "
+            "col2 varchar(10)) "
+            "  ENGINE = RocksDB "
+        )
+        table_obj_new = parse_create(
+            " CREATE TABLE __osc_new_tbl "
+            "( `fid` varbinary(36) NOT NULL COMMENT 'GUID for file' primary key,  "
+            "col1 varchar(10) CHARACTER SET latin2 COLLATE latin1_bin, "
+            "col2 varchar(100) CHARACTER SET latin3 COLLATE latin1_bin,"
+            "UNIQUE KEY key1 (col1)) "
+            "  ENGINE = RocksDB  "
+        )
+        payload._old_table = table_obj
+        payload._new_table = table_obj_new
+        params = payload.get_bulk_load_parameters()
+
+        self.assertFalse(params.should_disable_bulk_load)
+        self.assertFalse(params.use_bulk_load_with_pk_charset)
+        self.assertTrue(params.use_bulk_load_with_uk_check)
 
     def test_file_exists(self):
         payload = self.payload_setup()
