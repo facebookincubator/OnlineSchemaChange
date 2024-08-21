@@ -18,7 +18,6 @@ from osc.lib import sql
 
 from ..lib import constant
 from ..lib.error import OSCError
-from ..lib.mysql_version import MySQLVersion
 from ..lib.payload.cleanup import CleanupPayload
 from ..lib.payload.copy import CopyPayload
 from ..lib.sqlparse import parse_create
@@ -1211,6 +1210,27 @@ class CopyPayloadTestCase(unittest.TestCase):
         with self.assertRaises(OSCError):
             payload.detailed_checksum()
             self.assertTrue(payload.dump_current_chunk.called)
+
+    def test_table_timestamp_unchanged(self):
+        payload = self.payload_setup()
+        timestamp = 123
+        payload.saved_table_timestamp = timestamp
+        payload.get_table_timestamp = Mock(return_value=timestamp)
+        payload.select_table_into_outfile = Mock()
+        payload.dump_table()
+        self.assertTrue(payload.get_table_timestamp.called)
+        self.assertTrue(payload.select_table_into_outfile.called)
+
+    def test_table_timestamp_changed(self):
+        payload = self.payload_setup()
+        timestamp = 123
+        payload.saved_table_timestamp = timestamp
+        payload.get_table_timestamp = Mock(return_value=timestamp + 10)
+        payload.select_table_into_outfile = Mock()
+        with self.assertRaises(OSCError):
+            payload.dump_table()
+        self.assertTrue(payload.get_table_timestamp.called)
+        self.assertFalse(payload.select_table_into_outfile.called)
 
 
 class CopyPayloadPKFilterTestCase(unittest.TestCase):

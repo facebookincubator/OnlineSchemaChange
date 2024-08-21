@@ -226,6 +226,7 @@ class CopyPayload(Payload):
         self.max_id_now = 0
         self.mismatch_pk_charset = {}
         self.last_gc_collected = time.time()
+        self.saved_table_timestamp: str = ""
 
     @property
     def current_db(self):
@@ -622,6 +623,47 @@ class CopyPayload(Payload):
         """
         if "rocksdb_skip_fill_cache" in self.mysql_vars:
             self.execute_sql(sql.set_session_variable("rocksdb_skip_fill_cache"), (1,))
+
+    def table_timestamp_change_on_truncation_is_available(self):
+        try:
+            result = self.query_variable(
+                "update_table_create_timestamp_on_truncate", "global"
+            )
+        except MySQLdb.MySQLError:
+            return False
+        return bool(result)
+
+    def record_table_timestamp(self):
+        if self.table_timestamp_change_on_truncation_is_available():
+            self.execute_sql(
+                sql.set_global_variable("update_table_create_timestamp_on_truncate"),
+                ("ON",),
+            )
+        self.saved_table_timestamp = self.get_table_timestamp()
+        log.info("Saved table create timestamp: {}".format(self.saved_table_timestamp))
+
+    def stop_tracking_table_timestamp(self):
+        if self.table_timestamp_change_on_truncation_is_available():
+            self.execute_sql(
+                sql.set_global_variable("update_table_create_timestamp_on_truncate"),
+                ("OFF",),
+            )
+
+    def stop_if_table_timestamp_changed(func):
+        """
+        A decorator to check table timestamp has changed before executing a step
+        in the copy workflow. If the table timestamp has changed, it aborts by
+        raising an exception.
+        """
+
+        def before(self, *args, **kwargs):
+            previous_table_timestamp = self.saved_table_timestamp
+            if previous_table_timestamp != self.get_table_timestamp():
+                raise OSCError("TABLE_TIMESTAMP_CHANGED_ERROR")
+            log.info("No table timestamp change detetcted.")
+            return func(self, *args, **kwargs)
+
+        return before
 
     @wrap_hook
     def init_connection(self, db):
@@ -1795,6 +1837,22 @@ class CopyPayload(Payload):
         else:
             log.debug("TTL not enabled for MyRocks before schema change, skip")
 
+    def get_table_timestamp(self) -> str:
+        table_timestamp = ""
+        # Capture table create timestamp. We will continue to monitor this timestamp.
+        # A change to this timestamp is indicative of a DDL operation like truncate
+        # table that might have been executed while OSC is in progress.
+        try:
+            result = self.query(sql.get_table_timestamp(self.table_name))
+            table_timestamp = result[0]["LATEST_TIME"]
+        except Exception:
+            log.exception(
+                "Error while retrieving table create timestamp for {}".format(
+                    self.table_name
+                )
+            )
+        return table_timestamp
+
     @wrap_hook
     def start_snapshot(self):
         # We need to disable TTL feature in MyRocks. Otherwise rows will
@@ -1802,6 +1860,7 @@ class CopyPayload(Payload):
         if self.is_myrocks_table and self.is_myrocks_ttl_table:
             log.debug("It's schema change for MyRocks table which is using TTL")
             self.disable_ttl_for_myrocks()
+
         self.execute_sql(sql.start_transaction_with_snapshot)
         current_max = self.get_max_delta_id()
         log.info(
@@ -1959,6 +2018,7 @@ class CopyPayload(Payload):
         for i in range(num_chunks):
             self._cleanup_payload.add_file_entry(self._outfile_name(chunk_id=i))
 
+    @stop_if_table_timestamp_changed
     @wrap_hook
     def dump_table(self):
         """
@@ -2008,6 +2068,7 @@ class CopyPayload(Payload):
                 printed_chunk = progress_chunk
         self.commit()
 
+    @stop_if_table_timestamp_changed
     @wrap_hook
     def drop_non_unique_indexes(self):
         """
@@ -2195,6 +2256,7 @@ class CopyPayload(Payload):
         self.stats["load_progress"] = progress
         log.info(progress)
 
+    @stop_if_table_timestamp_changed
     @wrap_hook
     def load_data(self):
         stage_start_time = time.time()
@@ -2676,6 +2738,7 @@ class CopyPayload(Payload):
             else:
                 raise
 
+    @stop_if_table_timestamp_changed
     @wrap_hook
     def recreate_non_unique_indexes(self):
         """
@@ -2696,6 +2759,7 @@ class CopyPayload(Payload):
             )
             self.execute_sql(sql.add_index(self.new_table_name, self.droppable_indexes))
 
+    @stop_if_table_timestamp_changed
     @wrap_hook
     def analyze_table(self):
         """
@@ -3063,6 +3127,7 @@ class CopyPayload(Payload):
             return False
         return True
 
+    @stop_if_table_timestamp_changed
     @wrap_hook
     def checksum(self):
         """
@@ -3141,6 +3206,7 @@ class CopyPayload(Payload):
             f"{self.replay_max_attempt}(MAX ATTEMPTS)"
         )
 
+    @stop_if_table_timestamp_changed
     @wrap_hook
     def replay_till_good2go(self, checksum, final_catchup: bool = False):
         """
@@ -3489,6 +3555,7 @@ class CopyPayload(Payload):
             if self.is_myrocks_table and self.is_myrocks_ttl_table:
                 self.enable_ttl_for_myrocks()
             self.release_osc_lock()
+            self.stop_tracking_table_timestamp()
             self.close_conn()
         except Exception:
             log.exception(
@@ -3532,6 +3599,7 @@ class CopyPayload(Payload):
         if not self.use_sql_wsenv:
             log.info(f"Outfile total size: {self.stats.get('outfile_size', 0)} bytes")
 
+    @stop_if_table_timestamp_changed
     def execute_steps_to_cutover(self):
         self.sync_table_partitions()
         self.swap_tables()
@@ -3558,6 +3626,7 @@ class CopyPayload(Payload):
             self.create_delta_table()
             self.create_copy_table()
             self.create_triggers()
+            self.record_table_timestamp()
             self.start_snapshot()
             self.dump_table()
             self.drop_non_unique_indexes()

@@ -1024,3 +1024,15 @@ def get_all_osc_triggers(db=None) -> str:
     if db:
         sql += "AND TRIGGER_SCHEMA = %s "
     return sql
+
+
+def get_table_timestamp(table_name: str) -> str:
+    sql = (
+        "SELECT CREATE_TIME AS LATEST_TIME "
+        "FROM INFORMATION_SCHEMA.TABLES "
+        "WHERE TABLE_CATALOG = 'def' AND "
+        "TABLE_TYPE = 'BASE TABLE' AND "
+        "TABLE_NAME = '{}'"
+    )
+
+    return sql.format(escape(table_name))

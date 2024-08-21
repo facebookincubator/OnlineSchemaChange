@@ -443,6 +443,11 @@ class OSCError(Exception):
             "desc": "MyRocks required due to: {reason}",
             "retryable": False,
         },
+        "TABLE_TIMESTAMP_CHANGED_ERROR": {
+            "code": 155,
+            "desc": ("Table timestamp changed during copy phase"),
+            "retryable": False,
+        },
         # reserved for special internal errors
         "ASSERTION_ERROR": {
             "code": 249,
