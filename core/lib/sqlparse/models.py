@@ -260,6 +260,8 @@ class Column:
         self.auto_increment = None
         self.vector_dimension = None
         self.visibility = True
+        self.virtual_or_stored = None
+        self.expression = None
 
     def __str__(self):
         col_str = []
@@ -279,6 +281,8 @@ class Column:
         if self.vector_dimension is not None:
             col_str.append("FB_VECTOR_DIMENSION: {}".format(self.vector_dimension))
         col_str.append("VISIBILITY: {}".format(self.visibility))
+        col_str.append("EXPRESSION: {}".format(self.expression))
+        col_str.append("VIRTUAL_OR_STORED: {}".format(self.virtual_or_stored))
         return " ".join(col_str)
 
     @property
@@ -308,6 +312,8 @@ class Column:
             "auto_increment",
             "vector_dimension",
             "visibility",
+            "virtual_or_stored",
+            "expression",
         ):
 
             # Ignore display width of *int types, because of the new default in 8.0.20.
@@ -380,6 +386,11 @@ class Column:
             column_segment.append("{}({})".format(self.column_type, self.length))
         else:
             column_segment.append("{}".format(self.column_type))
+
+        if self.expression:
+            column_segment.append("GENERATED ALWAYS AS ({})".format(self.expression))
+            if self.virtual_or_stored:
+                column_segment.append(self.virtual_or_stored)
 
         if self.charset is not None:
             column_segment.append("CHARACTER SET {}".format(self.charset))
