@@ -18,6 +18,12 @@ start_slave_sql = "START SLAVE SQL_THREAD"
 kill_proc = "KILL %s"
 start_transaction = "START TRANSACTION"
 start_transaction_with_snapshot = "START TRANSACTION WITH CONSISTENT SNAPSHOT"
+start_transaction_with_rocksdb_snapshot = (
+    "START TRANSACTION WITH CONSISTENT ROCKSDB SNAPSHOT"
+)
+start_transaction_with_innodb_snapshot = (
+    "START TRANSACTION WITH CONSISTENT INNODB SNAPSHOT"
+)
 commit = "COMMIT"
 unlock_tables = "UNLOCK TABLES"
 show_processlist = "SHOW FULL PROCESSLIST"

@@ -81,6 +81,7 @@ class CopyPayload(Payload):
         self.outfile_suffix_end = 0
         self.outfile_suffix_start = 0
         self.last_replayed_id = 0
+        self.current_gtid_set = ""
         self.last_checksumed_id = 0
         self.current_checksum_record = -1
         self.table_size = 0
@@ -1853,6 +1854,9 @@ class CopyPayload(Payload):
             )
         return table_timestamp
 
+    def extract_gtid_set_from_snapshot_query_result(self, queryResult) -> str:
+        return queryResult[0]["Gtid_executed"]
+
     @wrap_hook
     def start_snapshot(self):
         # We need to disable TTL feature in MyRocks. Otherwise rows will
@@ -1861,7 +1865,15 @@ class CopyPayload(Payload):
             log.debug("It's schema change for MyRocks table which is using TTL")
             self.disable_ttl_for_myrocks()
 
-        self.execute_sql(sql.start_transaction_with_snapshot)
+        snapshot_with_gtid_set_query = (
+            sql.start_transaction_with_rocksdb_snapshot
+            if self.is_myrocks_table
+            else sql.start_transaction_with_innodb_snapshot
+        )
+        self.current_gtid_set = self.extract_gtid_set_from_snapshot_query_result(
+            self.query(snapshot_with_gtid_set_query)
+        )
+        log.info("Start snapshot with GTID set: {}".format(self.current_gtid_set))
         current_max = self.get_max_delta_id()
         log.info(
             "Changes with id <= {} committed before dump snapshot, "
