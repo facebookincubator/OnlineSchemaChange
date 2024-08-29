@@ -3611,6 +3611,11 @@ class CopyPayload(Payload):
         if not self.use_sql_wsenv:
             log.info(f"Outfile total size: {self.stats.get('outfile_size', 0)} bytes")
 
+    # This method is overridden by fb_copy::fast_catchup_tool_enabled() in case of
+    # running CopyV2. For CopyV1, it is turning off by default.
+    def fast_catchup_tool_enabled(self) -> bool:
+        return False
+
     @stop_if_table_timestamp_changed
     def execute_steps_to_cutover(self):
         self.sync_table_partitions()
