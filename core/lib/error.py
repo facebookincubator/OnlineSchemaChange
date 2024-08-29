@@ -518,6 +518,12 @@ class OSCError(Exception):
             "retryable": False,
             "internal": False,
         },
+        "NOT_IMPLEMENTED_EXCEPTION": {
+            "code": 260,
+            "desc": ("{errmsg}"),
+            "retryable": False,
+            "internal": True,
+        },
     }
 
     def __init__(self, err_key, desc_kwargs=None, mysql_err_code=None):
