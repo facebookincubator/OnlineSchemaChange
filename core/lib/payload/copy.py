@@ -21,6 +21,7 @@ from typing import collections, List, Optional, Set
 
 import MySQLdb
 from libfb.py.decorators import retryable
+from osc.lib.payload.osc_catchup_tool import OscCatchupTool
 from osc.lib.sqlparse.diff import IndexAlterType
 
 from .. import constant, sql, util
@@ -228,6 +229,7 @@ class CopyPayload(Payload):
         self.mismatch_pk_charset = {}
         self.last_gc_collected = time.time()
         self.saved_table_timestamp: str = ""
+        self.catchup_tool: OscCatchupTool = None
 
     @property
     def current_db(self):
@@ -1857,6 +1859,9 @@ class CopyPayload(Payload):
     def extract_gtid_set_from_snapshot_query_result(self, queryResult) -> str:
         return queryResult[0]["Gtid_executed"]
 
+    def get_current_gtid_set(self) -> str:
+        return self.current_gtid_set
+
     @wrap_hook
     def start_snapshot(self):
         # We need to disable TTL feature in MyRocks. Otherwise rows will
@@ -2555,33 +2560,18 @@ class CopyPayload(Payload):
             self.last_gc_collected = time.time()
             log.debug("GC collected {} objects".format(gc_count))
 
-    def replay_changes(
-        self, single_trx=False, holding_locks=False, delta_id_limit=None
-    ):
-        """
-        Loop through all the existing events in __osc_chg table and replay
-        the change
-
-        @param single_trx:  Replay all the changes in single transaction or
-        not
-        @type  single_trx:  bool
-        """
-        # all the changes to be replayed in this round will be stored in
-        # tmp_table_include_id. Though change events may keep being generated,
-        # we'll only replay till the end of temporary table
-        if (
-            single_trx
-            and not self.bypass_replay_timeout
-            and self.check_max_statement_time_exists()
-        ):
-            replay_ms = self.replay_timeout * 1000
-        else:
-            replay_ms = None
+    def replay_changes_internal_with_delta_table(
+        self, single_trx, holding_locks, delta_id_limit, stage_start_time, replay_ms
+    ) -> int:
+        log.info(
+            f"replay_changes with delta table {single_trx=}, {holding_locks=}, {delta_id_limit=}"
+        )
+        # This is the old catchup implementation, we use delta table to perform
+        # catchup, with the faster catchup tool this is not needed.
         max_id_now = self.determine_replay_id(
             delta_id_limit if delta_id_limit else self.get_max_delta_id()
         )
 
-        stage_start_time = time.time()
         self.current_catchup_start_time = int(stage_start_time)
         log.debug("Timeout for replay changes: {}".format(self.replay_timeout))
         time_start = stage_start_time
@@ -2698,24 +2688,71 @@ class CopyPayload(Payload):
             self.commit()
         self.last_replayed_id = max_id_now
 
-        self.perform_gc_collection()
+        log.info(
+            "Replayed {} INSERT, {} DELETE, {} UPDATE".format(
+                inserted, deleted, updated
+            )
+        )
+        return inserted + deleted + updated
 
+    def replay_changes(
+        self,
+        single_trx=False,
+        holding_locks=False,
+        delta_id_limit=None,
+        until_gtid_set=None,  # catch up indefinitely
+    ):
+        """
+        Loop through all the existing events in __osc_chg table and replay
+        the change
+
+        @param single_trx:  Replay all the changes in single transaction or
+        not
+        @type  single_trx:  bool
+        """
+        assert (
+            delta_id_limit is None or until_gtid_set is None
+        ), "delta_id_limit and until_gtid_set cannot be both non-empty"
+        # all the changes to be replayed in this round will be stored in
+        # tmp_table_include_id. Though change events may keep being generated,
+        # we'll only replay till the end of temporary table
+        if (
+            single_trx
+            and not self.bypass_replay_timeout
+            and self.check_max_statement_time_exists()
+        ):
+            replay_ms = self.replay_timeout * 1000
+        else:
+            replay_ms = None
+
+        log.info(
+            f"replay_changes use_gtid_for_catchup={self.fast_catchup_tool_enabled()}"
+        )
+        stage_start_time = time.time()
+        delta_updates_count = 0
+        if not self.fast_catchup_tool_enabled():
+            delta_updates_count = self.replay_changes_internal_with_delta_table(
+                single_trx, holding_locks, delta_id_limit, stage_start_time, replay_ms
+            )
+        else:
+            # Run faster catchup and wait for the catchup to complete,
+            # all the transformation logic would happen in the fast catchup tool
+            self.catchup_tool.async_catchup_table_to_gtid_set(until_gtid_set)
+            if not until_gtid_set:
+                # Write the ending signal to the catchup tool, so that it can stop
+                self.catchup_tool.write_stop_catchup_job_signal()
+            self.catchup_tool.wait_for_catchup_job_to_finish()
+
+        self.perform_gc_collection()
         end_time = time.time()
         self.current_catchup_end_time = int(end_time)
         time_spent = end_time - stage_start_time
         self.stats["time_in_replay"] = (
             self.stats.setdefault("time_in_replay", 0) + time_spent
         )
-        log.info(
-            "Replayed {} INSERT, {} DELETE, {} UPDATE in {:.2f} Seconds".format(
-                inserted, deleted, updated, time_spent
-            )
-        )
-
+        log.info("Replayed in {:.2f} Seconds".format(time_spent))
         if time_spent > 0.0:
-            self.stats["last_catchup_speed"] = (
-                inserted + deleted + updated
-            ) / time_spent
+            self.stats["last_catchup_speed"] = delta_updates_count / time_spent
 
     def record_currently_replaying_id(self, max_id_now: int) -> None:
         return
@@ -3237,6 +3274,7 @@ class CopyPayload(Payload):
             "Replay at most {} more round(s) until we can finish in {} "
             "seconds".format(self.replay_max_attempt, self.replay_timeout)
         )
+        log.info(f"use_gtid_for_catchup: {self.fast_catchup_tool_enabled()}")
         self.stats["num_replay_attempts"] = 0
         # Temporarily enable slow query log for slow replay statements
         self.execute_sql(sql.set_session_variable("long_query_time"), (1,))
@@ -3253,17 +3291,46 @@ class CopyPayload(Payload):
                     "rows that have been changed"
                 )
                 self.checksum_required_for_replay = True
-                self.replay_changes(single_trx=True)
+                if self.fast_catchup_tool_enabled():
+                    # If fast catchup tool is enabled, then we have to call
+                    # the replay_changes() with a clear gtid set to know where
+                    # to catchup to. In this case we want to catch up to the
+                    # consistent snapshot that we have taken.
+                    self.replay_changes(
+                        single_trx=True,
+                        until_gtid_set=self.current_gtid_set,
+                    )
+                else:
+                    self.replay_changes(single_trx=True)
                 self.checksum_for_changes(single_trx=False)
             else:
-                # Break replay into smaller chunks if it's too big
-                self.checksum_required_for_replay = False
-                max_id_now = self.get_max_delta_id()
-                while max_id_now - self.last_replayed_id > self.max_replay_batch_size:
-                    delta_id_limit = self.last_replayed_id + self.max_replay_batch_size
-                    log.info("Replay up to {}".format(delta_id_limit))
-                    self.replay_changes(single_trx=False, delta_id_limit=delta_id_limit)
-                self.replay_changes(single_trx=False, delta_id_limit=max_id_now)
+                if self.fast_catchup_tool_enabled():
+                    # If we are using GTID for catchup, there is no need to break
+                    # the replay into smaller chunks because the data is streamed
+                    # to the destination table.
+                    self.replay_changes(
+                        single_trx=False,
+                        until_gtid_set=self.current_gtid_set,
+                    )
+                else:
+                    # Break replay into smaller chunks if it's too big
+                    self.checksum_required_for_replay = False
+                    max_id_now = self.get_max_delta_id()
+                    while (
+                        max_id_now - self.last_replayed_id > self.max_replay_batch_size
+                    ):
+                        delta_id_limit = (
+                            self.last_replayed_id + self.max_replay_batch_size
+                        )
+                        log.info("Replay up to {}".format(delta_id_limit))
+                        self.replay_changes(
+                            single_trx=False,
+                            delta_id_limit=delta_id_limit,
+                        )
+                    self.replay_changes(
+                        single_trx=False,
+                        delta_id_limit=max_id_now,
+                    )
 
             time_in_replay = time.time() - start_time
             if time_in_replay < self.replay_timeout:
