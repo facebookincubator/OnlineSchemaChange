@@ -789,7 +789,10 @@ def checksum_full_table_native(table_name, columns) -> str:
     NOTE: This uses FB-only extensions to CHECKSUM TABLE that allow selection
     of columns.
     """
-    old_cols = [f"`{escape(col)}`" for col in columns]
+    # Sort the column names so that the old and new tables can be
+    # compared in case there was a reordering of columns in the new
+    # schema.
+    old_cols = [f"`{escape(col)}`" for col in sorted(columns)]
     return f"CHECKSUM TABLE `{escape(table_name)}` ({', '.join(old_cols)})"
 
 

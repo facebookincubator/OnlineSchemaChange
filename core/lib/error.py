@@ -9,9 +9,18 @@ This source code is licensed under the BSD-style license found in the
 LICENSE file in the root directory of this source tree.
 """
 
+from typing import TypedDict
+
+
+class ErrorDescriptor(TypedDict):
+    code: int
+    desc: str
+    retryable: bool
+    internal: bool
+
 
 class OSCError(Exception):
-    ERR_MAPPING = {
+    ERR_MAPPING: dict[str, ErrorDescriptor] = {
         "NON_ROOT_USER": {
             "code": 100,
             "desc": "Non-root user execution",
@@ -434,7 +443,7 @@ class OSCError(Exception):
         },
         "CREATE_TRIGGER_ERROR": {
             "code": 153,
-            "desc": ("Error when creating triggers, msg: {msg}"),
+            "desc": "Error when creating triggers, msg: {msg}",
             "retryable": True,
             "internal": True,
         },
@@ -451,19 +460,19 @@ class OSCError(Exception):
         # reserved for special internal errors
         "ASSERTION_ERROR": {
             "code": 249,
-            "desc": ("Assertion error. \n" "Expected: {expected}\n" "Got     : {got}"),
+            "desc": "Assertion error.\nExpected: {expected}\n" "Got: {got}",
             "retryable": False,
             "internal": True,
         },
         "CLEANUP_EXECUTION_ERROR": {
             "code": 250,
-            "desc": ("Error when running clean up statement: {sql} msg: {msg}"),
+            "desc": "Error when running clean up statement: {sql} msg: {msg}",
             "retryable": True,
             "internal": True,
         },
         "HOOK_EXECUTION_ERROR": {
             "code": 251,
-            "desc": ("Error when executing hook: {hook} msg: {msg}"),
+            "desc": "Error when executing hook: {hook} msg: {msg}",
             "retryable": True,
             "internal": True,
         },
@@ -484,19 +493,19 @@ class OSCError(Exception):
         },
         "GENERIC_MYSQL_ERROR": {
             "code": 254,
-            "desc": ('MySQL Error during stage "{stage}": [{errnum}] {errmsg}'),
+            "desc": 'MySQL Error during stage "{stage}": [{errnum}] {errmsg}',
             "retryable": True,
             "internal": True,
         },
         "OUTFILE_DIR_NOT_SPECIFIED_WSENV": {
             "code": 255,
-            "desc": ("--outfile-dir must be specified when using wsenv"),
+            "desc": "--outfile-dir must be specified when using wsenv",
             "retryable": False,
             "internal": True,
         },
         "SKIP_DISK_SPACE_CHECK_VALUE_INCOMPATIBLE_WSENV": {
             "code": 256,
-            "desc": ("-skip-disk-space-check must be true when using wsenv"),
+            "desc": "-skip-disk-space-check must be true when using wsenv",
             "retryable": False,
             "internal": True,
         },
@@ -508,13 +517,13 @@ class OSCError(Exception):
         },
         "GENERIC_RETRYABLE_EXCEPTION": {
             "code": 258,
-            "desc": ("{errmsg}"),
+            "desc": "{errmsg}",
             "retryable": True,
             "internal": False,
         },
         "GENERIC_NONRETRY_EXCEPTION": {
             "code": 259,
-            "desc": ("{errmsg}"),
+            "desc": "{errmsg}",
             "retryable": False,
             "internal": False,
         },
@@ -526,7 +535,9 @@ class OSCError(Exception):
         },
     }
 
-    def __init__(self, err_key, desc_kwargs=None, mysql_err_code=None):
+    def __init__(
+        self, err_key: str, desc_kwargs=None, mysql_err_code: int | None = None
+    ):
         self.err_key = err_key
         if desc_kwargs:
             self.desc_kwargs = desc_kwargs
@@ -534,27 +545,24 @@ class OSCError(Exception):
             self.desc_kwargs = {}
         self._mysql_err_code = mysql_err_code
         self.err_entry = self.ERR_MAPPING[err_key]
-        self._retryable = self.ERR_MAPPING[err_key]["retryable"]
+        self._retryable: bool = self.err_entry["retryable"]
 
     @property
-    def code(self):
-        return self.ERR_MAPPING[self.err_key]["code"]
+    def code(self) -> int:
+        return self.err_entry["code"]
 
     @property
-    def desc(self):
+    def desc(self) -> str:
         description = self.err_entry["desc"].format(**self.desc_kwargs)
         return "{}: {}: {}".format(self.code, self.err_key, description)
 
     @property
-    def mysql_err_code(self):
-        if self._mysql_err_code:
-            return self._mysql_err_code
-        else:
-            return 0
+    def mysql_err_code(self) -> int:
+        return self._mysql_err_code or 0
 
     @property
-    def retryable(self):
+    def retryable(self) -> bool:
         return self._retryable
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.desc

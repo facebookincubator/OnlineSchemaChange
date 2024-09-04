@@ -710,7 +710,7 @@ class CopyPayload(Payload):
     def fetch_table_schema(self, table_name):
         """
         Use lib.sqlparse.parse_create to turn a CREATE TABLE syntax into a
-        TABLE object, so that we can then do stuffs in a phythonic way later
+        TABLE object, so that we can then do stuff in a pythonic way later.
         """
         ddl = self.query(sql.show_create_table(table_name))
         if ddl:
@@ -2908,12 +2908,7 @@ class CopyPayload(Payload):
         checksums = []
         for table in [self.table_name, self.new_table_name]:
             log.info(f"Calculating checksum for {table}")
-            # Sort the column names so that the old and new tables can be
-            # compared in case there was a reordering of columns in the new
-            # schema.
-            sql_query = sql.checksum_full_table_native(
-                table, sorted(self.old_column_list)
-            )
+            sql_query = sql.checksum_full_table_native(table, self.old_column_list)
             checksums.append(
                 # Take the first row only as only one is expected.
                 self.query(sql_query)[0]
@@ -3037,10 +3032,10 @@ class CopyPayload(Payload):
 
     @wrap_hook
     def checksum_by_chunk(
-        self, table_name, dump_after_checksum=False
+        self, table_name: str, dump_after_checksum: bool = False
     ) -> list[dict[str, int]]:
         """
-        Running checksum for all the existing data in new table. This is to
+        Run checksum-by-chunk algorithm for the given table. This is to
         make sure there's no data corruption after load and first round of
         replay
         """
@@ -3057,7 +3052,7 @@ class CopyPayload(Payload):
             idx_for_checksum = self._idx_name_for_filter
             outfile_prefix = "{}.old".format(self.outfile)
         while affected_rows:
-            # TODO: consider adding a query_array method which calls
+            # TODO: consider using self.query_array method which calls
             # self._conn.query_array for memory efficiency. self.query uses
             # a DictCursor under the hood, which stores column names for each
             # row, which may be costly.
@@ -3210,33 +3205,37 @@ class CopyPayload(Payload):
 
         if self.use_checksum_statement:
             log.info("Doing full table checksum in single pass (CHECKSUM TABLE method)")
-            return self.checksum_full_table_native()
-        # if we don't have a PK on old schema, then we are not able to checksum
-        # by chunk. We'll do a full table scan for checksum instead
+            self.checksum_full_table_native()
+        # If we don't have a PK on old schema, then we are not able to checksum
+        # by chunk. We'll do a full table scan for checksum instead.
         elif self.is_full_table_dump:
             log.info("Doing full table checksum in single pass (SQL method)")
             return self.checksum_full_table()
-
-        if not self.detailed_mismatch_info:
-            log.info("Checksumming data from old table")
+        elif self.detailed_mismatch_info:
+            # Special mode of checksum for debugging.
+            log.info("Doing detailed (slower) checksum for debugging.")
+            self.detailed_checksum()
+        else:
+            # Chunk-based checksumming using SQL queries to run column-wise
+            # aggregates over batches of rows.
+            log.info("Doing chunk-based checksum of old and new tables.")
+            log.info("1. Checksumming data from old table")
             old_table_checksum = self.checksum_by_chunk(
                 self.table_name, dump_after_checksum=self.dump_after_checksum
             )
 
             # We can calculate the checksum for new table outside the
             # transaction, because the data in new table is static without
-            # replaying changes
+            # replaying changes.
             self.commit()
 
-            log.info("Checksuming data from new table")
+            log.info("2. Checksuming data from new table")
             new_table_checksum = self.checksum_by_chunk(
                 self.new_table_name, dump_after_checksum=self.dump_after_checksum
             )
 
-            log.info("Comparing checksum")
+            log.info("3. Comparing old and new checksums")
             self.compare_checksum(old_table_checksum, new_table_checksum)
-        else:
-            self.detailed_checksum()
 
         self.last_checksumed_id = self.last_replayed_id
         self.record_checksum()
