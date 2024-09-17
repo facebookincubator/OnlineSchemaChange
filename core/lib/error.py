@@ -454,8 +454,10 @@ class OSCError(Exception):
         },
         "TABLE_TIMESTAMP_CHANGED_ERROR": {
             "code": 155,
-            "desc": ("Table timestamp changed during copy phase"),
-            "retryable": False,
+            "desc": (
+                "Table timestamp changed during copy phase.\nExpected: {expected}\nGot: {got}"
+            ),
+            "retryable": True,
         },
         # reserved for special internal errors
         "ASSERTION_ERROR": {

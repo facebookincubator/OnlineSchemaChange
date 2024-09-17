@@ -643,7 +643,11 @@ class CopyPayload(Payload):
                 ("ON",),
             )
         self.saved_table_timestamp = self.get_table_timestamp()
-        log.info("Saved table create timestamp: {}".format(self.saved_table_timestamp))
+        log.info(
+            "Saved table create timestamp {} for table {}.".format(
+                self.saved_table_timestamp, self.table_name
+            )
+        )
 
     def stop_tracking_table_timestamp(self):
         if self.table_timestamp_change_on_truncation_is_available():
@@ -661,9 +665,13 @@ class CopyPayload(Payload):
 
         def before(self, *args, **kwargs):
             previous_table_timestamp = self.saved_table_timestamp
-            if previous_table_timestamp != self.get_table_timestamp():
-                raise OSCError("TABLE_TIMESTAMP_CHANGED_ERROR")
-            log.info("No table timestamp change detetcted.")
+            new_table_timestamp = self.get_table_timestamp()
+            if previous_table_timestamp != new_table_timestamp:
+                raise OSCError(
+                    "TABLE_TIMESTAMP_CHANGED_ERROR",
+                    {"expected": previous_table_timestamp, "got": new_table_timestamp},
+                )
+            log.info("No table timestamp change detected.")
             return func(self, *args, **kwargs)
 
         return before
