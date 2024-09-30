@@ -2851,7 +2851,8 @@ class CopyPayload(Payload):
                     len(old_table_checksum), len(new_table_checksum)
                 )
             )
-            raise OSCError("CHECKSUM_MISMATCH")
+            log.info("Running detailed checksum to get more detailed diagnostics")
+            self.detailed_checksum()
         log.debug("{} checksum chunks in total".format(len(old_table_checksum)))
 
         checksum_xor = 0
@@ -2880,7 +2881,10 @@ class CopyPayload(Payload):
                             self.last_replayed_id
                         )
                     )
-                    raise OSCError("CHECKSUM_MISMATCH")
+                    log.info(
+                        "Running detailed checksum to get more detailed diagnostics"
+                    )
+                    self.detailed_checksum()
                 else:
                     checksum_xor ^= old_table_checksum[idx][col]
 
@@ -2928,13 +2932,9 @@ class CopyPayload(Payload):
         checksum_new = checksums[1]["Checksum"]
 
         if checksum_old != checksum_new:
-            log.error(
-                "Checksum mismatch: "
-                f"OLD={checksum_old}, NEW={checksum_new}. "
-                "Run with --detailed-mismatch-info to get more detailed "
-                "diagnostics (if table has PK)."
-            )
-            raise OSCError("CHECKSUM_MISMATCH")
+            log.error(f"Checksum mismatch: OLD={checksum_old}, NEW={checksum_new}. ")
+            log.info("Running detailed checksum to get more detailed diagnostics")
+            self.detailed_checksum()
 
     def checksum_for_single_chunk(self, table_name, use_where, idx_for_checksum):
         """
