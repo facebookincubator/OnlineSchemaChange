@@ -526,9 +526,7 @@ class CreateParser:
                     )
                 )
                 + RIGHT_PARENTHESES
-            )(
-                "is_tuple"
-            )  # e.g. (("a", "b")), See test_parts_list_in_tuple15
+            )("is_tuple")  # e.g. (("a", "b")), See test_parts_list_in_tuple15
             # e.g. `_binary      0xdeadbeef123`, See test_parts_list_by_cols_with_binary17
             # turns to: `_BINARY 0xdeadbeef123`
             | Combine(

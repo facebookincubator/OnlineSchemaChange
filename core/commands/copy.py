@@ -376,7 +376,6 @@ class Copy(CommandBase):
         self.setup_optional_args(parser)
 
     def validate_args(self):
-
         if self.args.use_sql_wsenv:
             if self.args.skip_disk_space_check is None:
                 self.args.skip_disk_space_check = True

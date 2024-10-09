@@ -2846,8 +2846,7 @@ class CopyPayload(Payload):
         """
         if len(old_table_checksum) != len(new_table_checksum):
             log.error(
-                "The total number of checksum chunks mismatch "
-                "OLD={}, NEW={}".format(
+                "The total number of checksum chunks mismatch " "OLD={}, NEW={}".format(
                     len(old_table_checksum), len(new_table_checksum)
                 )
             )

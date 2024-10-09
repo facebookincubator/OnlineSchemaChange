@@ -8,6 +8,7 @@ All rights reserved.
 This source code is licensed under the BSD-style license found in the
 LICENSE file in the root directory of this source tree.
 """
+
 from typing import Any, List, Optional, Union
 
 
@@ -438,21 +439,17 @@ def select_into_file(
     delta_table_name: str,
     enable_outfile_compression: bool = False,
 ) -> str:
-    return (
-        "SELECT `{}`, `{}` "
-        "FROM `{}` "
-        "ORDER BY `{}` INTO OUTFILE %s {}".format(
-            escape(id_col_name),
-            escape(dml_col_name),
-            escape(delta_table_name),
-            escape(id_col_name),
-            # NOTE: Do not use chunk size in compression
-            #       This is intentional because we want to be able to predictably
-            #       determine the exact file that mysqld would create
-            #       (such as `{filename}.{mysqld_chunk_number}.{extension}`)
-            #       and because OSC does already do chunking in the not compressed path
-            " COMPRESSED" if enable_outfile_compression else "",
-        )
+    return "SELECT `{}`, `{}` " "FROM `{}` " "ORDER BY `{}` INTO OUTFILE %s {}".format(
+        escape(id_col_name),
+        escape(dml_col_name),
+        escape(delta_table_name),
+        escape(id_col_name),
+        # NOTE: Do not use chunk size in compression
+        #       This is intentional because we want to be able to predictably
+        #       determine the exact file that mysqld would create
+        #       (such as `{filename}.{mysqld_chunk_number}.{extension}`)
+        #       and because OSC does already do chunking in the not compressed path
+        " COMPRESSED" if enable_outfile_compression else "",
     )
 
 

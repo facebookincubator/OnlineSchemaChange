@@ -167,8 +167,9 @@ class RangeChain:
         else:
             if point > self._stop:
                 raise Exception(
-                    "Trying to fill a value {} "
-                    "beyond current covering range".format(point)
+                    "Trying to fill a value {} " "beyond current covering range".format(
+                        point
+                    )
                 )
             else:
                 raise Exception(

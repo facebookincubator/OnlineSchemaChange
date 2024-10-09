@@ -315,7 +315,6 @@ class Column:
             "virtual_or_stored",
             "expression",
         ):
-
             # Ignore display width of *int types, because of the new default in 8.0.20.
             # This is a bit of a heavy hammer, but it's the simpler alternative to be
             # able to support mixed version comparisons
