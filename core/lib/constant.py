@@ -54,3 +54,7 @@ MAX_REPLAY_CHANGES = 2146483647
 WSENV_CHUNK_BYTES = 64 * 1024 * 1024
 CHECKSUM_CHUNK_BYTES = 64 * 1024 * 1024
 GC_COLLECT_TIME_INTERVAL = 120  # 2 minutes
+
+# Types to exclude from checksum. These are non-deterministic when doing logical
+# dump and load due to unpredictability in string serialization.
+CHECKSUM_EXCLUDE_COLUMN_TYPES = ["FLOAT", "DOUBLE", "JSON"]

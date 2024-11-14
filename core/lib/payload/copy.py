@@ -307,6 +307,9 @@ class CopyPayload(Payload):
         new_columns = {col.name: col for col in self._new_table.column_list}
         old_pk_name_list = [c.name for c in self._old_table.primary_key.column_list]
         for col in self._old_table.column_list:
+            # Filter out non-deterministically serialized column types.
+            if col.column_type in constant.CHECKSUM_EXCLUDE_COLUMN_TYPES:
+                continue
             if exclude_pk and col.name in old_pk_name_list:
                 continue
             if col.name in self.dropped_column_name_list:

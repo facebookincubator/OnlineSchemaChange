@@ -798,24 +798,52 @@ class CopyPayloadTestCase(unittest.TestCase):
         self.assertEqual(payload.dropped_column_name_list, ["id2", "col2"])
 
     def test_checksum_column_list(self):
+        """
+        Ensure that only acceptable columns are selected for checksum purposes.
+        """
         payload = CopyPayload()
         table_obj = parse_create(
-            " CREATE TABLE a "
-            "( ID int primary key,  "
-            "col1 varchar(10), "
-            "col2 varchar(10)) "
+            """
+            CREATE TABLE a (
+                ID int primary key,
+                col1 varchar(10),
+                col2 varchar(10),
+                col3 JSON,
+                col3_1 json,
+                col3_2 jSoN,
+                col4 FLOAT,
+                col4_1 FLoaT,
+                col5 DOUBLE,
+                col5_1 DouBlE
+            )
+            """
         )
         table_obj_new = parse_create(
-            " CREATE TABLE a "
-            "( ID int primary key,  "
-            "col1 varchar(10), "
-            "col2 varchar(100)) "
+            """
+            CREATE TABLE a (
+                ID int primary key,
+                col1 varchar(10),
+                col2 varchar(100),
+                col3 JSON,
+                col4 FLOAT,
+                col5 DOUBLE
+            )
+            """
         )
         table_obj_dropped = parse_create(
-            " CREATE TABLE a " "( ID int primary key,  " "col2 varchar(100)) "
+            """
+            CREATE TABLE a (
+                ID int primary key,
+                col2 varchar(100),
+                col3 JSON,
+                col4 FLOAT,
+                col5 DOUBLE
+            )
+            """
         )
         payload._old_table = table_obj
         payload._new_table = table_obj
+
         # No change in the schema
         self.assertEqual(
             payload.checksum_column_list(exclude_pk=True), ["col1", "col2"]
