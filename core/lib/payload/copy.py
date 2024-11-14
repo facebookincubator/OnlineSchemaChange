@@ -272,9 +272,9 @@ class CopyPayload(Payload):
     @property
     def old_column_list(self):
         """
-        list of column names for all the columns in the old schema except
-        the ones are being dropped in the new schema.
-        It will be used in query construction for checksum
+        list of column names for all the columns in the old schema except the
+        ones are being dropped in the new schema. Used to create triggers and
+        delta table.
         """
         return [
             col.name
@@ -295,19 +295,22 @@ class CopyPayload(Payload):
             and col.name not in self.dropped_column_name_list
         ]
 
-    @property
-    def checksum_column_list(self):
+    def checksum_column_list(self, exclude_pk: bool):
         """
-        A list of non-pk column name suitable for comparing checksum
+        A list of column names suitable for comparing checksums. `exclude_pk`
+        causes this function to exclude primary key columns, for use when the
+        caller already provides them through another means.
         """
         column_list = []
+        # Create a mapping from the new table's column names to their definitions
+        # to detect changes to column definitions between old and new tables.
+        new_columns = {col.name: col for col in self._new_table.column_list}
         old_pk_name_list = [c.name for c in self._old_table.primary_key.column_list]
         for col in self._old_table.column_list:
-            if col.name in old_pk_name_list:
+            if exclude_pk and col.name in old_pk_name_list:
                 continue
             if col.name in self.dropped_column_name_list:
                 continue
-            new_columns = {col.name: col for col in self._new_table.column_list}
             if col != new_columns[col.name]:
                 if self.skip_checksum_for_modified:
                     continue
@@ -2897,12 +2900,16 @@ class CopyPayload(Payload):
         """
         # Calculate checksum for old table
         old_checksum = self.query(
-            sql.checksum_full_table(self.table_name, self.old_column_list)
+            sql.checksum_full_table(
+                self.table_name, self.checksum_column_list(exclude_pk=False)
+            )
         )
 
         # Calculate checksum for new table
         new_checksum = self.query(
-            sql.checksum_full_table(self.new_table_name, self.old_column_list)
+            sql.checksum_full_table(
+                self.new_table_name, self.checksum_column_list(exclude_pk=False)
+            )
         )
         self.commit()
 
@@ -2919,7 +2926,9 @@ class CopyPayload(Payload):
         checksums = []
         for table in [self.table_name, self.new_table_name]:
             log.info(f"Calculating checksum for {table}")
-            sql_query = sql.checksum_full_table_native(table, self.old_column_list)
+            sql_query = sql.checksum_full_table_native(
+                table, self.checksum_column_list(exclude_pk=False)
+            )
             checksums.append(
                 # Take the first row only as only one is expected.
                 self.query(sql_query)[0]
@@ -2945,7 +2954,7 @@ class CopyPayload(Payload):
         return self.query(
             sql.checksum_by_chunk_with_assign(
                 table_name,
-                self.checksum_column_list,
+                self.checksum_column_list(exclude_pk=True),
                 self._pk_for_filter,
                 self.range_start_vars_array,
                 self.range_end_vars_array,
@@ -2966,7 +2975,9 @@ class CopyPayload(Payload):
         """
         log.info("Dumping raw data onto local disk for further investigation")
         log.info("Columns will be dumped in following order: ")
-        log.info(", ".join(self._pk_for_filter + self.checksum_column_list))
+        log.info(
+            ", ".join(self._pk_for_filter + self.checksum_column_list(exclude_pk=True))
+        )
         for table_name in [self.table_name, self.new_table_name]:
             if table_name == self.new_table_name:
                 # index for new schema can be any indexes that provides
@@ -2991,7 +3002,7 @@ class CopyPayload(Payload):
             self.execute_sql(
                 sql.dump_current_chunk(
                     table_name,
-                    self.checksum_column_list,
+                    self.checksum_column_list(exclude_pk=True),
                     self._pk_for_filter,
                     self.range_start_vars_array,
                     self.select_chunk_size,
@@ -3066,7 +3077,7 @@ class CopyPayload(Payload):
             checksum: list[dict[str, int], ...] = self.query(
                 sql.checksum_by_chunk(
                     table_name,
-                    self.checksum_column_list,
+                    self.checksum_column_list(exclude_pk=True),
                     self._pk_for_filter,
                     self.range_start_vars_array,
                     self.range_end_vars_array,
@@ -3083,7 +3094,7 @@ class CopyPayload(Payload):
                 self.execute_sql(
                     sql.dump_current_chunk(
                         table_name,
-                        self.checksum_column_list,
+                        self.checksum_column_list(exclude_pk=True),
                         self._pk_for_filter,
                         self.range_start_vars_array,
                         self.select_checksum_chunk_size,
@@ -3375,7 +3386,9 @@ class CopyPayload(Payload):
                 sql.checksum_by_replay_chunk(
                     table_name,
                     self.delta_table_name,
-                    self.old_column_list,
+                    # This query only uses PK for the join condition, so don't
+                    # exclude them from the checksum itself.
+                    self.checksum_column_list(exclude_pk=False),
                     self._pk_for_filter,
                     self.IDCOLNAME,
                     id_limit,

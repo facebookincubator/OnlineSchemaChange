@@ -908,6 +908,12 @@ def checksum_by_chunk(
     using_where: bool,
     force_index: str = "PRIMARY",
 ) -> str:
+    """
+    Generate a SQL query to run an aggregate function over a table, taking
+    checksums of the columns named in `columns` and `pk_list`, where the latter
+    is also used to assign to SQL user variables for continuation, to facilitate
+    a chunk-by-chunk checksum.
+    """
     if using_where:
         row_range = get_range_start_condition(pk_list, range_start_values)
         where_clause = " WHERE {} ".format(row_range)

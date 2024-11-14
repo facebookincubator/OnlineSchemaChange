@@ -817,27 +817,40 @@ class CopyPayloadTestCase(unittest.TestCase):
         payload._old_table = table_obj
         payload._new_table = table_obj
         # No change in the schema
-        self.assertEqual(payload.checksum_column_list, ["col1", "col2"])
+        self.assertEqual(
+            payload.checksum_column_list(exclude_pk=True), ["col1", "col2"]
+        )
+        self.assertEqual(
+            payload.checksum_column_list(exclude_pk=False), ["ID", "col1", "col2"]
+        )
 
         # changed column being kept
         payload._new_table = table_obj_new
         payload.skip_checksum_for_modified = False
-        self.assertEqual(payload.checksum_column_list, ["col1", "col2"])
+        self.assertEqual(
+            payload.checksum_column_list(exclude_pk=True), ["col1", "col2"]
+        )
+        self.assertEqual(
+            payload.checksum_column_list(exclude_pk=False), ["ID", "col1", "col2"]
+        )
 
         # skip changed
         payload._new_table = table_obj_new
         payload.skip_checksum_for_modified = True
-        self.assertEqual(payload.checksum_column_list, ["col1"])
+        self.assertEqual(payload.checksum_column_list(exclude_pk=True), ["col1"])
+        self.assertEqual(payload.checksum_column_list(exclude_pk=False), ["ID", "col1"])
 
         # skip dropped
         payload._new_table = table_obj_dropped
         payload.skip_checksum_for_modified = False
-        self.assertEqual(payload.checksum_column_list, ["col2"])
+        self.assertEqual(payload.checksum_column_list(exclude_pk=True), ["col2"])
+        self.assertEqual(payload.checksum_column_list(exclude_pk=False), ["ID", "col2"])
 
         # skip dropped
         payload._new_table = table_obj_dropped
         payload.skip_checksum_for_modified = False
-        self.assertEqual(payload.checksum_column_list, ["col2"])
+        self.assertEqual(payload.checksum_column_list(exclude_pk=True), ["col2"])
+        self.assertEqual(payload.checksum_column_list(exclude_pk=False), ["ID", "col2"])
 
     def test_parse_session_overrides_str_empty(self):
         payload = self.payload_setup()
