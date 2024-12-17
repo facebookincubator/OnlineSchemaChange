@@ -9,10 +9,14 @@ LICENSE file in the root directory of this source tree.
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import copy
+
 import hashlib
 import logging
 import re
 from typing import List, NamedTuple, Optional, Set, Union
+
+import cd_experimental.cdc_format.datastore_types.thrift_types as ds_thrift_types
 
 log = logging.getLogger(__name__)
 
@@ -49,6 +53,37 @@ def is_equal(left, right):
     else:
         # Both of them are None
         return True
+
+
+class MySQLTypeNames:
+    TINYINT = "tinyint"
+    SMALLINT = "smallint"
+    MEDIUMINT = "mediumint"
+    REGULARINT = "int"
+    BIGINT = "bigint"
+    FLOAT = "float"
+    DOUBLE = "double"
+    DECIMAL = "decimal"
+    BOOLEAN = "boolean"
+    VARCHAR = "varchar"
+    CHAR = "char"
+    VARBINARY = "varbinary"
+    BINARY = "binary"
+    TINYTEXT = "tinytext"
+    MEDIUMTEXT = "mediumtext"
+    TEXT = "text"
+    LONGTEXT = "longtext"
+    TINYBLOB = "tinyblob"
+    MEDIUMBLOB = "mediumblob"
+    BLOB = "blob"
+    LONGBLOB = "longblob"
+    TIMESTAMP = "timestamp"
+    TIME = "time"
+    YEAR = "year"
+    DATE = "date"
+    DATETIME = "datetime"
+    SET = "set"
+    ENUM = "enum"
 
 
 class IndexColumn:
@@ -320,7 +355,13 @@ class Column:
             # able to support mixed version comparisons
             # Ref: https://dev.mysql.com/doc/relnotes/mysql/8.0/en/news-8-0-19.html
             # (search for: "Display width specification for integer data types")
-            int_types = {"int", "bigint", "tinyint", "smallint", "mediumint"}
+            int_types = {
+                MySQLTypeNames.TINYINT,
+                MySQLTypeNames.SMALLINT,
+                MySQLTypeNames.MEDIUMINT,
+                MySQLTypeNames.REGULARINT,
+                MySQLTypeNames.BIGINT,
+            }
             if self.column_type.lower() in int_types and attr == "length":
                 continue
 
@@ -422,6 +463,222 @@ class Column:
             column_segment.append("COMMENT {}".format(self.comment))
 
         return " ".join(column_segment)
+
+    def create_thrift_int_type_helper(
+        self, storage_size: int, int_type: ds_thrift_types.SpecificIntType
+    ) -> ds_thrift_types.MySQLDataType:
+        """A helper function to create an int type"""
+        iti = ds_thrift_types.IntTypeInfo(
+            specific_int_type=int_type,
+            display_size=self.length
+            if self.length is not None and isinstance(self.length, int)
+            else None,
+            storage_size=storage_size,
+            zerofill=bool(self.zerofill),
+            unsigned_or_signed=bool(self.unsigned),
+        )
+        optional_type_info = ds_thrift_types.OptionalTypeInfo(int_info=iti)
+        mdt = ds_thrift_types.MySQLDataType(
+            generic_type=ds_thrift_types.MySQLDataTypeGeneric.kInt,
+            extra_info=optional_type_info,
+        )
+        return mdt
+
+    def visit_for_thrift_gen(
+        self, col_index_in_table: int
+    ) -> ds_thrift_types.MySQLTableColumn:
+        """A visitor pattern, which creates a MySQLTableColumn thrift struct
+        and returns it to calling visitor
+        """
+        log.debug(f"\t\tVISITING COLUMN {self.name} {self.column_type}")
+        mdt: ds_thrift_types.MySQLDataType() = None
+        match self.column_type.lower():
+            case MySQLTypeNames.TINYINT:
+                mdt = self.create_thrift_int_type_helper(
+                    1, ds_thrift_types.SpecificIntType.kTinyInt
+                )
+            case MySQLTypeNames.SMALLINT:
+                mdt = self.create_thrift_int_type_helper(
+                    2, ds_thrift_types.SpecificIntType.kSmallInt
+                )
+            case MySQLTypeNames.MEDIUMINT:
+                mdt = self.create_thrift_int_type_helper(
+                    3, ds_thrift_types.SpecificIntType.kMediumInt
+                )
+            case MySQLTypeNames.REGULARINT:
+                mdt = self.create_thrift_int_type_helper(
+                    4, ds_thrift_types.SpecificIntType.kInt
+                )
+            case MySQLTypeNames.BIGINT:
+                mdt = self.create_thrift_int_type_helper(
+                    8, ds_thrift_types.SpecificIntType.kBigInt
+                )
+            case MySQLTypeNames.FLOAT:
+                fti = ds_thrift_types.FloatTypeInfo(storage_size=4)
+                optional_type_info = ds_thrift_types.OptionalTypeInfo(float_info=fti)
+                mdt = ds_thrift_types.MySQLDataType(
+                    generic_type=ds_thrift_types.MySQLDataTypeGeneric.kFloat,
+                    extra_info=optional_type_info,
+                )
+            case MySQLTypeNames.DOUBLE:
+                fti = ds_thrift_types.FloatTypeInfo(storage_size=8)
+                optional_type_info = ds_thrift_types.OptionalTypeInfo(float_info=fti)
+                mdt = ds_thrift_types.MySQLDataType(
+                    generic_type=ds_thrift_types.MySQLDataTypeGeneric.kDouble,
+                    extra_info=optional_type_info,
+                )
+            case MySQLTypeNames.DECIMAL:
+                fti = ds_thrift_types.FloatTypeInfo(storage_size=8)
+                optional_type_info = ds_thrift_types.OptionalTypeInfo(float_info=fti)
+                mdt = ds_thrift_types.MySQLDataType(
+                    generic_type=ds_thrift_types.MySQLDataTypeGeneric.kDecimal,
+                    extra_info=optional_type_info,
+                )
+            case MySQLTypeNames.BOOLEAN:
+                mdt = ds_thrift_types.MySQLDataType(
+                    generic_type=ds_thrift_types.MySQLDataTypeGeneric.kBoolean
+                )
+            case MySQLTypeNames.VARCHAR:
+                vti = ds_thrift_types.VarCharTypeInfo(
+                    max_size=int(self.length) if self.length is not None else None
+                )
+                optional_type_info = ds_thrift_types.OptionalTypeInfo(varchar_info=vti)
+                mdt = ds_thrift_types.MySQLDataType(
+                    generic_type=ds_thrift_types.MySQLDataTypeGeneric.kVarChar,
+                    extra_info=optional_type_info,
+                )
+            case MySQLTypeNames.CHAR:
+                cti = ds_thrift_types.CharTypeInfo(
+                    max_size=self.length
+                    if self.length is not None and isinstance(self.length, int)
+                    else None
+                )
+                optional_type_info = ds_thrift_types.OptionalTypeInfo(char_info=cti)
+                mdt = ds_thrift_types.MySQLDataType(
+                    generic_type=ds_thrift_types.MySQLDataTypeGeneric.kChar,
+                    extra_info=optional_type_info,
+                )
+            case MySQLTypeNames.VARBINARY:
+                bti = ds_thrift_types.BinaryTypeInfo(
+                    max_size=self.length
+                    if self.length is not None and isinstance(self.length, int)
+                    else None
+                )
+                optional_type_info = ds_thrift_types.OptionalTypeInfo(binary_info=bti)
+                mdt = ds_thrift_types.MySQLDataType(
+                    generic_type=ds_thrift_types.MySQLDataTypeGeneric.kVarBinary,
+                    extra_info=optional_type_info,
+                )
+            case MySQLTypeNames.BINARY:
+                bti = ds_thrift_types.BinaryTypeInfo(
+                    max_size=self.length
+                    if self.length is not None and isinstance(self.length, int)
+                    else None
+                )
+                optional_type_info = ds_thrift_types.OptionalTypeInfo(binary_info=bti)
+                mdt = ds_thrift_types.MySQLDataType(
+                    generic_type=ds_thrift_types.MySQLDataTypeGeneric.kBinary,
+                    extra_info=optional_type_info,
+                )
+            case MySQLTypeNames.TINYTEXT:
+                tti = ds_thrift_types.TextTypeInfo(
+                    specific_text_type=ds_thrift_types.SpecificTextType.kTinyText
+                )
+                optional_type_info = ds_thrift_types.OptionalTypeInfo(text_info=tti)
+                mdt = ds_thrift_types.MySQLDataType(
+                    generic_type=ds_thrift_types.MySQLDataTypeGeneric.kText,
+                    extra_info=optional_type_info,
+                )
+            case MySQLTypeNames.MEDIUMTEXT:
+                tti = ds_thrift_types.TextTypeInfo(
+                    specific_text_type=ds_thrift_types.SpecificTextType.kMediumText
+                )
+                optional_type_info = ds_thrift_types.OptionalTypeInfo(text_info=tti)
+                mdt = ds_thrift_types.MySQLDataType(
+                    generic_type=ds_thrift_types.MySQLDataTypeGeneric.kText,
+                    extra_info=optional_type_info,
+                )
+            case MySQLTypeNames.TEXT:
+                tti = ds_thrift_types.TextTypeInfo(
+                    specific_text_type=ds_thrift_types.SpecificTextType.kText
+                )
+                optional_type_info = ds_thrift_types.OptionalTypeInfo(text_info=tti)
+                mdt = ds_thrift_types.MySQLDataType(
+                    generic_type=ds_thrift_types.MySQLDataTypeGeneric.kText,
+                    extra_info=optional_type_info,
+                )
+            case MySQLTypeNames.LONGTEXT:
+                tti = ds_thrift_types.TextTypeInfo(
+                    specific_text_type=ds_thrift_types.SpecificTextType.kLongText
+                )
+                optional_type_info = ds_thrift_types.OptionalTypeInfo(text_info=tti)
+                mdt = ds_thrift_types.MySQLDataType(
+                    generic_type=ds_thrift_types.MySQLDataTypeGeneric.kText,
+                    extra_info=optional_type_info,
+                )
+            case MySQLTypeNames.TINYBLOB:
+                tti = ds_thrift_types.BlobTypeInfo(
+                    specific_blob_type=ds_thrift_types.SpecificBlobType.kTinyBlob
+                )
+                optional_type_info = ds_thrift_types.OptionalTypeInfo(blob_info=tti)
+                mdt = ds_thrift_types.MySQLDataType(
+                    generic_type=ds_thrift_types.MySQLDataTypeGeneric.kBlob,
+                    extra_info=optional_type_info,
+                )
+            case MySQLTypeNames.MEDIUMBLOB:
+                tti = ds_thrift_types.BlobTypeInfo(
+                    specific_blob_type=ds_thrift_types.SpecificBlobType.kMediumBlob
+                )
+                optional_type_info = ds_thrift_types.OptionalTypeInfo(blob_info=tti)
+                mdt = ds_thrift_types.MySQLDataType(
+                    generic_type=ds_thrift_types.MySQLDataTypeGeneric.kBlob,
+                    extra_info=optional_type_info,
+                )
+            case MySQLTypeNames.BLOB:
+                tti = ds_thrift_types.BlobTypeInfo(
+                    specific_blob_type=ds_thrift_types.SpecificBlobType.kBlob
+                )
+                optional_type_info = ds_thrift_types.OptionalTypeInfo(blob_info=tti)
+                mdt = ds_thrift_types.MySQLDataType(
+                    generic_type=ds_thrift_types.MySQLDataTypeGeneric.kBlob,
+                    extra_info=optional_type_info,
+                )
+            case MySQLTypeNames.LONGBLOB:
+                tti = ds_thrift_types.BlobTypeInfo(
+                    specific_blob_type=ds_thrift_types.SpecificBlobType.kLongBlob
+                )
+                optional_type_info = ds_thrift_types.OptionalTypeInfo(blob_info=tti)
+                mdt = ds_thrift_types.MySQLDataType(
+                    generic_type=ds_thrift_types.MySQLDataTypeGeneric.kBlob,
+                    extra_info=optional_type_info,
+                )
+            case MySQLTypeNames.TIMESTAMP:
+                mdt = ds_thrift_types.MySQLDataType(
+                    generic_type=ds_thrift_types.MySQLDataTypeGeneric.kTimestamp
+                )
+            case MySQLTypeNames.TIME:
+                mdt = ds_thrift_types.MySQLDataType(
+                    generic_type=ds_thrift_types.MySQLDataTypeGeneric.kTime
+                )
+            case MySQLTypeNames.DATE:
+                mdt = ds_thrift_types.MySQLDataType(
+                    generic_type=ds_thrift_types.MySQLDataTypeGeneric.kDate
+                )
+            case MySQLTypeNames.YEAR:
+                mdt = ds_thrift_types.MySQLDataType(
+                    generic_type=ds_thrift_types.MySQLDataTypeGeneric.kYear
+                )
+            case MySQLTypeNames.DATETIME:
+                mdt = ds_thrift_types.MySQLDataType(
+                    generic_type=ds_thrift_types.MySQLDataTypeGeneric.kDatetime
+                )
+        col = ds_thrift_types.MySQLTableColumn(
+            name=self.name,
+            col_type=mdt,
+            index_in_table=col_index_in_table,
+            comment=self.comment,
+        )
+        return copy.deepcopy(col)
 
 
 class TimestampColumn(Column):
@@ -965,3 +1222,17 @@ class Table:
                 return False
         else:
             return False
+
+    def visit_for_thrift_gen(self) -> ds_thrift_types.MySQLTable:
+        """A visitor pattern, which creates a MySQLTable thrift struct
+        and returns it to calling visitor.
+        """
+        log.debug(f"\tVISITING TABLE {self.name}")
+        ret_columns = []
+        for index in range(len(self.column_list)):
+            ret_col = self.column_list[index].visit_for_thrift_gen(index)
+            ret_columns.append(ret_col)
+        tbl = ds_thrift_types.MySQLTable(
+            name=self.name, comment=self.comment, columns=ret_columns
+        )
+        return tbl
