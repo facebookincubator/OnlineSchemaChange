@@ -14,9 +14,10 @@ import copy
 import hashlib
 import logging
 import re
-from typing import List, NamedTuple, Optional, Set, Union
+from typing import List, NamedTuple, Optional, Set, Tuple, Union
 
 import cd_experimental.cdc_format.datastore_types.thrift_types as ds_thrift_types
+from cd_experimental.cdc_format.gen_thrift import charset_helpers
 
 log = logging.getLogger(__name__)
 
@@ -464,15 +465,23 @@ class Column:
 
         return " ".join(column_segment)
 
+    def get_ir_int_length(self) -> Optional[int]:
+        """In this case IR refers to the intermediate representation. This function is
+        casting the self.length which might be string to integer"""
+        len = None
+        try:
+            len = int(self.length)
+        except Exception:
+            pass
+        return len
+
     def create_thrift_int_type_helper(
         self, storage_size: int, int_type: ds_thrift_types.SpecificIntType
     ) -> ds_thrift_types.MySQLDataType:
         """A helper function to create an int type"""
         iti = ds_thrift_types.IntTypeInfo(
             specific_int_type=int_type,
-            display_size=self.length
-            if self.length is not None and isinstance(self.length, int)
-            else None,
+            display_size=self.get_ir_int_length(),
             storage_size=storage_size,
             zerofill=bool(self.zerofill),
             unsigned_or_signed=bool(self.unsigned),
@@ -484,8 +493,50 @@ class Column:
         )
         return mdt
 
+    def get_charset_collate_for_column(
+        self, table_charset: Optional[str], table_collate: Optional[str]
+    ) -> Tuple[ds_thrift_types.MySQLCharacterSet, ds_thrift_types.MySQLCollation]:
+        charset_to_use = None
+        if self.charset is not None:
+            charset_to_use = self.charset
+            if self.collate is not None:
+                collate_to_use = self.collate
+            else:
+                collate_to_use = (
+                    charset_helpers.MySQLCharset2CollationMap.get_default_collation_str(
+                        self.charset
+                    )
+                )
+        elif table_charset is not None:
+            charset_to_use = table_charset
+            if table_collate is not None:
+                collate_to_use = table_collate
+            else:
+                collate_to_use = (
+                    charset_helpers.MySQLCharset2CollationMap.get_default_collation_str(
+                        table_charset
+                    )
+                )
+        else:
+            return (None, None)
+
+        charset_enum = (
+            charset_helpers.MySQLCharset2CollationMap.get_charset_enum_from_name(
+                charset_to_use
+            )
+        )
+        collate_enum = (
+            charset_helpers.MySQLCharset2CollationMap.get_collate_enum_from_name(
+                collate_to_use
+            )
+        )
+        return (charset_enum, collate_enum)
+
     def visit_for_thrift_gen(
-        self, col_index_in_table: int
+        self,
+        col_index_in_table: int,
+        table_charset: Optional[str],
+        table_collate: Optional[str],
     ) -> ds_thrift_types.MySQLTableColumn:
         """A visitor pattern, which creates a MySQLTableColumn thrift struct
         and returns it to calling visitor
@@ -539,8 +590,13 @@ class Column:
                     generic_type=ds_thrift_types.MySQLDataTypeGeneric.kBoolean
                 )
             case MySQLTypeNames.VARCHAR:
+                charset_collation = self.get_charset_collate_for_column(
+                    table_charset, table_collate
+                )
                 vti = ds_thrift_types.VarCharTypeInfo(
-                    max_size=int(self.length) if self.length is not None else None
+                    max_size=self.get_ir_int_length(),
+                    charset=charset_collation[0],
+                    collation=charset_collation[1],
                 )
                 optional_type_info = ds_thrift_types.OptionalTypeInfo(varchar_info=vti)
                 mdt = ds_thrift_types.MySQLDataType(
@@ -548,10 +604,13 @@ class Column:
                     extra_info=optional_type_info,
                 )
             case MySQLTypeNames.CHAR:
+                charset_collation = self.get_charset_collate_for_column(
+                    table_charset, table_collate
+                )
                 cti = ds_thrift_types.CharTypeInfo(
-                    max_size=self.length
-                    if self.length is not None and isinstance(self.length, int)
-                    else None
+                    max_size=self.get_ir_int_length(),
+                    charset=charset_collation[0],
+                    collation=charset_collation[1],
                 )
                 optional_type_info = ds_thrift_types.OptionalTypeInfo(char_info=cti)
                 mdt = ds_thrift_types.MySQLDataType(
@@ -559,11 +618,7 @@ class Column:
                     extra_info=optional_type_info,
                 )
             case MySQLTypeNames.VARBINARY:
-                bti = ds_thrift_types.BinaryTypeInfo(
-                    max_size=self.length
-                    if self.length is not None and isinstance(self.length, int)
-                    else None
-                )
+                bti = ds_thrift_types.BinaryTypeInfo(max_size=self.get_ir_int_length())
                 optional_type_info = ds_thrift_types.OptionalTypeInfo(binary_info=bti)
                 mdt = ds_thrift_types.MySQLDataType(
                     generic_type=ds_thrift_types.MySQLDataTypeGeneric.kVarBinary,
@@ -571,9 +626,7 @@ class Column:
                 )
             case MySQLTypeNames.BINARY:
                 bti = ds_thrift_types.BinaryTypeInfo(
-                    max_size=self.length
-                    if self.length is not None and isinstance(self.length, int)
-                    else None
+                    max_size=self.get_ir_int_length(),
                 )
                 optional_type_info = ds_thrift_types.OptionalTypeInfo(binary_info=bti)
                 mdt = ds_thrift_types.MySQLDataType(
@@ -581,8 +634,14 @@ class Column:
                     extra_info=optional_type_info,
                 )
             case MySQLTypeNames.TINYTEXT:
+                charset_collation = self.get_charset_collate_for_column(
+                    table_charset, table_collate
+                )
                 tti = ds_thrift_types.TextTypeInfo(
-                    specific_text_type=ds_thrift_types.SpecificTextType.kTinyText
+                    specific_text_type=ds_thrift_types.SpecificTextType.kTinyText,
+                    max_size=self.get_ir_int_length(),
+                    charset=charset_collation[0],
+                    collation=charset_collation[1],
                 )
                 optional_type_info = ds_thrift_types.OptionalTypeInfo(text_info=tti)
                 mdt = ds_thrift_types.MySQLDataType(
@@ -590,8 +649,14 @@ class Column:
                     extra_info=optional_type_info,
                 )
             case MySQLTypeNames.MEDIUMTEXT:
+                charset_collation = self.get_charset_collate_for_column(
+                    table_charset, table_collate
+                )
                 tti = ds_thrift_types.TextTypeInfo(
-                    specific_text_type=ds_thrift_types.SpecificTextType.kMediumText
+                    specific_text_type=ds_thrift_types.SpecificTextType.kMediumText,
+                    max_size=self.get_ir_int_length(),
+                    charset=charset_collation[0],
+                    collation=charset_collation[1],
                 )
                 optional_type_info = ds_thrift_types.OptionalTypeInfo(text_info=tti)
                 mdt = ds_thrift_types.MySQLDataType(
@@ -599,8 +664,14 @@ class Column:
                     extra_info=optional_type_info,
                 )
             case MySQLTypeNames.TEXT:
+                charset_collation = self.get_charset_collate_for_column(
+                    table_charset, table_collate
+                )
                 tti = ds_thrift_types.TextTypeInfo(
-                    specific_text_type=ds_thrift_types.SpecificTextType.kText
+                    specific_text_type=ds_thrift_types.SpecificTextType.kText,
+                    max_size=self.get_ir_int_length(),
+                    charset=charset_collation[0],
+                    collation=charset_collation[1],
                 )
                 optional_type_info = ds_thrift_types.OptionalTypeInfo(text_info=tti)
                 mdt = ds_thrift_types.MySQLDataType(
@@ -608,8 +679,14 @@ class Column:
                     extra_info=optional_type_info,
                 )
             case MySQLTypeNames.LONGTEXT:
+                charset_collation = self.get_charset_collate_for_column(
+                    table_charset, table_collate
+                )
                 tti = ds_thrift_types.TextTypeInfo(
-                    specific_text_type=ds_thrift_types.SpecificTextType.kLongText
+                    specific_text_type=ds_thrift_types.SpecificTextType.kLongText,
+                    max_size=self.get_ir_int_length(),
+                    charset=charset_collation[0],
+                    collation=charset_collation[1],
                 )
                 optional_type_info = ds_thrift_types.OptionalTypeInfo(text_info=tti)
                 mdt = ds_thrift_types.MySQLDataType(
@@ -618,7 +695,8 @@ class Column:
                 )
             case MySQLTypeNames.TINYBLOB:
                 tti = ds_thrift_types.BlobTypeInfo(
-                    specific_blob_type=ds_thrift_types.SpecificBlobType.kTinyBlob
+                    specific_blob_type=ds_thrift_types.SpecificBlobType.kTinyBlob,
+                    max_size=self.get_ir_int_length(),
                 )
                 optional_type_info = ds_thrift_types.OptionalTypeInfo(blob_info=tti)
                 mdt = ds_thrift_types.MySQLDataType(
@@ -627,7 +705,8 @@ class Column:
                 )
             case MySQLTypeNames.MEDIUMBLOB:
                 tti = ds_thrift_types.BlobTypeInfo(
-                    specific_blob_type=ds_thrift_types.SpecificBlobType.kMediumBlob
+                    specific_blob_type=ds_thrift_types.SpecificBlobType.kMediumBlob,
+                    max_size=self.get_ir_int_length(),
                 )
                 optional_type_info = ds_thrift_types.OptionalTypeInfo(blob_info=tti)
                 mdt = ds_thrift_types.MySQLDataType(
@@ -636,7 +715,8 @@ class Column:
                 )
             case MySQLTypeNames.BLOB:
                 tti = ds_thrift_types.BlobTypeInfo(
-                    specific_blob_type=ds_thrift_types.SpecificBlobType.kBlob
+                    specific_blob_type=ds_thrift_types.SpecificBlobType.kBlob,
+                    max_size=self.get_ir_int_length(),
                 )
                 optional_type_info = ds_thrift_types.OptionalTypeInfo(blob_info=tti)
                 mdt = ds_thrift_types.MySQLDataType(
@@ -645,7 +725,8 @@ class Column:
                 )
             case MySQLTypeNames.LONGBLOB:
                 tti = ds_thrift_types.BlobTypeInfo(
-                    specific_blob_type=ds_thrift_types.SpecificBlobType.kLongBlob
+                    specific_blob_type=ds_thrift_types.SpecificBlobType.kLongBlob,
+                    max_size=self.get_ir_int_length(),
                 )
                 optional_type_info = ds_thrift_types.OptionalTypeInfo(blob_info=tti)
                 mdt = ds_thrift_types.MySQLDataType(
@@ -1228,9 +1309,12 @@ class Table:
         and returns it to calling visitor.
         """
         log.debug(f"\tVISITING TABLE {self.name}")
+        log.debug(f"TABLE={self.name} charset={self.charset} collation={self.collate}")
         ret_columns = []
         for index in range(len(self.column_list)):
-            ret_col = self.column_list[index].visit_for_thrift_gen(index)
+            ret_col = self.column_list[index].visit_for_thrift_gen(
+                index, self.charset, self.collate
+            )
             ret_columns.append(ret_col)
         tbl = ds_thrift_types.MySQLTable(
             name=self.name, comment=self.comment, columns=ret_columns
