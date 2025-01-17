@@ -758,6 +758,7 @@ class Column:
             col_type=mdt,
             index_in_table=col_index_in_table,
             comment=self.comment,
+            nullable=self.nullable,
         )
         return copy.deepcopy(col)
 
