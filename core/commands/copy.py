@@ -368,6 +368,10 @@ class Copy(CommandBase):
                 " compression algorithms, add compression algorithm suffix."
             ),
         )
+        parser.add_argument(
+            "--bulk-load-session-id",
+            help="Bulk load session id for running new rocksdb bulk load",
+        )
 
     def setup_parser(self, parser, **kwargs):
         super(Copy, self).setup_parser(parser, **kwargs)

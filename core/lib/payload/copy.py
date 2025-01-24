@@ -21,6 +21,7 @@ from typing import collections, List, Optional, Set
 
 import MySQLdb
 from libfb.py.decorators import retryable
+from MySQLdb.constants import ER as mysql_errors
 from osc.lib.payload.osc_catchup_tool import OscCatchupTool
 from osc.lib.sqlparse.diff import IndexAlterType
 
@@ -225,6 +226,7 @@ class CopyPayload(Payload):
         self.compressed_outfile_extension = kwargs.get(
             "compressed_outfile_extension", None
         )
+        self.bulk_load_session_id = kwargs.get("bulk_load_session_id", None)
         self.max_id_now = 0
         self.mismatch_pk_charset = {}
         self.last_gc_collected = time.time()
@@ -2223,6 +2225,41 @@ class CopyPayload(Payload):
             else:
                 raise
 
+    def start_rocksdb_new_bulk_load(self):
+        log.info("Use new rocksdb bulk load")
+        assert self.bulk_load_session_id, "bulk load session id must be provided"
+        try:
+            # add cleanup no matter bulk load start succeeds or not, just in case
+            self._cleanup_payload.add_sql_entry(
+                sql.rollback_rocksdb_new_bulk_load(self.bulk_load_session_id),
+                self.current_db,
+            )
+            self.execute_sql(
+                sql.start_rocksdb_new_bulk_load(
+                    self.bulk_load_session_id, self.new_table_name
+                )
+            )
+        except MySQLdb.OperationalError as e:
+            errnum, errmsg = e.args
+            if errnum == mysql_errors.DA_BULK_LOAD:
+                raise OSCError("NEW_BULK_LOAD_EXCEPTION", {"errmsg": errmsg}) from e
+            else:
+                raise
+
+    def finish_rocksdb_new_bulk_load(self):
+        assert self.bulk_load_session_id, "bulk load session id must be provided"
+        try:
+            self.execute_sql(sql.end_rocksdb_new_bulk_load(self.bulk_load_session_id))
+            self.execute_sql(
+                sql.commit_rocksdb_new_bulk_load(self.bulk_load_session_id)
+            )
+        except MySQLdb.OperationalError as e:
+            errnum, errmsg = e.args
+            if errnum == mysql_errors.DA_BULK_LOAD:
+                raise OSCError("NEW_BULK_LOAD_EXCEPTION", {"errmsg": errmsg}) from e
+            else:
+                raise
+
     def get_bulk_load_parameters(self) -> BulkLoadParams:
         # rocksdb_bulk_load relies on data being dumping in the same sequence
         # as new pk.
@@ -2230,6 +2267,10 @@ class CopyPayload(Payload):
         # 1. PK columns changes
         # 2. PK columns don't change
         # but PK charset/collate changes and not casting_possible
+        # New bulk load supports PK column/charset/collate changes
+        # and always does unique key checks
+        if self.bulk_load_session_id:
+            return BulkLoadParams(False, False, True)
         use_bulk_load_with_pk_charset = False
         use_bulk_load_with_uk_check = False
         pk_collate_chg = False
@@ -2314,10 +2355,13 @@ class CopyPayload(Payload):
                 },
             )
         if self.is_myrocks_table:
-            # Enable rocksdb bulk load before loading data
-            self.change_rocksdb_bulk_load(enable=True)
-            # Enable rocksdb explicit commit before loading data
-            self.change_explicit_commit(enable=True)
+            if not self.bulk_load_session_id:
+                # Enable rocksdb bulk load before loading data
+                self.change_rocksdb_bulk_load(enable=True)
+                # Enable rocksdb explicit commit before loading data
+                self.change_explicit_commit(enable=True)
+            else:
+                self.start_rocksdb_new_bulk_load()
 
         # Print out information after every 5% chunks have been loaded
         chunk_pct_for_progress = 5
@@ -2330,10 +2374,13 @@ class CopyPayload(Payload):
                 self.log_load_progress(suffix)
 
         if self.is_myrocks_table:
-            # Disable rocksdb bulk load after loading data
-            self.change_rocksdb_bulk_load(enable=False)
-            # Disable rocksdb explicit commit after loading data
-            self.change_explicit_commit(enable=False)
+            if not self.bulk_load_session_id:
+                # Disable rocksdb bulk load after loading data
+                self.change_rocksdb_bulk_load(enable=False)
+                # Disable rocksdb explicit commit after loading data
+                self.change_explicit_commit(enable=False)
+            else:
+                self.finish_rocksdb_new_bulk_load()
         self.stats["time_in_load"] = time.time() - stage_start_time
 
     def check_max_statement_time_exists(self):

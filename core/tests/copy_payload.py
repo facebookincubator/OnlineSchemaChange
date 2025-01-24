@@ -1273,6 +1273,26 @@ class CopyPayloadTestCase(unittest.TestCase):
         self.assertTrue(payload.get_table_timestamp.called)
         self.assertFalse(payload.select_table_into_outfile.called)
 
+    def test_new_bulk_load_exception(self):
+        payload = self.payload_setup(bulk_load_session_id="job1")
+        payload.execute_sql = Mock(side_effect=MySQLdb.OperationalError(50142, "abc"))
+        with self.assertRaises(OSCError) as err_context:
+            payload.start_rocksdb_new_bulk_load()
+        self.assertEqual(err_context.exception.err_key, "NEW_BULK_LOAD_EXCEPTION")
+
+        with self.assertRaises(OSCError) as err_context:
+            payload.finish_rocksdb_new_bulk_load()
+        self.assertEqual(err_context.exception.err_key, "NEW_BULK_LOAD_EXCEPTION")
+
+        payload.execute_sql = Mock(side_effect=MySQLdb.OperationalError(111, "abc"))
+        with self.assertRaises(MySQLdb.OperationalError) as err_context:
+            payload.start_rocksdb_new_bulk_load()
+        self.assertEqual(err_context.exception.args[0], 111)
+
+        with self.assertRaises(MySQLdb.OperationalError) as err_context:
+            payload.finish_rocksdb_new_bulk_load()
+        self.assertEqual(err_context.exception.args[0], 111)
+
 
 class CopyPayloadPKFilterTestCase(unittest.TestCase):
     def setUp(self) -> None:

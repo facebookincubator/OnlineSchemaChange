@@ -87,6 +87,7 @@ class OSCError(Exception):
         GENERIC_RETRYABLE_EXCEPTION = auto()
         GENERIC_NONRETRY_EXCEPTION = auto()
         NOT_IMPLEMENTED_EXCEPTION = auto()
+        NEW_BULK_LOAD_EXCEPTION = auto()
 
     ERR_MAPPING: dict[str, ErrorDescriptor] = {
         Errors.NON_ROOT_USER.name: ErrorDescriptor(
@@ -601,7 +602,13 @@ class OSCError(Exception):
         ),
         Errors.NOT_IMPLEMENTED_EXCEPTION.name: ErrorDescriptor(
             code=Errors.NOT_IMPLEMENTED_EXCEPTION.value,
-            desc=("{errmsg}"),
+            desc="{errmsg}",
+            retryable=False,
+            internal=True,
+        ),
+        Errors.NEW_BULK_LOAD_EXCEPTION.name: ErrorDescriptor(
+            code=Errors.NEW_BULK_LOAD_EXCEPTION.value,
+            desc="{errmsg}",
             retryable=False,
             internal=True,
         ),

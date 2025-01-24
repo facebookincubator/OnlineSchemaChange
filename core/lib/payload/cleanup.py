@@ -108,7 +108,9 @@ class CleanupPayload(Payload):
                 # 1507 means the partition doesn't exist, which
                 #     is most likely competing partition maintenance
                 # 1508 means we tried to drop the last partition in a table
-                if errnum in [1507, 1508]:
+                # 50142 means rolling back a bulk load session that has already finished
+                if errnum in [1507, 1508, 50142]:
+                    log.info(f"Ignore SQL error {errnum} in cleanup")
                     continue
                 cleanupError = True
                 error = e
@@ -159,9 +161,9 @@ class CleanupPayload(Payload):
         log.debug("Removing all cleanup file entries")
         self.files_to_clean = []
 
-    def add_sql_entry(self, sql):
+    def add_sql_entry(self, sql, db):
         log.debug("Cleanup SQL entry added: {}".format(sql))
-        self.sqls_to_execute.append(sql)
+        self.sqls_to_execute.append((sql, db))
 
     def gen_drop_sqls(self):
         # always drop trigger first, otherwise there's a small window

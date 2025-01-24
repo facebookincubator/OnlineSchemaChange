@@ -1048,3 +1048,19 @@ def get_table_timestamp(table_name: str) -> str:
     )
 
     return sql.format(escape(table_name))
+
+
+def start_rocksdb_new_bulk_load(bulk_load_session_id: str, table_name: str) -> str:
+    return f"BULK LOAD START {bulk_load_session_id!r} TABLES={table_name}"
+
+
+def end_rocksdb_new_bulk_load(bulk_load_session_id: str) -> str:
+    return f"BULK LOAD END {bulk_load_session_id!r}"
+
+
+def commit_rocksdb_new_bulk_load(bulk_load_session_id: str) -> str:
+    return f"BULK LOAD COMMIT {bulk_load_session_id!r}"
+
+
+def rollback_rocksdb_new_bulk_load(bulk_load_session_id: str) -> str:
+    return f"BULK LOAD ROLLBACK {bulk_load_session_id!r}"
