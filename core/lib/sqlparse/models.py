@@ -87,6 +87,36 @@ class MySQLTypeNames:
     ENUM = "enum"
 
 
+class ShardingKey:
+    """
+    A sharding key which is used on a table
+    """
+
+    def __init__(self, column_names: List[str]):
+        self.column_names = column_names
+
+    def col_names(self) -> List[str]:
+        return self.column_names
+
+    def __str__(self) -> str:
+        return "({})".format(",".join(self.column_names))
+
+    def __eq__(self, other) -> bool:
+        if self.column_names != other.column_names:
+            return False
+        return (
+            len(self.column_names) == len(other.column_names)
+            and self.column_names == other.column_names
+        )
+
+    def __ne__(self, other):
+        return not self == other
+
+    def to_sql(self):
+        wrapped_strings = [f"`{col_name}`" for col_name in self.column_names]
+        return "({})".format(",".join(wrapped_strings))
+
+
 class IndexColumn:
     """
     A column definition inside index section.
@@ -1105,6 +1135,7 @@ class Table:
         self.has_80_features = False
         self.tablespace = None
         self.fk_constraint = {}
+        self.sharding_key: Optional[ShardingKey] = None
 
     def __str__(self):
         table_str = ""
@@ -1127,6 +1158,7 @@ class Table:
             table_str += "\t{}\n".format(str(index))
         table_str += "CONSTRAINT: {}\n".format(str(self.constraint))
         table_str += "TABLESPACE: {}".format(str(self.tablespace))
+        table_str += "SHARDING_KEY: {}".format(str(self.sharding_key))
 
         return table_str
 
@@ -1142,6 +1174,7 @@ class Table:
             # "partition",
             "partition_config",
             "constraint",
+            "sharding_key",
         ):
             # "utf8" and "utf8mb3" are alias for table charset
             # Ref: https://dev.mysql.com/doc/refman/8.0/en/charset-unicode-utf8mb3.html
@@ -1232,6 +1265,8 @@ class Table:
             sql += "COMPRESSION={} ".format(self.compression)
         if self.comment is not None:
             sql += "COMMENT={} ".format(self.comment)
+        if self.sharding_key is not None:
+            sql += "SHARDING_KEY {} ".format(self.sharding_key.to_sql())
         if self.partition is not None:
             sql += "\n{} ".format(self.partition)
         return sql
