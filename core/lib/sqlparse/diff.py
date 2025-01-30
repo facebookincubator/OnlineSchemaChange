@@ -75,6 +75,9 @@ class TableAlterType(BaseAlterType):
     CHANGE_TABLE_COMMENT = "change_table_comment"
     CHANGE_ENGINE = "change_engine"
     DROP_FK = "drop_fk"
+    ADD_SHARDING_KEY = "add_sharding_key"  # inplace
+    DROP_SHARDING_KEY = "drop_sharding_key"  # inplace
+    CHANGE_SHARDING_KEY = "change_sharding_key"  # inplace
 
 
 class PartitionAlterType(BaseAlterType):
@@ -95,6 +98,9 @@ class NewMysql80FeatureAlterType(BaseAlterType):
 INSTANT_DDLS = {
     ColAlterType.ADD_COL,
     ColAlterType.ADD_TIMESTAMP_COL,
+    TableAlterType.ADD_SHARDING_KEY,
+    TableAlterType.DROP_SHARDING_KEY,
+    TableAlterType.CHANGE_SHARDING_KEY,
 }
 
 
@@ -105,6 +111,15 @@ class TableOptionDiff:
 
     def to_sql(self):
         return "{}={}".format(self.option_name, self.value)
+
+
+class ShardingKeyDiff:
+    def __init__(self, col_names: list[str]):
+        self.col_names = col_names
+
+    def to_sql(self):
+        wrapped_strings = [f"`{col_name}`" for col_name in self.col_names]
+        return "({})".format(",".join(wrapped_strings))
 
 
 class SchemaDiff:
@@ -124,6 +139,7 @@ class SchemaDiff:
             "name",
             "row_format",
             "constraint",
+            "sharding_key",
         ]
         self.ignore_partition = ignore_partition
         if not ignore_partition:
@@ -212,7 +228,13 @@ class SchemaDiff:
                     tbl_option_old = tbl_option_old.replace("utf8mb3", "utf8")
                 if tbl_option_new and isinstance(tbl_option_new, str):
                     tbl_option_new = tbl_option_new.replace("utf8mb3", "utf8")
-
+            if attr == "sharding_key":
+                sharding_key_left = self.left.sharding_key
+                sharding_key_right = self.right.sharding_key
+                if not is_equal(sharding_key_left, sharding_key_right):
+                    diffs["removed"].append(ShardingKeyDiff(sharding_key_left))
+                    diffs["added"].append(ShardingKeyDiff(sharding_key_right))
+                    diffs["attrs_modified"].append(attr)
             if not is_equal(tbl_option_old, tbl_option_new):
                 if attr == "constraint":
                     for key in set(self.left.fk_constraint.keys()) - set(
@@ -575,6 +597,13 @@ class SchemaDiff:
                     )
                     for key in sorted(dropped_fks):
                         segments.append("DROP FOREIGN KEY `{}`".format(key))
+                elif attr == "sharding_key":
+                    if tbl_option_new is None:
+                        segments.append("SHARDING_KEY ()")
+                    else:
+                        segments.append(
+                            "SHARDING_KEY {}".format(tbl_option_new.to_sql())
+                        )
                 else:
                     segments.append("{}={}".format(attr, tbl_option_new))
 
@@ -594,6 +623,13 @@ class SchemaDiff:
                 elif attr == "constraint":
                     if dropped_fks:
                         self.add_alter_type(TableAlterType.DROP_FK)
+                elif attr == "sharding_key":
+                    if tbl_option_old is None:
+                        self.add_alter_type(TableAlterType.ADD_SHARDING_KEY)
+                    elif tbl_option_new is None:
+                        self.add_alter_type(TableAlterType.DROP_SHARDING_KEY)
+                    else:
+                        self.add_alter_type(TableAlterType.CHANGE_SHARDING_KEY)
 
         return segments
 
