@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# pyre-unsafe
+
 """
 Copyright (c) 2017-present, Facebook, Inc.
 All rights reserved.
