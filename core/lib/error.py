@@ -91,44 +91,44 @@ class OSCError(Exception):
         NOT_IMPLEMENTED_EXCEPTION = auto()
         NEW_BULK_LOAD_EXCEPTION = auto()
 
-    ERR_MAPPING: dict[str, ErrorDescriptor] = {
-        Errors.NON_ROOT_USER.name: ErrorDescriptor(
+    ERR_MAPPING: dict[Errors, ErrorDescriptor] = {
+        Errors.NON_ROOT_USER: ErrorDescriptor(
             code=Errors.NON_ROOT_USER.value,
             desc="Non-root user execution",
             retryable=False,
             internal=True,
         ),
-        Errors.OUTFILE_DIR_NOT_EXIST.name: ErrorDescriptor(
+        Errors.OUTFILE_DIR_NOT_EXIST: ErrorDescriptor(
             code=Errors.OUTFILE_DIR_NOT_EXIST.value,
             desc='--outfile-dir "{dir}" does not exist',
             retryable=False,
             internal=True,
         ),
-        Errors.NO_SUCH_MODE.name: ErrorDescriptor(
+        Errors.NO_SUCH_MODE: ErrorDescriptor(
             code=Errors.NO_SUCH_MODE.value,
             desc="{mode} is not a supported mode",
             retryable=False,
             internal=True,
         ),
-        Errors.OUTFILE_DIR_NOT_DIR.name: ErrorDescriptor(
+        Errors.OUTFILE_DIR_NOT_DIR: ErrorDescriptor(
             code=Errors.OUTFILE_DIR_NOT_DIR.value,
             desc='--outfile-dir "{dir}" is not a directory',
             retryable=False,
             internal=True,
         ),
-        Errors.DDL_FILE_LIST_NOT_SPECIFIED.name: ErrorDescriptor(
+        Errors.DDL_FILE_LIST_NOT_SPECIFIED: ErrorDescriptor(
             code=Errors.DDL_FILE_LIST_NOT_SPECIFIED.value,
             desc="no ddl_file_list specified",
             retryable=False,
             internal=True,
         ),
-        Errors.UNABLE_TO_GET_FREE_DISK_SPACE.name: ErrorDescriptor(
+        Errors.UNABLE_TO_GET_FREE_DISK_SPACE: ErrorDescriptor(
             code=Errors.UNABLE_TO_GET_FREE_DISK_SPACE.value,
             desc="Unable to read free disk size for path: {path}",
             retryable=True,
             internal=True,
         ),
-        Errors.FILE_ALREADY_EXIST.name: ErrorDescriptor(
+        Errors.FILE_ALREADY_EXIST: ErrorDescriptor(
             code=Errors.FILE_ALREADY_EXIST.value,
             desc=(
                 "Outfile {file} already exists. Please cleanup or use "
@@ -138,25 +138,25 @@ class OSCError(Exception):
             retryable=False,
             internal=True,
         ),
-        Errors.UNABLE_TO_GET_PARTITION_SIZE.name: ErrorDescriptor(
+        Errors.UNABLE_TO_GET_PARTITION_SIZE: ErrorDescriptor(
             code=Errors.UNABLE_TO_GET_PARTITION_SIZE.value,
             desc="Unable to read partition size from path: {path}",
             retryable=True,
             internal=True,
         ),
-        Errors.DB_NOT_GIVEN.name: ErrorDescriptor(
+        Errors.DB_NOT_GIVEN: ErrorDescriptor(
             code=Errors.DB_NOT_GIVEN.value,
             desc=("At least one database name should be given for running " "OSC"),
             retryable=False,
             internal=True,
         ),
-        Errors.DB_NOT_EXIST.name: ErrorDescriptor(
+        Errors.DB_NOT_EXIST: ErrorDescriptor(
             code=Errors.DB_NOT_EXIST.value,
             desc=("Database: {db_list} do(es) not exist in MySQL"),
             retryable=False,
             internal=True,
         ),
-        Errors.INVALID_SYNTAX.name: ErrorDescriptor(
+        Errors.INVALID_SYNTAX: ErrorDescriptor(
             code=Errors.INVALID_SYNTAX.value,
             desc=(
                 "Fail to parse: {filepath} {msg} "
@@ -167,7 +167,7 @@ class OSCError(Exception):
             retryable=False,
             internal=True,  # Shouldn't hit parse error on desired schema in OSC
         ),
-        Errors.INVALID_REPL_STATUS.name: ErrorDescriptor(
+        Errors.INVALID_REPL_STATUS: ErrorDescriptor(
             code=Errors.INVALID_REPL_STATUS.value,
             desc=(
                 "Invalid replication status: <{repl_status}>. "
@@ -176,7 +176,7 @@ class OSCError(Exception):
             retryable=False,
             internal=True,
         ),
-        Errors.FAILED_TO_LOCK.name: ErrorDescriptor(
+        Errors.FAILED_TO_LOCK: ErrorDescriptor(
             code=Errors.FAILED_TO_LOCK.value,
             desc=(
                 "Failed to grab external lock, "
@@ -185,25 +185,25 @@ class OSCError(Exception):
             retryable=True,
             internal=True,
         ),
-        Errors.TOO_MANY_OSC_RUNNING.name: ErrorDescriptor(
+        Errors.TOO_MANY_OSC_RUNNING: ErrorDescriptor(
             code=Errors.TOO_MANY_OSC_RUNNING.value,
             desc=("Too many osc is running. {limit} allowed, {running} " "running"),
             retryable=True,
             internal=True,
         ),
-        Errors.FAILED_TO_READ_DDL_FILE.name: ErrorDescriptor(
+        Errors.FAILED_TO_READ_DDL_FILE: ErrorDescriptor(
             code=Errors.FAILED_TO_READ_DDL_FILE.value,
             desc=("Failed to read DDL file: '{filepath}'"),
             retryable=True,
             internal=True,
         ),
-        Errors.ARGUMENT_ERROR.name: ErrorDescriptor(
+        Errors.ARGUMENT_ERROR: ErrorDescriptor(
             code=Errors.ARGUMENT_ERROR.value,
             desc=("Invalid value for argument {argu}: {errmsg}"),
             retryable=False,
             internal=True,
         ),
-        Errors.FAILED_TO_CONNECT_DB.name: ErrorDescriptor(
+        Errors.FAILED_TO_CONNECT_DB: ErrorDescriptor(
             code=Errors.FAILED_TO_CONNECT_DB.value,
             desc=(
                 "Failed to connect to database using user: {user} " "through {socket}"
@@ -211,7 +211,7 @@ class OSCError(Exception):
             retryable=True,
             internal=True,
         ),
-        Errors.REPL_ROLE_MISMATCH.name: ErrorDescriptor(
+        Errors.REPL_ROLE_MISMATCH: ErrorDescriptor(
             code=Errors.REPL_ROLE_MISMATCH.value,
             desc=(
                 "Replication role fail to match what is given on CLI: " "{given_role}"
@@ -219,13 +219,13 @@ class OSCError(Exception):
             retryable=False,
             internal=True,
         ),
-        Errors.FAILED_TO_FETCH_MYSQL_VARS.name: ErrorDescriptor(
+        Errors.FAILED_TO_FETCH_MYSQL_VARS: ErrorDescriptor(
             code=Errors.FAILED_TO_FETCH_MYSQL_VARS.value,
             desc=("Failed to fetch local mysql variables"),
             retryable=True,
             internal=True,
         ),
-        Errors.TABLE_ALREADY_EXIST.name: ErrorDescriptor(
+        Errors.TABLE_ALREADY_EXIST: ErrorDescriptor(
             code=Errors.TABLE_ALREADY_EXIST.value,
             desc=(
                 "Table `{db}`.`{table}` already exists in MySQL. "
@@ -234,13 +234,13 @@ class OSCError(Exception):
             retryable=False,
             internal=True,
         ),
-        Errors.TRIGGER_ALREADY_EXIST.name: ErrorDescriptor(
+        Errors.TRIGGER_ALREADY_EXIST: ErrorDescriptor(
             code=Errors.TRIGGER_ALREADY_EXIST.value,
             desc=("Following trigger(s) already exist on table: \n" "{triggers}"),
             retryable=False,
             internal=True,
         ),
-        Errors.MISSING_COLUMN.name: ErrorDescriptor(
+        Errors.MISSING_COLUMN: ErrorDescriptor(
             code=Errors.MISSING_COLUMN.value,
             desc=(
                 "Column(s): {column} missing in new table schema "
@@ -250,13 +250,13 @@ class OSCError(Exception):
             retryable=False,
             internal=True,
         ),
-        Errors.TABLE_NOT_EXIST.name: ErrorDescriptor(
+        Errors.TABLE_NOT_EXIST: ErrorDescriptor(
             code=Errors.TABLE_NOT_EXIST.value,
             desc=("Table: `{db}`.`{table}` does not exist in MySQL"),
             retryable=False,
             internal=True,
         ),
-        Errors.TABLE_PARSING_ERROR.name: ErrorDescriptor(
+        Errors.TABLE_PARSING_ERROR: ErrorDescriptor(
             code=Errors.TABLE_PARSING_ERROR.value,
             desc=("Fail to parse table: `{db}`.`{table}` {msg}"),
             retryable=False,
@@ -264,13 +264,13 @@ class OSCError(Exception):
             # Parser may fail on original schema
             # but users need support for this case
         ),
-        Errors.NO_PK_EXIST.name: ErrorDescriptor(
+        Errors.NO_PK_EXIST: ErrorDescriptor(
             code=Errors.NO_PK_EXIST.value,
             desc=("Table: `{db}`.`{table}` does not have a primary key."),
             retryable=False,
             internal=False,
         ),
-        Errors.NOT_ENOUGH_SPACE.name: ErrorDescriptor(
+        Errors.NOT_ENOUGH_SPACE: ErrorDescriptor(
             code=Errors.NOT_ENOUGH_SPACE.value,
             desc=(
                 "Not enough disk space to execute schema change. "
@@ -279,7 +279,7 @@ class OSCError(Exception):
             retryable=False,
             internal=True,
         ),
-        Errors.DDL_GUARD_ATTEMPTS.name: ErrorDescriptor(
+        Errors.DDL_GUARD_ATTEMPTS: ErrorDescriptor(
             code=Errors.DDL_GUARD_ATTEMPTS.value,
             desc=(
                 "Max attempts exceeded, but the threads_running still "
@@ -288,25 +288,25 @@ class OSCError(Exception):
             retryable=True,
             internal=True,
         ),
-        Errors.UNLOCK_FAILED.name: ErrorDescriptor(
+        Errors.UNLOCK_FAILED: ErrorDescriptor(
             code=Errors.UNLOCK_FAILED.value,
             desc=("Failed to unlock external lock"),
             retryable=True,
             internal=True,
         ),
-        Errors.OSC_INTERNAL_ERROR.name: ErrorDescriptor(
+        Errors.OSC_INTERNAL_ERROR: ErrorDescriptor(
             code=Errors.OSC_INTERNAL_ERROR.value,
             desc=("Internal OSC Exception: {msg}"),
             retryable=False,
             internal=True,
         ),
-        Errors.REPLAY_TIMEOUT.name: ErrorDescriptor(
+        Errors.REPLAY_TIMEOUT: ErrorDescriptor(
             code=Errors.REPLAY_TIMEOUT.value,
             desc=("Timeout when replaying changes"),
             retryable=True,
             internal=True,
         ),
-        Errors.REPLAY_WRONG_AFFECTED.name: ErrorDescriptor(
+        Errors.REPLAY_WRONG_AFFECTED: ErrorDescriptor(
             code=Errors.REPLAY_WRONG_AFFECTED.value,
             desc=(
                 "Unexpected affected number of rows when replaying events. "
@@ -318,7 +318,7 @@ class OSCError(Exception):
             retryable=False,
             internal=True,
         ),
-        Errors.CHECKSUM_MISMATCH.name: ErrorDescriptor(
+        Errors.CHECKSUM_MISMATCH: ErrorDescriptor(
             code=Errors.CHECKSUM_MISMATCH.value,
             desc=(
                 "Checksum mismatch between origin table and intermediate "
@@ -333,7 +333,7 @@ class OSCError(Exception):
             retryable=False,
             internal=True,
         ),
-        Errors.OFFLINE_NOT_SUPPORTED.name: ErrorDescriptor(
+        Errors.OFFLINE_NOT_SUPPORTED: ErrorDescriptor(
             code=Errors.OFFLINE_NOT_SUPPORTED.value,
             desc=(
                 "--offline-checksum only supported in slave mode, "
@@ -342,7 +342,7 @@ class OSCError(Exception):
             retryable=False,
             internal=True,
         ),
-        Errors.UNABLE_TO_GET_LOCK.name: ErrorDescriptor(
+        Errors.UNABLE_TO_GET_LOCK: ErrorDescriptor(
             code=Errors.UNABLE_TO_GET_LOCK.value,
             desc=(
                 "Unable to get MySQL lock for OSC. Please check whether there "
@@ -353,13 +353,13 @@ class OSCError(Exception):
             retryable=True,
             internal=True,
         ),
-        Errors.FAIL_TO_GUESS_CHUNK_SIZE.name: ErrorDescriptor(
+        Errors.FAIL_TO_GUESS_CHUNK_SIZE: ErrorDescriptor(
             code=Errors.FAIL_TO_GUESS_CHUNK_SIZE.value,
             desc=("Failed to decide optimal chunk size for dump"),
             retryable=True,
             internal=True,
         ),
-        Errors.NO_INDEX_COVERAGE.name: ErrorDescriptor(
+        Errors.NO_INDEX_COVERAGE: ErrorDescriptor(
             code=Errors.NO_INDEX_COVERAGE.value,
             desc=(
                 "None of the indexes in new table schema can perfectly "
@@ -370,7 +370,7 @@ class OSCError(Exception):
             retryable=False,
             internal=True,
         ),
-        Errors.NEW_PK.name: ErrorDescriptor(
+        Errors.NEW_PK: ErrorDescriptor(
             code=Errors.NEW_PK.value,
             desc=(
                 "You're adding new primary key to table. This will "
@@ -381,7 +381,7 @@ class OSCError(Exception):
             retryable=False,
             internal=False,
         ),
-        Errors.MAX_ATTEMPT_EXCEEDED.name: ErrorDescriptor(
+        Errors.MAX_ATTEMPT_EXCEEDED: ErrorDescriptor(
             code=Errors.MAX_ATTEMPT_EXCEEDED.value,
             desc=(
                 "Max attempt exceeded, but time spent in replay still "
@@ -394,7 +394,7 @@ class OSCError(Exception):
             retryable=True,
             internal=True,
         ),
-        Errors.LONG_RUNNING_TRX.name: ErrorDescriptor(
+        Errors.LONG_RUNNING_TRX: ErrorDescriptor(
             code=Errors.LONG_RUNNING_TRX.value,
             desc=(
                 "Long running transaction exist: \n"
@@ -408,19 +408,19 @@ class OSCError(Exception):
             retryable=True,
             internal=True,
         ),
-        Errors.UNKOWN_REPLAY_TYPE.name: ErrorDescriptor(
+        Errors.UNKOWN_REPLAY_TYPE: ErrorDescriptor(
             code=Errors.UNKOWN_REPLAY_TYPE.value,
             desc=("Unknown replay type: {type_value}"),
             retryable=False,
             internal=True,
         ),
-        Errors.FAILED_TO_LOCK_TABLE.name: ErrorDescriptor(
+        Errors.FAILED_TO_LOCK_TABLE: ErrorDescriptor(
             code=Errors.FAILED_TO_LOCK_TABLE.value,
             desc=("Failed to lock table: {tables}"),
             retryable=True,
             internal=True,
         ),
-        Errors.FOREIGN_KEY_FOUND.name: ErrorDescriptor(
+        Errors.FOREIGN_KEY_FOUND: ErrorDescriptor(
             code=Errors.FOREIGN_KEY_FOUND.value,
             desc=(
                 "{db}.{table} is referencing or being referenced "
@@ -430,7 +430,7 @@ class OSCError(Exception):
             retryable=False,
             internal=False,
         ),
-        Errors.WRONG_ENGINE.name: ErrorDescriptor(
+        Errors.WRONG_ENGINE: ErrorDescriptor(
             code=Errors.WRONG_ENGINE.value,
             desc=(
                 'Engine in the SQL file "{engine}" does not match "{expect}" '
@@ -439,7 +439,7 @@ class OSCError(Exception):
             retryable=False,
             internal=True,
         ),
-        Errors.PRI_COL_DROPPED.name: ErrorDescriptor(
+        Errors.PRI_COL_DROPPED: ErrorDescriptor(
             code=Errors.PRI_COL_DROPPED.value,
             desc=(
                 "<{pri_col}> which belongs to current primary key is "
@@ -452,7 +452,7 @@ class OSCError(Exception):
             retryable=False,
             internal=False,
         ),
-        Errors.INCORRECT_SESSION_OVERRIDE.name: ErrorDescriptor(
+        Errors.INCORRECT_SESSION_OVERRIDE: ErrorDescriptor(
             code=Errors.INCORRECT_SESSION_OVERRIDE.value,
             desc=(
                 "Failed to parse the given session override "
@@ -461,7 +461,7 @@ class OSCError(Exception):
             retryable=False,
             internal=True,
         ),
-        Errors.NOT_RBR_SAFE.name: ErrorDescriptor(
+        Errors.NOT_RBR_SAFE: ErrorDescriptor(
             code=Errors.NOT_RBR_SAFE.value,
             desc=(
                 "Running OSC with RBR is not safe for a non-FB MySQL version. "
@@ -471,7 +471,7 @@ class OSCError(Exception):
             retryable=False,
             internal=True,
         ),
-        Errors.IMPLICIT_CONVERSION_DETECTED.name: ErrorDescriptor(
+        Errors.IMPLICIT_CONVERSION_DETECTED: ErrorDescriptor(
             code=Errors.IMPLICIT_CONVERSION_DETECTED.value,
             desc=(
                 "Implicit conversion happened after executing the CREATE "
@@ -483,7 +483,7 @@ class OSCError(Exception):
             retryable=False,
             internal=True,  # Shouldn't hit parse error on the desired schema in OSC
         ),
-        Errors.FAILED_TO_DECODE_DDL_FILE.name: ErrorDescriptor(
+        Errors.FAILED_TO_DECODE_DDL_FILE: ErrorDescriptor(
             code=Errors.FAILED_TO_DECODE_DDL_FILE.value,
             desc=(
                 "Failed to decode DDL file '{filepath}' "
@@ -493,7 +493,7 @@ class OSCError(Exception):
             retryable=False,
             internal=True,
         ),
-        Errors.REPLAY_TOO_MANY_DELTAS.name: ErrorDescriptor(
+        Errors.REPLAY_TOO_MANY_DELTAS: ErrorDescriptor(
             code=Errors.REPLAY_TOO_MANY_DELTAS.value,
             desc=(
                 "Recorded too many changes to ever catchup "
@@ -502,7 +502,7 @@ class OSCError(Exception):
             retryable=True,
             internal=True,
         ),
-        Errors.UNSAFE_TS_BOOTSTRAP.name: ErrorDescriptor(
+        Errors.UNSAFE_TS_BOOTSTRAP: ErrorDescriptor(
             code=Errors.UNSAFE_TS_BOOTSTRAP.value,
             desc=(
                 "Adding columns or changing columns to use CURRENT_TIMESTAMP as "
@@ -512,19 +512,19 @@ class OSCError(Exception):
             retryable=False,
             internal=True,
         ),
-        Errors.CREATE_TRIGGER_ERROR.name: ErrorDescriptor(
+        Errors.CREATE_TRIGGER_ERROR: ErrorDescriptor(
             code=Errors.CREATE_TRIGGER_ERROR.value,
             desc="Error when creating triggers, msg: {msg}",
             retryable=True,
             internal=True,
         ),
-        Errors.MYROCKS_REQUIRED.name: ErrorDescriptor(
+        Errors.MYROCKS_REQUIRED: ErrorDescriptor(
             code=Errors.MYROCKS_REQUIRED.value,
             desc="MyRocks required due to: {reason}",
             retryable=False,
             internal=False,
         ),
-        Errors.TABLE_TIMESTAMP_CHANGED_ERROR.name: ErrorDescriptor(
+        Errors.TABLE_TIMESTAMP_CHANGED_ERROR: ErrorDescriptor(
             code=Errors.TABLE_TIMESTAMP_CHANGED_ERROR.value,
             desc=(
                 "Table timestamp changed during copy phase.\nExpected: {expected}\nGot: {got}"
@@ -533,25 +533,25 @@ class OSCError(Exception):
             internal=True,
         ),
         # reserved for special internal errors
-        Errors.ASSERTION_ERROR.name: ErrorDescriptor(
+        Errors.ASSERTION_ERROR: ErrorDescriptor(
             code=Errors.ASSERTION_ERROR.value,
             desc="Assertion error.\nExpected: {expected}\n" "Got: {got}",
             retryable=False,
             internal=True,
         ),
-        Errors.CLEANUP_EXECUTION_ERROR.name: ErrorDescriptor(
+        Errors.CLEANUP_EXECUTION_ERROR: ErrorDescriptor(
             code=Errors.CLEANUP_EXECUTION_ERROR.value,
             desc="Error when running clean up statement: {sql} msg: {msg}",
             retryable=True,
             internal=True,
         ),
-        Errors.HOOK_EXECUTION_ERROR.name: ErrorDescriptor(
+        Errors.HOOK_EXECUTION_ERROR: ErrorDescriptor(
             code=Errors.HOOK_EXECUTION_ERROR.value,
             desc="Error when executing hook: {hook} msg: {msg}",
             retryable=True,
             internal=True,
         ),
-        Errors.SHELL_ERROR.name: ErrorDescriptor(
+        Errors.SHELL_ERROR: ErrorDescriptor(
             code=Errors.SHELL_ERROR.value,
             desc=(
                 "Shell command exit with error when executing: {cmd} "
@@ -560,55 +560,55 @@ class OSCError(Exception):
             retryable=True,
             internal=True,
         ),
-        Errors.SHELL_TIMEOUT.name: ErrorDescriptor(
+        Errors.SHELL_TIMEOUT: ErrorDescriptor(
             code=Errors.SHELL_TIMEOUT.value,
             desc=("Timeout when executing shell command: {cmd}"),
             retryable=True,
             internal=True,
         ),
-        Errors.GENERIC_MYSQL_ERROR.name: ErrorDescriptor(
+        Errors.GENERIC_MYSQL_ERROR: ErrorDescriptor(
             code=Errors.GENERIC_MYSQL_ERROR.value,
             desc='MySQL Error during stage "{stage}": [{errnum}] {errmsg}',
             retryable=True,
             internal=True,
         ),
-        Errors.OUTFILE_DIR_NOT_SPECIFIED_WSENV.name: ErrorDescriptor(
+        Errors.OUTFILE_DIR_NOT_SPECIFIED_WSENV: ErrorDescriptor(
             code=Errors.OUTFILE_DIR_NOT_SPECIFIED_WSENV.value,
             desc="--outfile-dir must be specified when using wsenv",
             retryable=False,
             internal=True,
         ),
-        Errors.SKIP_DISK_SPACE_CHECK_VALUE_INCOMPATIBLE_WSENV.name: ErrorDescriptor(
+        Errors.SKIP_DISK_SPACE_CHECK_VALUE_INCOMPATIBLE_WSENV: ErrorDescriptor(
             code=Errors.SKIP_DISK_SPACE_CHECK_VALUE_INCOMPATIBLE_WSENV.value,
             desc="-skip-disk-space-check must be true when using wsenv",
             retryable=False,
             internal=True,
         ),
-        Errors.OSC_CANNOT_MATCH_WRITE_RATE.name: ErrorDescriptor(
+        Errors.OSC_CANNOT_MATCH_WRITE_RATE: ErrorDescriptor(
             code=Errors.OSC_CANNOT_MATCH_WRITE_RATE.value,
             desc="OSC catchup speed {speed} is not matching the write rate. We have exhausted the retries. Please reduce the incoming write rate or use a different deployment method for this(check documentation before proceeding)",
             retryable=False,
             internal=True,
         ),
-        Errors.GENERIC_RETRYABLE_EXCEPTION.name: ErrorDescriptor(
+        Errors.GENERIC_RETRYABLE_EXCEPTION: ErrorDescriptor(
             code=Errors.GENERIC_RETRYABLE_EXCEPTION.value,
             desc="{errmsg}",
             retryable=True,
             internal=False,
         ),
-        Errors.GENERIC_NONRETRY_EXCEPTION.name: ErrorDescriptor(
+        Errors.GENERIC_NONRETRY_EXCEPTION: ErrorDescriptor(
             code=Errors.GENERIC_NONRETRY_EXCEPTION.value,
             desc="{errmsg}",
             retryable=False,
             internal=False,
         ),
-        Errors.NOT_IMPLEMENTED_EXCEPTION.name: ErrorDescriptor(
+        Errors.NOT_IMPLEMENTED_EXCEPTION: ErrorDescriptor(
             code=Errors.NOT_IMPLEMENTED_EXCEPTION.value,
             desc="{errmsg}",
             retryable=False,
             internal=True,
         ),
-        Errors.NEW_BULK_LOAD_EXCEPTION.name: ErrorDescriptor(
+        Errors.NEW_BULK_LOAD_EXCEPTION: ErrorDescriptor(
             code=Errors.NEW_BULK_LOAD_EXCEPTION.value,
             desc="{errmsg}",
             retryable=False,
@@ -617,7 +617,7 @@ class OSCError(Exception):
     }
 
     def __init__(
-        self, err_key: str, desc_kwargs=None, mysql_err_code: int | None = None
+        self, err_key: Errors, desc_kwargs=None, mysql_err_code: int | None = None
     ):
         self.err_key = err_key
         if desc_kwargs:
@@ -635,7 +635,7 @@ class OSCError(Exception):
     @property
     def desc(self) -> str:
         description = self.err_entry.desc.format(**self.desc_kwargs)
-        return "{}: {}: {}".format(self.code, self.err_key, description)
+        return "{}: {}: {}".format(self.code, self.err_key.name, description)
 
     @property
     def mysql_err_code(self) -> int:

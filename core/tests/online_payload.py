@@ -38,7 +38,7 @@ class DirectPayloadDeadMySQL(BasePayloadTestCase):
             self._payload.init_conn()
             self._payload.run()
 
-        self.assertEqual(e.exception.err_key, "GENERIC_MYSQL_ERROR")
+        self.assertEqual(e.exception.err_key, OSCError.Errors.GENERIC_MYSQL_ERROR)
 
 
 class DirectPayloadSQLFailed(BasePayloadTestCase):
@@ -55,4 +55,4 @@ class DirectPayloadSQLFailed(BasePayloadTestCase):
             self._payload.init_conn()
             self._payload.run()
         oscerr = e.exception
-        self.assertEqual(oscerr.err_key, "GENERIC_MYSQL_ERROR")
+        self.assertEqual(oscerr.err_key, OSCError.Errors.GENERIC_MYSQL_ERROR)

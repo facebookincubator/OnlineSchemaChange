@@ -38,7 +38,7 @@ def rm(filename, sudo=False):
         return not proc.returncode
     except subprocess.TimeoutExpired:
         proc.kill()
-        raise OSCError("SHELL_TIMEOUT", {"cmd": " ".join(cmd_args)})
+        raise OSCError(OSCError.Errors.SHELL_TIMEOUT, {"cmd": " ".join(cmd_args)})
 
 
 def sync_dir(dirname):
@@ -95,7 +95,7 @@ def disk_partition_free(path):
         return vfs.f_bavail * vfs.f_bsize
     except Exception:
         log.exception("Exception when trying to get disk free space: ")
-        raise OSCError("UNABLE_TO_GET_FREE_DISK_SPACE", {"path": path})
+        raise OSCError(OSCError.Errors.UNABLE_TO_GET_FREE_DISK_SPACE, {"path": path})
 
 
 def disk_partition_size(path):
@@ -115,7 +115,7 @@ def disk_partition_size(path):
         return vfs.f_blocks * vfs.f_bsize
     except Exception:
         log.exception("Exception when trying to get partition size: ")
-        raise OSCError("UNABLE_TO_GET_PARTITION_SIZE", {"path": path})
+        raise OSCError(OSCError.Errors.UNABLE_TO_GET_PARTITION_SIZE, {"path": path})
 
 
 def readable_size(nbytes):

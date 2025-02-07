@@ -43,7 +43,9 @@ def gen_test_cases(
     def gen_test(test_case_dir, config, gen_conn, database):
         def test_function(self):
             last_seen_err_key = None
-            expect_error = config.get("expect_result", {}).get("err_key", None)
+            expect_error: str | None = config.get("expect_result", {}).get(
+                "err_key", None
+            )
             hook_map = collections.defaultdict(lambda: hook.NoopHook())
             for c in config["hooks"]:
                 file_path = os.path.join(test_case_dir, config["hooks"][c])
@@ -56,6 +58,7 @@ def gen_test_cases(
                 "socket": socket,
                 "database": [database],
                 "print_tables": True,
+                "force_cleanup": True,
             }
             if is_rocksdb:
                 param_dict["rocksdb_bulk_load_allow_sk"] = True
@@ -74,8 +77,8 @@ def gen_test_cases(
                 )
                 payload.run()
             except error.OSCError as e:
-                self.assertEqual(e.err_key, expect_error)
-                last_seen_err_key = e.err_key
+                self.assertEqual(e.err_key.name, expect_error)
+                last_seen_err_key = e.err_key.name
                 if expect_error == "GENERIC_MYSQL_ERROR":
                     mysql_err_code = config.get("expect_result", {}).get(
                         "mysql_err_code", None

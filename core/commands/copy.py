@@ -385,13 +385,15 @@ class Copy(CommandBase):
                 self.args.skip_disk_space_check = True
 
             if not self.args.skip_disk_space_check:
-                raise OSCError("SKIP_DISK_SPACE_CHECK_VALUE_INCOMPATIBLE_WSENV")
+                raise OSCError(
+                    OSCError.Errors.SKIP_DISK_SPACE_CHECK_VALUE_INCOMPATIBLE_WSENV
+                )
 
             if self.args.chunk_size is None:
                 self.args.chunk_size = constant.WSENV_CHUNK_BYTES
 
             if not self.args.outfile_dir:
-                raise OSCError("OUTFILE_DIR_NOT_SPECIFIED_WSENV")
+                raise OSCError(OSCError.Errors.OUTFILE_DIR_NOT_SPECIFIED_WSENV)
 
         else:
             if self.args.skip_disk_space_check is None:
@@ -401,18 +403,22 @@ class Copy(CommandBase):
             if self.args.outfile_dir:
                 if not os.path.exists(self.args.outfile_dir):
                     raise OSCError(
-                        "OUTFILE_DIR_NOT_EXIST", {"dir": self.args.outfile_dir}
+                        OSCError.Errors.OUTFILE_DIR_NOT_EXIST,
+                        {"dir": self.args.outfile_dir},
                     )
                 if not os.path.isdir(self.args.outfile_dir):
                     raise OSCError(
-                        "OUTFILE_DIR_NOT_DIR", {"dir": self.args.outfile_dir}
+                        OSCError.Errors.OUTFILE_DIR_NOT_DIR,
+                        {"dir": self.args.outfile_dir},
                     )
 
         # Ensure all the given ddl files are readable and
         # can be decoded with the current charset
         for filepath in self.args.ddl_file_list:
             if not util.is_file_readable(filepath):
-                raise OSCError("FAILED_TO_READ_DDL_FILE", {"filepath": filepath})
+                raise OSCError(
+                    OSCError.Errors.FAILED_TO_READ_DDL_FILE, {"filepath": filepath}
+                )
             charset_str = "charset"
             charset = getattr(self.args, charset_str)
             try:
@@ -420,7 +426,7 @@ class Copy(CommandBase):
                     fh.read()
             except UnicodeDecodeError:
                 raise OSCError(
-                    "FAILED_TO_DECODE_DDL_FILE",
+                    OSCError.Errors.FAILED_TO_DECODE_DDL_FILE,
                     {"filepath": filepath, "charset": charset},
                 )
 

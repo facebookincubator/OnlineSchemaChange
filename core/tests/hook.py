@@ -39,7 +39,7 @@ class SQLHookTest(unittest.TestCase):
             sql_obj = self.gen_sql_hook_obj(expected=((1, 1, 1),), got=((1, 1, 2),))
             with self.assertRaises(OSCError) as context:
                 sql_obj.execute_sqls()
-            self.assertEqual(context.exception.err_key, "ASSERTION_ERROR")
+            self.assertEqual(context.exception.err_key, OSCError.Errors.ASSERTION_ERROR)
 
     def test_expect_more_rows(self):
         with patch.object(SQLHook, "read_sqls"):
@@ -48,7 +48,7 @@ class SQLHookTest(unittest.TestCase):
             )
             with self.assertRaises(OSCError) as context:
                 sql_obj.execute_sqls()
-            self.assertEqual(context.exception.err_key, "ASSERTION_ERROR")
+            self.assertEqual(context.exception.err_key, OSCError.Errors.ASSERTION_ERROR)
 
     def test_expect_less_rows(self):
         with patch.object(SQLHook, "read_sqls"):
@@ -57,7 +57,7 @@ class SQLHookTest(unittest.TestCase):
             )
             with self.assertRaises(OSCError) as context:
                 sql_obj.execute_sqls()
-            self.assertEqual(context.exception.err_key, "ASSERTION_ERROR")
+            self.assertEqual(context.exception.err_key, OSCError.Errors.ASSERTION_ERROR)
 
     def test_expect_different_order(self):
         with patch.object(SQLHook, "read_sqls"):
@@ -66,4 +66,4 @@ class SQLHookTest(unittest.TestCase):
             )
             with self.assertRaises(OSCError) as context:
                 sql_obj.execute_sqls()
-            self.assertEqual(context.exception.err_key, "ASSERTION_ERROR")
+            self.assertEqual(context.exception.err_key, OSCError.Errors.ASSERTION_ERROR)

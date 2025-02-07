@@ -113,7 +113,7 @@ class Payload:
             errcode, errmsg = e.args
             log.error("Error when connecting to MySQL [{}] {}".format(errcode, errmsg))
             raise OSCError(
-                "GENERIC_MYSQL_ERROR",
+                OSCError.Errors.GENERIC_MYSQL_ERROR,
                 {"stage": "Connecting to MySQL", "errnum": errcode, "errmsg": errmsg},
             )
 
@@ -273,7 +273,8 @@ class Payload:
                     parsed_sql = self.parse_function(raw_sql, self.use_ast_parser)
                 except ParseError as e:
                     raise OSCError(
-                        "INVALID_SYNTAX", {"filepath": ddl_file, "msg": str(e)}
+                        OSCError.Errors.INVALID_SYNTAX,
+                        {"filepath": ddl_file, "msg": str(e)},
                     )
                 # If engine enforcement is given on CLI, we need to compare
                 # whether the engine in file is the same as what we expect
@@ -286,7 +287,7 @@ class Payload:
                         )
                     elif self.mysql_engine.lower() != parsed_sql.engine.lower():
                         raise OSCError(
-                            "WRONG_ENGINE",
+                            OSCError.Errors.WRONG_ENGINE,
                             {"engine": parsed_sql.engine, "expect": self.mysql_engine},
                         )
                 self.sql_list.append(
@@ -302,7 +303,7 @@ class Payload:
         except MySQLdb.MySQLError as e:
             errcode, errmsg = e.args
             raise OSCError(
-                "GENERIC_MYSQL_ERROR",
+                OSCError.Errors.GENERIC_MYSQL_ERROR,
                 {"stage": "before running ddl", "errnum": errcode, "errmsg": errmsg},
             )
 
@@ -315,7 +316,7 @@ class Payload:
         except MySQLdb.MySQLError as e:
             errcode, errmsg = e.args
             raise OSCError(
-                "GENERIC_MYSQL_ERROR",
+                OSCError.Errors.GENERIC_MYSQL_ERROR,
                 {"stage": "before running ddl", "errnum": errcode, "errmsg": errmsg},
             )
 
@@ -500,7 +501,7 @@ class Payload:
             log.warning(f"failed lock result: {result}")
             if result:
                 log.warning(f"failed lock status: {result[0]}")
-            raise OSCError("UNABLE_TO_GET_LOCK")
+            raise OSCError(OSCError.Errors.UNABLE_TO_GET_LOCK)
         else:
             log.warning(f"success lock result: {result}")
 
@@ -540,27 +541,32 @@ class Payload:
         # connection each time we want to execute a SQL
         if not self.init_conn():
             raise OSCError(
-                "FAILED_TO_CONNECT_DB", {"user": self.mysql_user, "socket": self.socket}
+                OSCError.Errors.FAILED_TO_CONNECT_DB,
+                {"user": self.mysql_user, "socket": self.socket},
             )
         self.set_no_binlog()
 
         # Check database existence
         if not bool(self.db_list):
-            raise OSCError("DB_NOT_GIVEN")
+            raise OSCError(OSCError.Errors.DB_NOT_GIVEN)
 
         # Check database existence
         non_exist_dbs = self.check_db_existence()
         if non_exist_dbs:
-            raise OSCError("DB_NOT_EXIST", {"db_list": ", ".join(non_exist_dbs)})
+            raise OSCError(
+                OSCError.Errors.DB_NOT_EXIST, {"db_list": ", ".join(non_exist_dbs)}
+            )
 
         # Test whether the replication role matches
         if self.repl_status:
             if not self.check_replication_type():
-                raise OSCError("REPL_ROLE_MISMATCH", {"given_role": self.repl_status})
+                raise OSCError(
+                    OSCError.Errors.REPL_ROLE_MISMATCH, {"given_role": self.repl_status}
+                )
 
         # Fetch mysql variables from server
         if not self.fetch_mysql_vars():
-            raise OSCError("FAILED_TO_FETCH_MYSQL_VARS")
+            raise OSCError(OSCError.Errors.FAILED_TO_FETCH_MYSQL_VARS)
 
         _current_db_outfile_dir = self.outfile_dir
         # Iterate through all the specified databases
@@ -582,7 +588,7 @@ class Payload:
                 try:
                     if not self.init_conn():
                         raise OSCError(
-                            "FAILED_TO_CONNECT_DB",
+                            OSCError.Errors.FAILED_TO_CONNECT_DB,
                             {"user": self.mysql_user, "socket": self.socket},
                         )
                     if self.standardize:

@@ -211,11 +211,13 @@ class CopyPayload(Payload):
             self.skip_disk_space_check = kwargs.get("skip_disk_space_check", True)
             # skip local disk space check when using wsenv
             if not self.skip_disk_space_check:
-                raise OSCError("SKIP_DISK_SPACE_CHECK_VALUE_INCOMPATIBLE_WSENV")
+                raise OSCError(
+                    OSCError.Errors.SKIP_DISK_SPACE_CHECK_VALUE_INCOMPATIBLE_WSENV
+                )
 
             # require outfile_dir not empty
             if not self.outfile_dir:
-                raise OSCError("OUTFILE_DIR_NOT_SPECIFIED_WSENV")
+                raise OSCError(OSCError.Errors.OUTFILE_DIR_NOT_SPECIFIED_WSENV)
         else:
             self.chunk_size = kwargs.get("chunk_size", constant.CHUNK_BYTES)
             self.skip_disk_space_check = kwargs.get("skip_disk_space_check", False)
@@ -570,7 +572,9 @@ class CopyPayload(Payload):
                 or splitted_array[0] == ""
                 or splitted_array[1] == ""
             ):
-                raise OSCError("INCORRECT_SESSION_OVERRIDE", {"section": section})
+                raise OSCError(
+                    OSCError.Errors.INCORRECT_SESSION_OVERRIDE, {"section": section}
+                )
             overrides.append(splitted_array)
         return overrides
 
@@ -626,7 +630,7 @@ class CopyPayload(Payload):
         hold a name lock for
         """
         if not self.is_trigger_rbr_safe:
-            raise OSCError("NOT_RBR_SAFE")
+            raise OSCError(OSCError.Errors.NOT_RBR_SAFE)
 
     def skip_cache_fill_for_myrocks(self):
         """
@@ -676,7 +680,7 @@ class CopyPayload(Payload):
             new_table_timestamp = self.get_table_timestamp()
             if previous_table_timestamp != new_table_timestamp:
                 raise OSCError(
-                    "TABLE_TIMESTAMP_CHANGED_ERROR",
+                    OSCError.Errors.TABLE_TIMESTAMP_CHANGED_ERROR,
                     {"expected": previous_table_timestamp, "got": new_table_timestamp},
                 )
             log.info("No table timestamp change detected.")
@@ -734,7 +738,7 @@ class CopyPayload(Payload):
                 return self.parse_function(ddl[0]["Create Table"], self.use_ast_parser)
             except ParseError as e:
                 raise OSCError(
-                    "TABLE_PARSING_ERROR",
+                    OSCError.Errors.TABLE_PARSING_ERROR,
                     {"db": self._current_db, "table": self.table_name, "msg": str(e)},
                 )
 
@@ -779,7 +783,8 @@ class CopyPayload(Payload):
         # Check the existence of original table
         if not self.table_exists(self.table_name):
             raise OSCError(
-                "TABLE_NOT_EXIST", {"db": self._current_db, "table": self.table_name}
+                OSCError.Errors.TABLE_NOT_EXIST,
+                {"db": self._current_db, "table": self.table_name},
             )
         self._old_table = self.fetch_table_schema(self.table_name)
         self.partitions[self.table_name] = self.fetch_partitions(self.table_name)
@@ -894,7 +899,8 @@ class CopyPayload(Payload):
         for table_name in tables_to_check:
             if self.table_exists(table_name):
                 raise OSCError(
-                    "TABLE_ALREADY_EXIST", {"db": self._current_db, "table": table_name}
+                    OSCError.Errors.TABLE_ALREADY_EXIST,
+                    {"db": self._current_db, "table": table_name},
                 )
 
         # Make sure new table schema has primary key
@@ -902,7 +908,8 @@ class CopyPayload(Payload):
             (self._new_table.primary_key, self._new_table.primary_key.column_list)
         ):
             raise OSCError(
-                "NO_PK_EXIST", {"db": self._current_db, "table": self.table_name}
+                OSCError.Errors.NO_PK_EXIST,
+                {"db": self._current_db, "table": self.table_name},
             )
 
     def trigger_check(self):
@@ -924,7 +931,8 @@ class CopyPayload(Payload):
                 for trigger in triggers
             ]
             raise OSCError(
-                "TRIGGER_ALREADY_EXIST", {"triggers": "\n".join(trigger_desc)}
+                OSCError.Errors.TRIGGER_ALREADY_EXIST,
+                {"triggers": "\n".join(trigger_desc)},
             )
 
     def foreign_key_check(self):
@@ -955,7 +963,7 @@ class CopyPayload(Payload):
                 foreign_keys[0]["ref_col_name"],
             )
             raise OSCError(
-                "FOREIGN_KEY_FOUND",
+                OSCError.Errors.FOREIGN_KEY_FOUND,
                 {"db": self._current_db, "table": self.table_name, "fk": fk},
             )
 
@@ -1065,7 +1073,7 @@ class CopyPayload(Payload):
         )
         if required_size > disk_space:
             raise OSCError(
-                "NOT_ENOUGH_SPACE",
+                OSCError.Errors.NOT_ENOUGH_SPACE,
                 {
                     "need": util.readable_size(required_size),
                     "avail": util.readable_size(disk_space),
@@ -1084,7 +1092,7 @@ class CopyPayload(Payload):
         free_space_reserved = disk_partition_size * free_space_factor
         if free_disk_space < free_space_reserved:
             raise OSCError(
-                "NOT_ENOUGH_SPACE",
+                OSCError.Errors.NOT_ENOUGH_SPACE,
                 {
                     "need": util.readable_size(free_space_reserved),
                     "avail": util.readable_size(free_disk_space),
@@ -1230,7 +1238,7 @@ class CopyPayload(Payload):
                 int(result[0]["TABLE_ROWS"] / self.select_chunk_size), 1
             )
         else:
-            raise OSCError("FAIL_TO_GUESS_CHUNK_SIZE")
+            raise OSCError(OSCError.Errors.FAIL_TO_GUESS_CHUNK_SIZE)
 
     def has_desired_schema(self):
         """
@@ -1272,7 +1280,7 @@ class CopyPayload(Payload):
                     ]
                     self.is_full_table_dump = True
                 else:
-                    raise OSCError("NEW_PK")
+                    raise OSCError(OSCError.Errors.NEW_PK)
         # If we have PK in existing schema, then we use current PK as an unique
         # row finder
         else:
@@ -1312,7 +1320,7 @@ class CopyPayload(Payload):
                 "Bypassing the safety check as requested"
             )
             return
-        raise OSCError("UNSAFE_TS_BOOTSTRAP")
+        raise OSCError(OSCError.Errors.UNSAFE_TS_BOOTSTRAP)
 
     @wrap_hook
     def pre_osc_check(self):
@@ -1359,7 +1367,9 @@ class CopyPayload(Payload):
                     "`{}`".format(col.name)
                     for col in self._old_table.primary_key.column_list
                 )
-                raise OSCError("NO_INDEX_COVERAGE", {"pk_names": old_pk_names})
+                raise OSCError(
+                    OSCError.Errors.NO_INDEX_COVERAGE, {"pk_names": old_pk_names}
+                )
 
         log.info(
             "PK filter for replaying changes later: {}".format(self._pk_for_filter)
@@ -1377,7 +1387,9 @@ class CopyPayload(Payload):
         # Check things that require myrocks
         if not self.is_myrocks_table:
             if self.use_dump_table_stmt:
-                raise OSCError("MYROCKS_REQUIRED", {"reason": "DUMP TABLE statement"})
+                raise OSCError(
+                    OSCError.Errors.MYROCKS_REQUIRED, {"reason": "DUMP TABLE statement"}
+                )
 
     def drop_columns_check(self):
         # We only allow dropping columns with the flag --allow-drop-column.
@@ -1391,11 +1403,13 @@ class CopyPayload(Payload):
                     )
             else:
                 missing_columns = ", ".join(self.dropped_column_name_list)
-                raise OSCError("MISSING_COLUMN", {"column": missing_columns})
+                raise OSCError(
+                    OSCError.Errors.MISSING_COLUMN, {"column": missing_columns}
+                )
             # We don't allow dropping columns from current primary key
             for col in self._pk_for_filter:
                 if col in self.dropped_column_name_list:
-                    raise OSCError("PRI_COL_DROPPED", {"pri_col": col})
+                    raise OSCError(OSCError.Errors.PRI_COL_DROPPED, {"pri_col": col})
 
     def add_drop_table_entry(self, table_name):
         """
@@ -1531,7 +1545,7 @@ class CopyPayload(Payload):
                         idx.using = None
             if obj_after != self._new_table:
                 raise OSCError(
-                    "IMPLICIT_CONVERSION_DETECTED",
+                    OSCError.Errors.IMPLICIT_CONVERSION_DETECTED,
                     {"diff": str(SchemaDiff(self._new_table, obj_after))},
                 )
 
@@ -1653,7 +1667,7 @@ class CopyPayload(Payload):
                 return True
         else:
             raise OSCError(
-                "LONG_RUNNING_TRX",
+                OSCError.Errors.LONG_RUNNING_TRX,
                 {
                     "pid": slow_query.get("Id", 0),
                     "user": slow_query.get("User", ""),
@@ -1768,7 +1782,7 @@ class CopyPayload(Payload):
             "Hit max attempts: {}, but the threads running still don't drop"
             "below: {}.".format(self.ddl_guard_attempts, self.max_running_before_ddl)
         )
-        raise OSCError("DDL_GUARD_ATTEMPTS")
+        raise OSCError(OSCError.Errors.DDL_GUARD_ATTEMPTS)
 
     @wrap_hook
     def lock_tables(self, tables):
@@ -1810,7 +1824,9 @@ class CopyPayload(Payload):
 
         else:
             # Cannot lock write after max lock attempts
-            raise OSCError("FAILED_TO_LOCK_TABLE", {"tables": ", ".join(tables)})
+            raise OSCError(
+                OSCError.Errors.FAILED_TO_LOCK_TABLE, {"tables": ", ".join(tables)}
+            )
 
     def unlock_tables(self):
         self.execute_sql(sql.unlock_tables)
@@ -1837,7 +1853,7 @@ class CopyPayload(Payload):
                 self.unlock_tables()
             self.start_slave_sql()
             log.error("Failed to execute sql for creating triggers")
-            raise OSCError("CREATE_TRIGGER_ERROR", {"msg": str(e)})
+            raise OSCError(OSCError.Errors.CREATE_TRIGGER_ERROR, {"msg": str(e)})
 
         if not self.is_high_pri_ddl_supported:
             self.unlock_tables()
@@ -1956,7 +1972,7 @@ class CopyPayload(Payload):
             errnum, errmsg = e.args
             # 1086: File exists
             if errnum == 1086:
-                raise OSCError("FILE_ALREADY_EXIST", {"file": outfile})
+                raise OSCError(OSCError.Errors.FILE_ALREADY_EXIST, {"file": outfile})
             else:
                 raise
         self.stats["time_in_dump"] = time.time() - stage_start_time
@@ -1987,7 +2003,7 @@ class CopyPayload(Payload):
             errnum, errmsg = e.args
             # 1086: File exists
             if errnum == 1086:
-                raise OSCError("FILE_ALREADY_EXIST", {"file": outfile})
+                raise OSCError(OSCError.Errors.FILE_ALREADY_EXIST, {"file": outfile})
             else:
                 raise
 
@@ -2035,7 +2051,7 @@ class CopyPayload(Payload):
         result = self.query(dump_sql)
         if not result:
             raise OSCError(
-                "OSC_INTERNAL_ERROR",
+                OSCError.Errors.OSC_INTERNAL_ERROR,
                 {"msg": "Missing result from DUMP TABLE statement."},
             )
 
@@ -2242,7 +2258,9 @@ class CopyPayload(Payload):
         except MySQLdb.OperationalError as e:
             errnum, errmsg = e.args
             if errnum == mysql_errors.DA_BULK_LOAD:
-                raise OSCError("NEW_BULK_LOAD_EXCEPTION", {"errmsg": errmsg}) from e
+                raise OSCError(
+                    OSCError.Errors.NEW_BULK_LOAD_EXCEPTION, {"errmsg": errmsg}
+                ) from e
             else:
                 raise
 
@@ -2256,7 +2274,9 @@ class CopyPayload(Payload):
         except MySQLdb.OperationalError as e:
             errnum, errmsg = e.args
             if errnum == mysql_errors.DA_BULK_LOAD:
-                raise OSCError("NEW_BULK_LOAD_EXCEPTION", {"errmsg": errmsg}) from e
+                raise OSCError(
+                    OSCError.Errors.NEW_BULK_LOAD_EXCEPTION, {"errmsg": errmsg}
+                ) from e
             else:
                 raise
 
@@ -2348,7 +2368,7 @@ class CopyPayload(Payload):
             # column in old table which MySQL doesn't support. Something is
             # totally wrong if we get to this point
             raise OSCError(
-                "OSC_INTERNAL_ERROR",
+                OSCError.Errors.OSC_INTERNAL_ERROR,
                 {
                     "msg": "Unexpected scenario. Both _pk_for_filter "
                     "and old_non_pk_column_list are empty"
@@ -2466,7 +2486,9 @@ class CopyPayload(Payload):
                         self.max_id_now,
                     ),
                 )
-                raise OSCError("REPLAY_WRONG_AFFECTED", {"num": affected_row})
+                raise OSCError(
+                    OSCError.Errors.REPLAY_WRONG_AFFECTED, {"num": affected_row}
+                )
 
     @wrap_hook
     def replay_insert_row(self, sql, last_id, *ids):
@@ -2485,7 +2507,9 @@ class CopyPayload(Payload):
             and not self.skip_affected_rows_check
         ):
             if not affected_row != 0:
-                raise OSCError("REPLAY_WRONG_AFFECTED", {"num": affected_row})
+                raise OSCError(
+                    OSCError.Errors.REPLAY_WRONG_AFFECTED, {"num": affected_row}
+                )
 
     @wrap_hook
     def replay_update_row(self, sql, last_id, *ids):
@@ -2644,7 +2668,7 @@ class CopyPayload(Payload):
         log.info("max_id_now is %r / %r", max_id_now, self.replay_max_changes)
         if max_id_now > self.replay_max_changes:
             raise OSCError(
-                "REPLAY_TOO_MANY_DELTAS",
+                OSCError.Errors.REPLAY_TOO_MANY_DELTAS,
                 {"deltas": max_id_now, "max_deltas": self.replay_max_changes},
             )
 
@@ -2710,7 +2734,7 @@ class CopyPayload(Payload):
                 and not self.bypass_replay_timeout
                 and time.time() - time_start > self.replay_timeout
             ):
-                raise OSCError("REPLAY_TIMEOUT")
+                raise OSCError(OSCError.Errors.REPLAY_TIMEOUT)
             replayed_total += len(ids)
             # Commit transaction after every replay_batch_size number of
             # changes have been replayed
@@ -2734,7 +2758,9 @@ class CopyPayload(Payload):
             else:
                 # We are not supposed to reach here, unless someone explicitly
                 # insert a row with unknown type into _chg table during OSC
-                raise OSCError("UNKOWN_REPLAY_TYPE", {"type_value": chg_type})
+                raise OSCError(
+                    OSCError.Errors.UNKOWN_REPLAY_TYPE, {"type_value": chg_type}
+                )
             # Print progress information after every 10% changes have been
             # replayed. If there're no more than 100 changes to replay then
             # there'll be no such progress information
@@ -3091,7 +3117,7 @@ class CopyPayload(Payload):
                 log.info("OLD: {}".format(str(old_checksum)))
                 log.info("NEW: {}".format(str(new_checksum)))
                 self.dump_current_chunk(use_where)
-                raise OSCError("CHECKSUM_MISMATCH")
+                raise OSCError(OSCError.Errors.CHECKSUM_MISMATCH)
 
             # Refresh where condition range for next select
             if affected_rows:
@@ -3410,7 +3436,10 @@ class CopyPayload(Payload):
         else:
             # We are not able to bring the replay time down to replay_timeout
             if not self.bypass_replay_timeout:
-                raise OSCError("MAX_ATTEMPT_EXCEEDED", {"timeout": self.replay_timeout})
+                raise OSCError(
+                    OSCError.Errors.MAX_ATTEMPT_EXCEEDED,
+                    {"timeout": self.replay_timeout},
+                )
             else:
                 log.warning(
                     "Proceed after max replay attempts exceeded. "
@@ -3826,7 +3855,7 @@ class CopyPayload(Payload):
             if not self.keep_tmp_table:
                 self.cleanup()
             raise OSCError(
-                "GENERIC_MYSQL_ERROR",
+                OSCError.Errors.GENERIC_MYSQL_ERROR,
                 {
                     "stage": "running DDL on db '{}'".format(db),
                     "errnum": errnum,
@@ -3845,6 +3874,6 @@ class CopyPayload(Payload):
                 self.cleanup()
             if not isinstance(e, OSCError):
                 # It's a python exception
-                raise OSCError("OSC_INTERNAL_ERROR", {"msg": str(e)})
+                raise OSCError(OSCError.Errors.OSC_INTERNAL_ERROR, {"msg": str(e)})
             else:
                 raise

@@ -131,7 +131,7 @@ class SQLHook(HookBase):
             result = self._dbh.query_array(self._sqls[0])
             if len(result) != len(self._expected_lines):
                 raise OSCError(
-                    "ASSERTION_ERROR",
+                    OSCError.Errors.ASSERTION_ERROR,
                     {
                         "expected": "{} lines of result set".format(
                             len(self._expected_lines)
@@ -144,7 +144,8 @@ class SQLHook(HookBase):
                 got_line = "\t".join([str(col) for col in result[idx]])
                 if got_line != expected_row:
                     raise OSCError(
-                        "ASSERTION_ERROR", {"expected": expected_row, "got": got_line}
+                        OSCError.Errors.ASSERTION_ERROR,
+                        {"expected": expected_row, "got": got_line},
                     )
         else:
             for sql in self._sqls:

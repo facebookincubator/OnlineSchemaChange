@@ -437,7 +437,9 @@ class CopyPayloadTestCase(unittest.TestCase):
         self.assertEqual(
             len(payload._cleanup_payload.files_to_clean), payload.outfile_suffix_end
         )
-        self.assertEqual(err_context.exception.err_key, "GENERIC_MYSQL_ERROR")
+        self.assertEqual(
+            err_context.exception.err_key, OSCError.Errors.GENERIC_MYSQL_ERROR
+        )
 
         # If we are skipping cleanup, then there's nothing to cleanup
         payload.skip_cleanup_after_kill = True
@@ -449,7 +451,9 @@ class CopyPayloadTestCase(unittest.TestCase):
         # There should be no cleanup entry at all if we skip the table cleanup
         self.assertEqual(payload._cleanup_payload.to_drop, [])
         self.assertEqual(len(payload._cleanup_payload.files_to_clean), 0)
-        self.assertEqual(err_context.exception.err_key, "GENERIC_MYSQL_ERROR")
+        self.assertEqual(
+            err_context.exception.err_key, OSCError.Errors.GENERIC_MYSQL_ERROR
+        )
 
     def test_get_bulk_load_parameters(self):
         payload = CopyPayload()
@@ -527,14 +531,18 @@ class CopyPayloadTestCase(unittest.TestCase):
                 side_effect=MySQLdb.OperationalError(1086, "abc")
             )
             payload.select_full_table_into_outfile()
-        self.assertEqual(err_context.exception.err_key, "FILE_ALREADY_EXIST")
+        self.assertEqual(
+            err_context.exception.err_key, OSCError.Errors.FILE_ALREADY_EXIST
+        )
 
         with self.assertRaises(OSCError) as err_context:
             payload.execute_sql = Mock(
                 side_effect=MySQLdb.OperationalError(1086, "abc")
             )
             payload.select_chunk_into_outfile(False)
-        self.assertEqual(err_context.exception.err_key, "FILE_ALREADY_EXIST")
+        self.assertEqual(
+            err_context.exception.err_key, OSCError.Errors.FILE_ALREADY_EXIST
+        )
 
         # Any mysql error other than 1086 should surface
         with self.assertRaises(MySQLdb.OperationalError) as err_context:
@@ -913,7 +921,9 @@ class CopyPayloadTestCase(unittest.TestCase):
         overrides_str = "var1=v;var2="
         with self.assertRaises(OSCError) as err_context:
             payload.parse_session_overrides_str(overrides_str)
-        self.assertEqual(err_context.exception.err_key, "INCORRECT_SESSION_OVERRIDE")
+        self.assertEqual(
+            err_context.exception.err_key, OSCError.Errors.INCORRECT_SESSION_OVERRIDE
+        )
 
     def test_execute_sql_not_called_for_empty_overrides(self):
         # we shouldn't execute any sql if there's no session overrides
@@ -931,7 +941,9 @@ class CopyPayloadTestCase(unittest.TestCase):
         row = {payload.IDCOLNAME: 1}
         with self.assertRaises(OSCError) as err_context:
             payload.replay_insert_row(row, 1)
-        self.assertEqual(err_context.exception.err_key, "REPLAY_WRONG_AFFECTED")
+        self.assertEqual(
+            err_context.exception.err_key, OSCError.Errors.REPLAY_WRONG_AFFECTED
+        )
 
     def test_skip_affected_rows_check(self):
         # No exception should be raised if we skip affected_rows check and 0
@@ -1141,7 +1153,9 @@ class CopyPayloadTestCase(unittest.TestCase):
         )
         with self.assertRaises(OSCError) as err_context:
             payload.wait_until_slow_query_finish()
-        self.assertEqual(err_context.exception.err_key, "LONG_RUNNING_TRX")
+        self.assertEqual(
+            err_context.exception.err_key, OSCError.Errors.LONG_RUNNING_TRX
+        )
 
     def test_auto_table_collation_population(self):
         payload = self.payload_setup()
@@ -1278,11 +1292,15 @@ class CopyPayloadTestCase(unittest.TestCase):
         payload.execute_sql = Mock(side_effect=MySQLdb.OperationalError(50142, "abc"))
         with self.assertRaises(OSCError) as err_context:
             payload.start_rocksdb_new_bulk_load()
-        self.assertEqual(err_context.exception.err_key, "NEW_BULK_LOAD_EXCEPTION")
+        self.assertEqual(
+            err_context.exception.err_key, OSCError.Errors.NEW_BULK_LOAD_EXCEPTION
+        )
 
         with self.assertRaises(OSCError) as err_context:
             payload.finish_rocksdb_new_bulk_load()
-        self.assertEqual(err_context.exception.err_key, "NEW_BULK_LOAD_EXCEPTION")
+        self.assertEqual(
+            err_context.exception.err_key, OSCError.Errors.NEW_BULK_LOAD_EXCEPTION
+        )
 
         payload.execute_sql = Mock(side_effect=MySQLdb.OperationalError(111, "abc"))
         with self.assertRaises(MySQLdb.OperationalError) as err_context:

@@ -23,12 +23,16 @@ class BasePayloadTestCase(unittest.TestCase):
         with self.assertRaises(OSCError) as err_context:
             payload.query = Mock(return_value=None)
             payload.get_osc_lock()
-        self.assertEqual(err_context.exception.err_key, "UNABLE_TO_GET_LOCK")
+        self.assertEqual(
+            err_context.exception.err_key, OSCError.Errors.UNABLE_TO_GET_LOCK
+        )
 
         with self.assertRaises(OSCError) as err_context:
             payload.query = Mock(return_value=[{"lockstatus": 0}])
             payload.get_osc_lock()
-        self.assertEqual(err_context.exception.err_key, "UNABLE_TO_GET_LOCK")
+        self.assertEqual(
+            err_context.exception.err_key, OSCError.Errors.UNABLE_TO_GET_LOCK
+        )
 
     def test_successfully_get_name_lock(self):
         payload = Payload()
