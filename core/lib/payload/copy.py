@@ -101,90 +101,104 @@ class CopyPayload(Payload):
         self.under_transaction = False
         self.checksum_required_for_replay = False
 
-        self.repl_status = kwargs.get("repl_status", "")
-        self.outfile_dir = kwargs.get("outfile_dir", "")
+        self.repl_status: str = kwargs.get("repl_status", "")
+        self.outfile_dir: str = kwargs.get("outfile_dir", "")
         # By specify this option we are allowed to open a long transaction
         # during full table dump and full table checksum
-        self.allow_new_pk = kwargs.get("allow_new_pk", False)
-        self.allow_drop_column = kwargs.get("allow_drop_column", False)
-        self.detailed_mismatch_info = kwargs.get("detailed_mismatch_info", False)
-        self.dump_after_checksum = kwargs.get("dump_after_checksum", False)
+        self.allow_new_pk: bool = kwargs.get("allow_new_pk", False)
+        self.allow_drop_column: bool = kwargs.get("allow_drop_column", False)
+        self.detailed_mismatch_info: bool = kwargs.get("detailed_mismatch_info", False)
+        self.dump_after_checksum: bool = kwargs.get("dump_after_checksum", False)
         # Whether to ignore unique key violations and silently drop such rows.
         # This implies checksum will be skipped, since it cannot match.
         self.eliminate_dups: bool = kwargs.get("eliminate_dups", False)
-        self.rm_partition = kwargs.get("rm_partition", False)
-        self.force_cleanup = kwargs.get("force_cleanup", False)
-        self.skip_cleanup_after_kill = kwargs.get("skip_cleanup_after_kill", False)
-        self.pre_load_statement = kwargs.get("pre_load_statement", "")
-        self.post_load_statement = kwargs.get("post_load_statement", "")
-        self.replay_max_attempt = kwargs.get(
+        self.rm_partition: bool = kwargs.get("rm_partition", False)
+        self.force_cleanup: bool = kwargs.get("force_cleanup", False)
+        self.skip_cleanup_after_kill: bool = kwargs.get(
+            "skip_cleanup_after_kill", False
+        )
+
+        # TODO: are these used?
+        self.pre_load_statement: str = kwargs.get("pre_load_statement", "")
+        self.post_load_statement: str = kwargs.get("post_load_statement", "")
+
+        self.replay_max_attempt: int = kwargs.get(
             "replay_max_attempt", constant.DEFAULT_REPLAY_ATTEMPT
         )
-        self.replay_timeout = kwargs.get(
+        self.replay_timeout: int = kwargs.get(
             "replay_timeout", constant.REPLAY_DEFAULT_TIMEOUT
         )
-        self.replay_batch_size = kwargs.get(
+        self.replay_batch_size: int = kwargs.get(
             "replay_batch_size", constant.DEFAULT_BATCH_SIZE
         )
-        self.replay_group_size = kwargs.get(
+        self.replay_group_size: int = kwargs.get(
             "replay_group_size", constant.DEFAULT_REPLAY_GROUP_SIZE
         )
-        self.skip_pk_coverage_check = kwargs.get("skip_pk_coverage_check", False)
-        self.pk_coverage_size_threshold = kwargs.get(
+        self.skip_pk_coverage_check: bool = kwargs.get("skip_pk_coverage_check", False)
+        self.pk_coverage_size_threshold: int = kwargs.get(
             "pk_coverage_size_threshold", constant.PK_COVERAGE_SIZE_THRESHOLD
         )
-        self.skip_long_trx_check = kwargs.get("skip_long_trx_check", False)
-        self.ddl_file_list = kwargs.get("ddl_file_list", "")
-        self.free_space_reserved_percent = kwargs.get(
+        self.skip_long_trx_check: bool = kwargs.get("skip_long_trx_check", False)
+
+        # TODO: Is this actually needed here?
+        self.ddl_file_list: str = kwargs.get("ddl_file_list", "")
+
+        self.free_space_reserved_percent: int = kwargs.get(
             "free_space_reserved_percent", constant.DEFAULT_RESERVED_SPACE_PERCENT
         )
-        self.long_trx_time = kwargs.get("long_trx_time", constant.LONG_TRX_TIME)
-        self.max_running_before_ddl = kwargs.get(
+        self.long_trx_time: int = kwargs.get("long_trx_time", constant.LONG_TRX_TIME)
+        self.max_running_before_ddl: int = kwargs.get(
             "max_running_before_ddl", constant.MAX_RUNNING_BEFORE_DDL
         )
-        self.ddl_guard_attempts = kwargs.get(
+        self.ddl_guard_attempts: int = kwargs.get(
             "ddl_guard_attempts", constant.DDL_GUARD_ATTEMPTS
         )
-        self.lock_max_attempts = kwargs.get(
+        self.lock_max_attempts: int = kwargs.get(
             "lock_max_attempts", constant.LOCK_MAX_ATTEMPTS
         )
-        self.lock_max_wait_before_kill_seconds = kwargs.get(
+        self.lock_max_wait_before_kill_seconds: float = kwargs.get(
             "lock_max_wait_before_kill_seconds",
             constant.LOCK_MAX_WAIT_BEFORE_KILL_SECONDS,
         )
-        self.session_timeout = kwargs.get(
+        self.session_timeout: int = kwargs.get(
             "mysql_session_timeout", constant.SESSION_TIMEOUT
         )
-        self.idx_recreation = kwargs.get("idx_recreation", False)
-        self.rocksdb_bulk_load_allow_sk = kwargs.get(
+        self.idx_recreation: bool = kwargs.get("idx_recreation", False)
+        self.rocksdb_bulk_load_allow_sk: bool = kwargs.get(
             "rocksdb_bulk_load_allow_sk", False
         )
-        self.unblock_table_creation_without_pk = kwargs.get(
+        self.unblock_table_creation_without_pk: bool = kwargs.get(
             "unblock_table_creation_without_pk", False
         )
-        self.rebuild = kwargs.get("rebuild", False)
-        self.keep_tmp_table = kwargs.get("keep_tmp_table_after_exception", False)
-        self.skip_checksum = kwargs.get("skip_checksum", False)
-        self.skip_checksum_for_modified = kwargs.get(
+        self.rebuild: bool = kwargs.get("rebuild", False)
+        self.keep_tmp_table: bool = kwargs.get("keep_tmp_table_after_exception", False)
+        self.skip_checksum: bool = kwargs.get("skip_checksum", False)
+        self.skip_checksum_for_modified: bool = kwargs.get(
             "skip_checksum_for_modified", False
         )
-        self.skip_delta_checksum = kwargs.get("skip_delta_checksum", False)
+        self.skip_delta_checksum: bool = kwargs.get("skip_delta_checksum", False)
+
         # Whether to use the server-native CHECKSUM TABLE statement.
         self.use_checksum_statement: bool = kwargs.get("use_checksum_statement", False)
-        self.skip_named_lock = kwargs.get("skip_named_lock", False)
-        self.skip_affected_rows_check = kwargs.get("skip_affected_rows_check", False)
+        self.skip_named_lock: bool = kwargs.get("skip_named_lock", False)
+        self.skip_affected_rows_check: bool = kwargs.get(
+            "skip_affected_rows_check", False
+        )
+
         # Debugging only
         self.skip_chunk_cleanup = False
-        self.where = kwargs.get("where", None)
-        self.session_overrides_str = kwargs.get("session_overrides", "")
-        self.fail_for_implicit_conv = kwargs.get("fail_for_implicit_conv", False)
-        self.max_wait_for_slow_query = kwargs.get(
+        self.where: str | None = kwargs.get("where", None)
+        self.session_overrides_str: str = kwargs.get("session_overrides", "")
+        self.fail_for_implicit_conv: bool = kwargs.get("fail_for_implicit_conv", False)
+        self.max_wait_for_slow_query: int = kwargs.get(
             "max_wait_for_slow_query", constant.MAX_WAIT_FOR_SLOW_QUERY
         )
-        self.max_replay_batch_size = kwargs.get(
+        self.max_replay_batch_size: int = kwargs.get(
             "max_replay_batch_size", constant.MAX_REPLAY_BATCH_SIZE
         )
-        self.allow_unsafe_ts_bootstrap = kwargs.get("allow_unsafe_ts_bootstrap", False)
+        self.allow_unsafe_ts_bootstrap: bool = kwargs.get(
+            "allow_unsafe_ts_bootstrap", False
+        )
         self.is_full_table_dump = False
 
         # Whether to use the server-native DUMP TABLE statement (FB-internal)
@@ -192,23 +206,23 @@ class CopyPayload(Payload):
         # If using DUMP TABLE, controls the number of worker threads.
         self.dump_threads: int = kwargs.get("dump_threads", constant.DUMP_THREADS)
 
-        self.replay_max_changes = kwargs.get(
+        self.replay_max_changes: int = kwargs.get(
             "replay_max_changes", constant.MAX_REPLAY_CHANGES
         )
 
-        self.use_sql_wsenv = kwargs.get("use_sql_wsenv", False)
+        self.use_sql_wsenv: bool = kwargs.get("use_sql_wsenv", False)
 
         # checksum can have their own chunks
-        self.checksum_chunk_size = kwargs.get(
+        self.checksum_chunk_size: int = kwargs.get(
             "chunk_size", constant.CHECKSUM_CHUNK_BYTES
         )
 
         if self.use_sql_wsenv:
             # by default, wsenv requires to use big chunk
-            self.chunk_size = kwargs.get("chunk_size", constant.WSENV_CHUNK_BYTES)
+            self.chunk_size: int = kwargs.get("chunk_size", constant.WSENV_CHUNK_BYTES)
 
             # by default, wsenv doesn't use local disk
-            self.skip_disk_space_check = kwargs.get("skip_disk_space_check", True)
+            self.skip_disk_space_check: bool = kwargs.get("skip_disk_space_check", True)
             # skip local disk space check when using wsenv
             if not self.skip_disk_space_check:
                 raise OSCError(
@@ -219,18 +233,20 @@ class CopyPayload(Payload):
             if not self.outfile_dir:
                 raise OSCError(OSCError.Errors.OUTFILE_DIR_NOT_SPECIFIED_WSENV)
         else:
-            self.chunk_size = kwargs.get("chunk_size", constant.CHUNK_BYTES)
-            self.skip_disk_space_check = kwargs.get("skip_disk_space_check", False)
+            self.chunk_size: int = kwargs.get("chunk_size", constant.CHUNK_BYTES)
+            self.skip_disk_space_check: bool = kwargs.get(
+                "skip_disk_space_check", False
+            )
 
-        self.enable_outfile_compression = kwargs.get(
+        self.enable_outfile_compression: bool = kwargs.get(
             "enable_outfile_compression", False
         )
-        self.compressed_outfile_extension = kwargs.get(
+        self.compressed_outfile_extension: str | None = kwargs.get(
             "compressed_outfile_extension", None
         )
-        self.bulk_load_session_id = kwargs.get("bulk_load_session_id", None)
+        self.bulk_load_session_id: str | None = kwargs.get("bulk_load_session_id", None)
         self.max_id_now = 0
-        self.mismatch_pk_charset = {}
+        self.mismatch_pk_charset: dict[str, str] = {}
         self.last_gc_collected = time.time()
         self.saved_table_timestamp: str = ""
         self.catchup_tool: OscCatchupTool = None

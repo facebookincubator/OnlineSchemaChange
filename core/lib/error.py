@@ -617,8 +617,12 @@ class OSCError(Exception):
     }
 
     def __init__(
-        self, err_key: Errors, desc_kwargs=None, mysql_err_code: int | None = None
+        self,
+        err_key: Errors,
+        desc_kwargs: dict[str, object] | None = None,
+        mysql_err_code: int | None = None,
     ):
+        self.desc_kwargs: dict[str, object]
         self.err_key = err_key
         if desc_kwargs:
             self.desc_kwargs = desc_kwargs
