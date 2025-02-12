@@ -11,8 +11,6 @@ LICENSE file in the root directory of this source tree.
 
 import logging
 
-import pyjk as justknobs
-
 from ..lib.error import OSCError
 from ..lib.payload.cleanup import CleanupPayload
 from .base import CommandBase
@@ -60,22 +58,6 @@ class Cleanup(CommandBase):
             non_exist_dbs = self.payload.check_db_existence()
             if non_exist_dbs:
                 raise OSCError("DB_NOT_EXIST", {"db_list": ", ".join(non_exist_dbs)})
-
-        # only if osc has given up, go ahead with cleaning up.
-        if not self.payload.kill_only and justknobs.check(
-            "dba/oscv2/co_osc:allow_co_osc_resumption"
-        ):
-            tables = self.payload.fetch_all_tables()
-            if (
-                "__osc_checkpoints" in tables
-                and "_restore_chunkinfo" not in self.payload.additional_osc_tables
-            ):
-                raise OSCError(
-                    "GENERIC_RETRYABLE_EXCEPTION",
-                    {
-                        "errmsg": "Cannot proceed with trigger cleanup since resumption is supported"
-                    },
-                )
 
     def op(self, sudo=False):
         self.payload = CleanupPayload(
